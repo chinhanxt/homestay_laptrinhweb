@@ -14,4 +14,7 @@ public class BookingCheckoutViewModel
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
     public decimal TotalPrice { get; set; }
+    public int Capacity { get; set; }
+    public int MaxGuests { get; set; }
+    public decimal ExtraGuestFee { get; set; }
 }

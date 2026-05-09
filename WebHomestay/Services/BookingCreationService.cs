@@ -39,7 +39,7 @@ public class BookingCreationService : IBookingCreationService
             SlotLabel = inventory.SlotLabel,
             StartTime = inventory.StartTime,
             EndTime = inventory.EndTime,
-            TotalPrice = inventory.Room.PricePerHour, // Hourly booking uses fixed PricePerHour per slot for simplicity in this MVP
+            TotalPrice = inventory.Room.PricePerHour + (Math.Max(0, request.GuestCount - inventory.Room.Capacity) * inventory.Room.ExtraGuestFee),
             Status = "AwaitingPayment",
             PaymentStatus = "Unpaid"
         };
@@ -74,7 +74,7 @@ public class BookingCreationService : IBookingCreationService
             BookingMode = BookingMode.Daily,
             StartTime = interval.Start,
             EndTime = interval.End,
-            TotalPrice = room.PricePerDay * nights,
+            TotalPrice = (room.PricePerDay * nights) + (Math.Max(0, request.GuestCount - room.Capacity) * room.ExtraGuestFee),
             Status = "AwaitingPayment",
             PaymentStatus = "Unpaid"
         };

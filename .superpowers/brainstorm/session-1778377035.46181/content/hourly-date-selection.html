@@ -1,0 +1,44 @@
+<h2>Chọn ngày xa hơn - Chế độ Theo Giờ</h2>
+<p class="subtitle">Nâng cấp thanh chọn ngày để hỗ trợ linh hoạt hơn</p>
+
+<div class="section">
+  <h3>Các phương án thiết kế</h3>
+  
+  <div class="cards">
+    <!-- Option 1 -->
+    <div class="card" data-choice="calendar-icon" onclick="toggleSelect(this)">
+      <div class="card-image" style="background: #f1f5f9; padding: 20px; display: flex; align-items: center; justify-content: center;">
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <div class="luxury-date-chip" style="padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 60px; text-align: center; opacity: 0.5;">10/05</div>
+          <div class="luxury-date-chip" style="padding: 10px; border: 2px solid var(--luxury-accent); border-radius: 8px; width: 60px; text-align: center; background: #fff;">11/05</div>
+          <div style="font-size: 24px; color: var(--luxury-accent);">📅</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <h3>Biểu tượng Lịch ở cuối thanh</h3>
+        <p>Thêm một nút biểu tượng lịch ở cuối thanh chọn ngày hiện tại. Nhấn vào sẽ mở một mini-calendar để chọn ngày bất kỳ.</p>
+      </div>
+    </div>
+
+    <!-- Option 2 -->
+    <div class="card" data-choice="manual-input-box" onclick="toggleSelect(this)">
+      <div class="card-image" style="background: #f1f5f9; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+        <div class="mockup-header" style="font-size: 0.7rem;">CHỌN NGÀY KHÁC</div>
+        <input type="date" style="border: 1px solid #ddd; padding: 5px; border-radius: 4px; width: 150px;">
+      </div>
+      <div class="card-body">
+        <h3>Ô nhập ngày chuyên biệt</h3>
+        <p>Thêm một khu vực "Chọn ngày xa hơn" riêng biệt phía trên thanh chọn ngày (giống như bên chế độ Theo Ngày).</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Câu hỏi làm rõ:</h3>
+  <p>Khi chọn một ngày ở rất xa (ví dụ 1 tháng sau), bạn muốn thanh chọn ngày (Date Chips) hiển thị như thế nào?</p>
+  <ul>
+    <li><strong>Cách 1:</strong> Thanh ngang sẽ nhảy đến dải ngày xung quanh ngày mới chọn.</li>
+    <li><strong>Cách 2:</strong> Thanh ngang vẫn giữ dải ngày cũ, nhưng ngày mới chọn sẽ được hiển thị như một "ngoại lệ" ở đâu đó.</li>
+  </ul>
+</div>

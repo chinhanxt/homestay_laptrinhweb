@@ -1,0 +1,63 @@
+<h2>Thiết kế thanh chọn ngày "Premium"</h2>
+<p class="subtitle">Nâng cấp thẩm mỹ cho chế độ đặt theo giờ</p>
+
+<div class="section">
+  <h3>Bản phác thảo giao diện mới</h3>
+  <div class="mockup">
+    <div class="mockup-header">MODE THEO GIỜ - LUXURY VIEW</div>
+    <div class="mockup-body" style="background: #fff; padding: 40px 20px; display: flex; flex-direction: column; gap: 30px;">
+      
+      <!-- Manual Picker (Option 2) -->
+      <div style="background: #fafafa; border: 1px solid #f1f5f9; padding: 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <div class="label" style="margin-bottom: 0;">CHỌN NGÀY XA HƠN</div>
+        <input type="date" value="2026-05-10" style="border: none; background: transparent; font-family: inherit; font-weight: 600; color: var(--luxury-accent); font-size: 1.1rem; outline: none; cursor: pointer;">
+      </div>
+
+      <!-- Enhanced Date Bar -->
+      <div class="lux-date-bar-container" style="position: relative; padding: 10px 0;">
+        <!-- Gradient overlay for scroll effect -->
+        <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 40px; background: linear-gradient(to right, #fff, transparent); z-index: 2;"></div>
+        <div style="position: absolute; right: 0; top: 0; bottom: 0; width: 40px; background: linear-gradient(to left, #fff, transparent); z-index: 2;"></div>
+        
+        <div style="display: flex; gap: 15px; overflow-x: auto; padding: 10px 5px; scrollbar-width: none;">
+          <!-- Chip 1 (Past/Inactive) -->
+          <div style="min-width: 70px; height: 90px; border: 1px solid #eee; border-radius: 15px; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0.4;">
+            <div class="label" style="font-size: 0.6rem; margin-bottom: 5px;">TH 7</div>
+            <strong style="font-size: 1.2rem;">09</strong>
+          </div>
+          
+          <!-- Chip 2 (Active - The "Beautiful" part) -->
+          <div style="min-width: 80px; height: 100px; background: #fff; border: none; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(184, 146, 94, 0.2); transform: scale(1.1); border: 1px solid rgba(184, 146, 94, 0.3); position: relative;">
+            <div style="position: absolute; top: 8px; width: 4px; height: 4px; background: var(--luxury-accent); border-radius: 50%;"></div>
+            <div class="label" style="font-size: 0.65rem; color: var(--luxury-accent); font-weight: 700; margin-bottom: 5px;">CN</div>
+            <strong style="font-size: 1.4rem; color: var(--luxury-accent);">10</strong>
+            <div style="font-size: 0.6rem; color: #999; margin-top: 2px;">HÔM NAY</div>
+          </div>
+
+          <!-- Chip 3 -->
+          <div style="min-width: 70px; height: 90px; border: 1px solid #eee; border-radius: 15px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fafafa;">
+            <div class="label" style="font-size: 0.6rem; margin-bottom: 5px;">TH 2</div>
+            <strong style="font-size: 1.2rem;">11</strong>
+          </div>
+
+          <!-- Chip 4 -->
+          <div style="min-width: 70px; height: 90px; border: 1px solid #eee; border-radius: 15px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <div class="label" style="font-size: 0.6rem; margin-bottom: 5px;">TH 3</div>
+            <strong style="font-size: 1.2rem;">12</strong>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="modern-clean" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Thiết kế Hiện đại & Sạch (Modern Clean)</h3>
+      <p>Sử dụng các khối bo góc lớn, đổ bóng nhẹ nhàng và tập trung vào Typography.</p>
+    </div>
+  </div>
+</div>

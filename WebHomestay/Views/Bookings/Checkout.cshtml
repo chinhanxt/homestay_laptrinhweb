@@ -31,24 +31,39 @@
                         <div class="lux-form-group">
                             <label class="lux-label">Họ và tên khách hàng</label>
                             <input name="CustomerName" class="lux-input" placeholder="Ví dụ: Nguyễn Văn A" required />
+                            <span class="text-danger small error-msg" id="err-CustomerName"></span>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="lux-form-group">
                             <label class="lux-label">Số Zalo liên hệ</label>
                             <input name="CustomerPhone" class="lux-input" placeholder="090x xxx xxx" required />
+                            <span class="text-danger small error-msg" id="err-CustomerPhone"></span>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="lux-form-group">
                             <label class="lux-label">Địa chỉ Email</label>
                             <input name="CustomerEmail" class="lux-input" type="email" placeholder="email@example.com" required />
+                            <span class="text-danger small error-msg" id="err-CustomerEmail"></span>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="lux-form-group">
                             <label class="lux-label">Số lượng khách</label>
-                            <input name="GuestCount" class="lux-input" type="number" min="1" max="@Model.Room.MaxGuests" value="1" />
+                            <input name="GuestCount" class="lux-input" type="number" min="1" max="@Model.Capacity" value="1" />
+                            <span class="text-danger small error-msg" id="err-GuestCount"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-12">
+                        <div class="p-3 border rounded bg-light-gold" style="background-color: #fffaf5; border: 1px solid #e29b6144 !important;">
+                            <div class="form-check d-flex align-items-center">
+                                <input class="form-check-input" type="checkbox" id="extraGuestCheck" style="width: 22px; height: 22px; cursor: pointer; border-color: var(--luxury-accent);">
+                                <label class="form-check-label ms-3 fw-bold" for="extraGuestCheck" style="cursor: pointer; font-family: var(--luxury-font-heading);">
+                                    Tôi muốn thêm người ở (có phụ phí)
+                                    <span class="d-block small text-muted fw-normal">Phí khách thêm: @Model.ExtraGuestFee.ToString("N0")đ/người</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -148,9 +163,19 @@
                     </div>
 
                     <div class="mt-5 pt-4 border-top">
+                        <div id="priceBreakdown" class="mb-3" style="display: none;">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="small text-muted">Tiền phòng:</span>
+                                <span class="small fw-bold" id="basePriceDisplay">@Model.TotalPrice.ToString("N0")đ</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="small text-muted">Phí khách thêm:</span>
+                                <span class="small fw-bold text-accent" id="extraFeeDisplay">+0đ</span>
+                            </div>
+                        </div>
                         <div class="d-flex justify-content-between align-items-center">
                             <span class="fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.1em;">Tổng cộng</span>
-                            <span class="fs-4 fw-bold" style="color: var(--luxury-accent);">@Model.TotalPrice.ToString("N0")đ</span>
+                            <span class="fs-4 fw-bold" style="color: var(--luxury-accent);" id="finalTotalPrice">@Model.TotalPrice.ToString("N0")đ</span>
                         </div>
                     </div>
                 </div>
@@ -183,5 +208,134 @@
                 reader.readAsDataURL(input.files[0]);
             }
         }
+
+        jQuery(function($) {
+            console.log("Extra Guest Logic Initializing...");
+            
+            const $extraGuestCheck = $('#extraGuestCheck');
+            const $guestInput = $('input[name="GuestCount"]');
+            const $priceBreakdown = $('#priceBreakdown');
+            const $extraFeeDisplay = $('#extraFeeDisplay');
+            const $finalTotalPrice = $('#finalTotalPrice');
+            
+            const config = {
+                capacity: parseInt('@Model.Capacity') || 0,
+                maxGuests: parseInt('@Model.MaxGuests') || 0,
+                extraFee: parseInt('@Model.ExtraGuestFee') || 0,
+                basePrice: parseInt('@Model.TotalPrice') || 0
+            };
+
+            console.log("Config loaded:", config);
+
+            // Initialize limits
+            function updateLimitsAndPrice() {
+                const isChecked = $extraGuestCheck.is(':checked');
+                const currentVal = parseInt($guestInput.val()) || 0;
+                const $err = $('#err-GuestCount');
+
+                if (!isChecked) {
+                    $guestInput.attr('max', config.capacity);
+                    if (currentVal > config.capacity) {
+                        $err.text('Vui lòng tích chọn "Thêm người ở" để đặt cho ' + (config.capacity + 1) + ' người trở lên.');
+                        $guestInput.css('border-bottom', '2px solid #dc3545');
+                    } else {
+                        $err.text('');
+                        $guestInput.css('border-bottom', '1px solid var(--luxury-accent)');
+                    }
+                } else {
+                    $guestInput.attr('max', config.maxGuests);
+                    if (currentVal > config.maxGuests) {
+                        $err.text('Phòng này tối đa chỉ ở được ' + config.maxGuests + ' người.');
+                        $guestInput.css('border-bottom', '2px solid #dc3545');
+                    } else {
+                        $err.text('');
+                        $guestInput.css('border-bottom', '1px solid var(--luxury-accent)');
+                    }
+                }
+                
+                // Calculate Price
+                let extraGuestsCount = 0;
+                if (isChecked && currentVal > config.capacity) {
+                    // Chỉ tính tiền cho số người thêm trong giới hạn cho phép
+                    const validGuestCount = Math.min(currentVal, config.maxGuests);
+                    extraGuestsCount = validGuestCount - config.capacity;
+                }
+
+                const totalExtraFee = extraGuestsCount * config.extraFee;
+                const total = config.basePrice + totalExtraFee;
+
+                if (totalExtraFee > 0) {
+                    $priceBreakdown.show();
+                    $extraFeeDisplay.text('+' + totalExtraFee.toLocaleString('vi-VN') + 'đ');
+                } else {
+                    $priceBreakdown.hide();
+                }
+
+                $finalTotalPrice.text(total.toLocaleString('vi-VN') + 'đ');
+            }
+
+            $extraGuestCheck.on('change click', updateLimitsAndPrice);
+            $guestInput.on('input change keyup', updateLimitsAndPrice);
+
+            // Real-time Validation for other fields
+            const validationRules = {
+                CustomerName: {
+                    regex: /^.{2,}$/,
+                    msg: "Họ tên phải có ít nhất 2 ký tự."
+                },
+                CustomerPhone: {
+                    regex: /^[0-9]{10,11}$/,
+                    msg: "Số điện thoại phải là số (10-11 chữ số)."
+                },
+                CustomerEmail: {
+                    regex: /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/,
+                    msg: "Email không đúng định dạng."
+                }
+            };
+
+            $('input[name="CustomerName"], input[name="CustomerPhone"], input[name="CustomerEmail"]').on('input blur keyup', function() {
+                const name = $(this).attr('name');
+                const val = $(this).val();
+                const rule = validationRules[name];
+                const $err = $('#err-' + name);
+
+                if (!rule.regex.test(val)) {
+                    $err.text(rule.msg);
+                    $(this).css('border-bottom', '2px solid #dc3545');
+                } else {
+                    $err.text('');
+                    $(this).css('border-bottom', '1px solid var(--luxury-accent)');
+                }
+            });
+
+            // Prevent form submit if invalid
+            $('#checkoutForm').on('submit', function(e) {
+                let isValid = true;
+                
+                // Check standard fields
+                for (let key in validationRules) {
+                    const $input = $('input[name="' + key + '"]');
+                    if (!validationRules[key].regex.test($input.val())) {
+                        $('#err-' + key).text(validationRules[key].msg);
+                        $input.css('border-bottom', '2px solid #dc3545');
+                        isValid = false;
+                    }
+                }
+
+                // Check GuestCount
+                const gVal = parseInt($guestInput.val()) || 0;
+                if (!$extraGuestCheck.is(':checked') && gVal > config.capacity) {
+                    isValid = false;
+                }
+
+                if (!isValid) {
+                    e.preventDefault();
+                    alert('Vui lòng kiểm tra lại các thông tin màu đỏ.');
+                }
+            });
+
+            // Initial run
+            updateLimitsAndPrice();
+        });
     </script>
 }

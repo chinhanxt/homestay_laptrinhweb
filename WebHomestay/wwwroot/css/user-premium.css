@@ -309,25 +309,6 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
-.luxury-date-chip {
-    min-width: 70px;
-    padding: 12px 8px;
-    text-align: center;
-    border: 1px solid var(--luxury-border);
-    transition: all 0.3s;
-    background: white;
-    color: var(--luxury-text);
-}
-
-.luxury-date-chip:hover {
-    border-color: var(--luxury-accent);
-}
-
-.luxury-date-chip.active {
-    background: var(--luxury-primary);
-    border-color: var(--luxury-primary);
-    color: white;
-}
 
 .luxury-slot-grid {
     display: grid;
@@ -360,7 +341,6 @@ h1, h2, h3, h4, h5, h6 {
     color: #cbd5e1;
     border-color: #f1f5f9;
     cursor: not-allowed;
-    text-decoration: line-through;
 }
 
 .luxury-calendar-grid {
@@ -560,3 +540,256 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 700;
     text-transform: uppercase;
 }
+
+/* --- Calendar & Date Bar Enhancements --- */
+.lux-date-bar-horizontal {
+    display: flex;
+    overflow-x: auto;
+    gap: 12px;
+    padding-bottom: 15px;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;  /* IE and Edge */
+}
+
+.lux-date-bar-horizontal::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+}
+
+.lux-cal-day.blocked {
+    background: #f8fafc;
+    color: #cbd5e1;
+    cursor: not-allowed;
+    position: relative;
+    opacity: 0.9;
+    border-color: #f1f5f9 !important;
+    pointer-events: auto; /* Toast Notification System */
+}
+
+.lux-toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.lux-toast {
+    background: #ffffff;
+    border-left: 4px solid var(--luxury-accent);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    padding: 16px 20px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: toastSlideIn 0.3s ease forwards;
+    min-width: 300px;
+    pointer-events: auto;
+}
+
+.lux-toast.error {
+    border-left-color: #ef4444;
+}
+
+.lux-toast-content {
+    font-size: 0.9rem;
+    color: #333;
+    font-weight: 500;
+}
+
+@keyframes toastSlideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes toastFadeOut {
+    to { transform: translateY(-20px); opacity: 0; }
+}
+
+.lux-toast.fade-out {
+    animation: toastFadeOut 0.3s ease forwards;
+}
+
+.lux-cal-day.blocked:hover {
+    background: #f8fafc !important; /* Keep same background on hover */
+    border-color: #f1f5f9 !important;
+}
+
+.lux-cal-day.blocked .booked-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 6px;
+    font-size: 0.5rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #94a3b8;
+    letter-spacing: 0.02em;
+    background: rgba(241, 245, 249, 0.4);
+    z-index: 2;
+}
+
+.lux-cal-day.available:hover {
+    background: #fdfaf5;
+    border-color: var(--luxury-accent) !important;
+}
+
+/* --- Custom Checkbox Premium --- */
+.lux-custom-checkbox label:hover {
+    background: #fdfaf5;
+}
+
+/* --- Hourly Slot Enhancements --- */
+.luxury-slot-btn.booked {
+    background: #f8fafc !important;
+    color: #94a3b8 !important;
+    border-color: #e2e8f0 !important;
+    cursor: not-allowed;
+    opacity: 0.8;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    /* Removed pointer-events: none to allow cursor change */
+}
+
+.luxury-slot-btn.booked::after {
+    content: 'Đã đặt';
+    font-size: 0.5rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #cbd5e1;
+    display: block;
+}
+
+.lux-no-availability {
+    padding: 40px 20px;
+    border: 1px dashed #e2e8f0;
+    background: #f8fafc;
+    text-align: center;
+    border-radius: 4px;
+}
+
+.lux-no-availability i {
+    font-size: 1.5rem;
+    color: #cbd5e1;
+    margin-bottom: 12px;
+    display: block;
+}
+
+.lux-no-availability p {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: 0;
+}
+
+.text-accent {
+    color: var(--luxury-accent) !important;
+}
+
+/* Premium Hourly Date Bar */
+.lux-date-bar-wrapper { padding: 5px 0; margin-top: 10px; }
+.lux-scroll-gradient {
+    position: absolute; top: 0; bottom: 0; width: 40px; z-index: 2; pointer-events: none;
+}
+.lux-scroll-gradient.left { left: 0; background: linear-gradient(to right, var(--luxury-surface), transparent); }
+.lux-scroll-gradient.right { right: 0; background: linear-gradient(to left, var(--luxury-surface), transparent); }
+
+.lux-date-bar-horizontal { 
+    scrollbar-width: none; 
+    padding: 15px 5px; 
+    -ms-overflow-style: none;
+}
+.lux-date-bar-horizontal::-webkit-scrollbar { display: none; }
+
+.luxury-date-chip {
+    min-width: 75px; 
+    height: 95px; 
+    border: 1px solid #f1f5f9; 
+    border-radius: 18px;
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center;
+    transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+    background: #fff; 
+    cursor: pointer; 
+    flex-shrink: 0;
+    position: relative;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+}
+
+.luxury-date-chip:hover {
+    border-color: var(--luxury-accent);
+    transform: translateY(-3px);
+}
+
+.luxury-date-chip.active {
+    transform: scale(1.1);
+    box-shadow: 0 15px 35px rgba(184, 146, 94, 0.2);
+    border-color: rgba(184, 146, 94, 0.4);
+    z-index: 5;
+    background: #fff;
+}
+
+.luxury-date-chip.active .chip-day-name { color: var(--luxury-accent); font-weight: 700; }
+.luxury-date-chip.active .chip-day-num { color: var(--luxury-accent); font-size: 1.4rem; }
+
+.chip-today-label { 
+    font-size: 0.55rem; 
+    color: #999; 
+    margin-top: 4px; 
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.luxury-date-chip.active::after {
+    content: '';
+    position: absolute;
+    top: 10px;
+    width: 5px;
+    height: 5px;
+    background: var(--luxury-accent);
+    border-radius: 50%;
+}
+
+/* Scroll Arrows */
+.lux-scroll-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    background: #fff;
+    border: 1px solid var(--luxury-border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transition: all 0.3s;
+    color: var(--luxury-primary);
+}
+
+.lux-scroll-btn:hover {
+    background: var(--luxury-accent);
+    color: #fff;
+    border-color: var(--luxury-accent);
+}
+
+.lux-scroll-btn.left { left: -10px; }
+.lux-scroll-btn.right { right: -10px; }

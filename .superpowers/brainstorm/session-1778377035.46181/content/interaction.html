@@ -1,0 +1,59 @@
+<h2>Logic tương tác & Xác thực</h2>
+<p class="subtitle">Đảm bảo trải nghiệm mượt mà và ngăn chặn lỗi chọn nhầm</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">1. Chọn tay (Manual Input)</div>
+    <div class="mockup-body" style="padding: 15px;">
+      <div class="label">Input: 10/05/2026</div>
+      <div style="background: #fee2e2; border: 1px solid #ef4444; padding: 10px; border-radius: 4px; margin-top: 10px; color: #b91c1c;">
+        <strong>Cảnh báo:</strong> Ngày này đã có khách đặt. Vui lòng chọn ngày khác.
+      </div>
+      <p style="font-size: 0.8rem; color: #666; margin-top: 10px;">→ Hệ thống tự động xóa giá trị và yêu cầu chọn lại.</p>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">2. Lịch động (Dynamic Grid)</div>
+    <div class="mockup-body" style="padding: 15px;">
+      <div class="cards" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;">
+        <div style="border: 1px solid #ddd; padding: 10px; text-align: center; opacity: 0.5;">
+          <div class="label" style="font-size: 0.5rem;">Th 4</div>
+          <strong>10</strong>
+          <div style="font-size: 0.6rem; color: var(--luxury-accent);">Đã đặt</div>
+        </div>
+        <div style="border: 2px solid var(--luxury-accent); padding: 10px; text-align: center; background: #fdf2f2;">
+          <div class="label" style="font-size: 0.5rem;">Th 5</div>
+          <strong>11</strong>
+        </div>
+        <div style="border: 1px solid #ddd; padding: 10px; text-align: center;">
+          <div class="label" style="font-size: 0.5rem;">Th 6</div>
+          <strong>12</strong>
+        </div>
+      </div>
+      <p style="font-size: 0.8rem; color: #666; margin-top: 10px;">→ Dù nhảy sang tháng khác và quay lại, nhãn "Đã đặt" vẫn được bảo toàn.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Câu hỏi cho bạn:</h3>
+  <p>Bạn muốn thông báo lỗi khi chọn nhầm ngày "Đã đặt" hiển thị theo cách nào?</p>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="alert" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Dùng Alert hệ thống</h3>
+      <p>Đơn giản, khách hàng phải nhấn OK mới tiếp tục được (Giống hiện tại).</p>
+    </div>
+  </div>
+  <div class="option" data-choice="toast" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Dùng Toast Message (Gợi ý)</h3>
+      <p>Hiện thông báo nhẹ nhàng ở góc màn hình, chuyên nghiệp hơn cho giao diện Luxury.</p>
+    </div>
+  </div>
+</div>

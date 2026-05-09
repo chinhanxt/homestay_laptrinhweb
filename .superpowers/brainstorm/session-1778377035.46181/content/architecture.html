@@ -1,0 +1,53 @@
+<h2>Giải pháp đồng bộ trạng thái phòng</h2>
+<p class="subtitle">Khắc phục lỗi quên ngày đã đặt khi chuyển tháng hoặc chọn tay</p>
+
+<div class="section">
+  <h3>Kiến trúc đề xuất</h3>
+  <div class="mockup">
+    <div class="mockup-header">Luồng dữ liệu tập trung</div>
+    <div class="mockup-body">
+      <div style="display: flex; gap: 20px; align-items: center; justify-content: center; padding: 20px;">
+        <div class="card" style="width: 200px;">
+          <div class="card-body">
+            <div class="label">Server</div>
+            <strong>Dữ liệu gốc</strong>
+            <p>Lịch 30 ngày hiện tại</p>
+          </div>
+        </div>
+        <div style="font-size: 24px;">→</div>
+        <div class="card" style="width: 250px; border: 2px solid var(--luxury-accent);">
+          <div class="card-body">
+            <div class="label">JavaScript State</div>
+            <strong>Bộ nhớ đệm (Global)</strong>
+            <p>Lưu toàn bộ ngày "Đã đặt" ngay khi tải trang</p>
+          </div>
+        </div>
+        <div style="font-size: 24px;">→</div>
+        <div class="card" style="width: 200px;">
+          <div class="card-body">
+            <div class="label">UI</div>
+            <strong>Lịch động</strong>
+            <p>Luôn check bộ nhớ đệm trước khi vẽ</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="accept" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Đồng ý với kiến trúc này</h3>
+      <p>Sử dụng bộ nhớ đệm JavaScript để quản lý trạng thái phòng xuyên suốt phiên làm việc.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="discuss" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Cần thảo luận thêm</h3>
+      <p>Bạn có ý tưởng khác hoặc muốn điều chỉnh luồng dữ liệu này.</p>
+    </div>
+  </div>
+</div>

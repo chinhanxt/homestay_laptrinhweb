@@ -32,5 +32,17 @@ namespace WebHomestay.Controllers
             var model = await _roomBookingViewService.BuildAsync(room, selectedDate);
             return View(model);
         }
+
+        public async Task<IActionResult> GetHourlySlots(int id, DateOnly hourlyDate)
+        {
+            var room = await _context.Rooms
+                .Include(r => r.Branch)
+                .FirstOrDefaultAsync(m => m.Id == id);
+            
+            if (room == null) return NotFound();
+
+            var model = await _roomBookingViewService.BuildAsync(room, hourlyDate);
+            return PartialView("_HourlySlots", model);
+        }
     }
 }

@@ -1,0 +1,29 @@
+@model WebHomestay.Models.ViewModels.RoomDetailsViewModel
+
+@if (!Model.HourlyGroups.Any())
+{
+    <div class="lux-no-availability reveal-up">
+        <i class="fas fa-calendar-times"></i>
+        <p>Ngày này đã hết khung giờ trống</p>
+    </div>
+}
+
+@foreach (var group in Model.HourlyGroups)
+{
+    <div class="mb-4">
+        <div class="small fw-bold text-muted mb-3 text-uppercase" style="letter-spacing: 0.1em; font-size: 0.65rem;">@group.Title</div>
+        <div class="luxury-slot-grid">
+            @foreach (var slot in group.Slots)
+            {
+                if (slot.Status == "Available")
+                {
+                    <a asp-controller="Bookings" asp-action="CheckoutHourly" asp-route-roomId="@Model.Room.Id" asp-route-slotId="@slot.SlotId" class="luxury-slot-btn">@slot.Label</a>
+                }
+                else
+                {
+                    <span class="luxury-slot-btn booked">@slot.Label</span>
+                }
+            }
+        </div>
+    </div>
+}

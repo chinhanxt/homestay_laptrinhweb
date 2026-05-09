@@ -1,0 +1,60 @@
+<h2>Lô-gic phí khách thêm</h2>
+<p class="subtitle">Tôi cần xác nhận cách tính phí và hành vi của giao diện khi tích chọn ô "Thêm khách".</p>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">Mô phỏng form đặt phòng</div>
+    <div class="mockup-body">
+      <div style="padding: 20px; background: #fff; border: 1px solid #eee;">
+        <div style="margin-bottom: 15px;">
+          <label style="display:block; font-weight:bold; margin-bottom: 5px;">Số lượng khách</label>
+          <input type="number" value="2" style="width: 100%; padding: 10px; border: 1px solid #ccc;" disabled>
+          <small style="color: #666;">(Sức chứa tiêu chuẩn: 2, Tối đa: 4)</small>
+        </div>
+        
+        <div style="margin-bottom: 20px; padding: 10px; background: #f9f9f9; border-radius: 5px; border-left: 4px solid var(--luxury-accent, #c5a059);">
+          <label style="display: flex; align-items: center; cursor: pointer;">
+            <input type="checkbox" checked style="margin-right: 10px; width: 20px; height: 20px;">
+            <div>
+              <strong>Trả thêm phí khách (100.000đ)</strong><br>
+              <span style="font-size: 0.85rem; color: #666;">Tích chọn để tăng thêm 1 khách vượt quá tiêu chuẩn.</span>
+            </div>
+          </label>
+        </div>
+
+        <div style="border-top: 2px dashed #eee; padding-top: 15px; text-align: right;">
+          <div style="color: #666; font-size: 0.9rem;">Tiền phòng: 150.000đ</div>
+          <div style="color: #666; font-size: 0.9rem;">Phí khách thêm: +100.000đ</div>
+          <div style="font-size: 1.2rem; font-weight: bold; color: var(--luxury-accent, #c5a059); margin-top: 5px;">
+            Tổng cộng: 250.000đ
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>Chọn hành vi bạn muốn:</h3>
+<div class="options">
+  <div class="option" data-choice="one_extra" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Cố định +1 khách</h3>
+      <p>Tích vào chỉ tăng thêm đúng 1 khách và cộng phí 1 lần. Phù hợp nếu bạn chỉ muốn giới hạn tối đa 1 khách thêm qua ô tích.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="per_extra" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Tự động theo SL khách</h3>
+      <p>Khi tích vào, nếu khách tự nhập "Số lượng khách" > "Sức chứa tiêu chuẩn", hệ thống sẽ tự tính phí nhân với số người dư ra. Ô tích chỉ dùng để "Xác nhận" trả phí.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="custom" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Khác</h3>
+      <p>Vui lòng mô tả thêm ý định của bạn trong phần chat.</p>
+    </div>
+  </div>
+</div>

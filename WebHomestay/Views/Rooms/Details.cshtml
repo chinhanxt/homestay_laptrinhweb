@@ -74,43 +74,53 @@
                             <div class="fw-bold" style="color: var(--luxury-accent);">@Model.Room.PricePerHour.ToString("N0")đ/h</div>
                         </div>
 
-                        <div class="d-flex overflow-auto mb-4 pb-2 gap-2" style="scrollbar-width: none;">
-                            @foreach (var day in Model.DailyCalendar.Take(7))
-                            {
-                                <a class="luxury-date-chip @(day.Date == Model.SelectedHourlyDate ? "active" : "") text-decoration-none"
-                                   asp-action="Details" asp-route-id="@Model.Room.Id" asp-route-hourlyDate="@day.Date.ToString("yyyy-MM-dd")">
-                                    <div class="small opacity-75">@day.Date.ToString("ddd")</div>
-                                    <div class="fw-bold">@day.Date.ToString("dd/MM")</div>
-                                </a>
-                            }
-                        </div>
-                        
-                        @if (!Model.HourlyGroups.Any())
-                        {
-                            <div class="text-center py-5 border dashed bg-light opacity-50">
-                                <p class="small m-0">Lịch trình đã đầy cho ngày này.</p>
+                        <div class="hourly-date-selection-container mb-4">
+                            <!-- Manual Picker for Farther Dates -->
+                            <div class="lux-manual-range mb-4 p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                                <div class="small fw-bold text-uppercase mb-2" style="letter-spacing: 0.1em; font-size: 0.65rem; color: var(--luxury-accent);">Chọn ngày xa hơn</div>
+                                <div class="d-flex justify-content-between align-items-center bg-white p-2 rounded-2">
+                                    <span class="small text-muted fw-bold ps-2" style="font-size: 0.65rem;">NGÀY ĐẶT</span>
+                                    <input type="date" id="hourly-manual-date" class="border-0 fw-bold pe-2" 
+                                           style="color: var(--luxury-accent); outline: none; font-size: 0.85rem;"
+                                           min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                                           value="@Model.SelectedHourlyDate.ToString("yyyy-MM-dd")">
+                                </div>
                             </div>
-                        }
+                            
+                            <!-- Premium Horizontal Date Bar -->
+                            <div class="small fw-bold text-muted mb-3 text-uppercase" style="letter-spacing: 0.1em; font-size: 0.65rem;">Hoặc chọn nhanh</div>
+                            <div class="lux-date-bar-wrapper position-relative">
+                                <div class="lux-scroll-gradient left"></div>
+                                <div class="lux-scroll-gradient right"></div>
+                                
+                                <!-- Navigation Arrows -->
+                                <button type="button" class="lux-scroll-btn left" onclick="scrollHourlyBar(-200)">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <button type="button" class="lux-scroll-btn right" onclick="scrollHourlyBar(200)">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
 
-                        @foreach (var group in Model.HourlyGroups)
-                        {
-                            <div class="mb-4">
-                                <div class="small fw-bold text-muted mb-3 text-uppercase" style="letter-spacing: 0.1em; font-size: 0.65rem;">@group.Title</div>
-                                <div class="luxury-slot-grid">
-                                    @foreach (var slot in group.Slots)
+                                <div id="hourly-date-bar" class="lux-date-bar-horizontal d-flex gap-3 overflow-auto" style="scrollbar-width: none;">
+                                    @foreach (var day in Model.DailyCalendar.Take(14))
                                     {
-                                        if (slot.Status == "Available")
-                                        {
-                                            <a asp-controller="Bookings" asp-action="CheckoutHourly" asp-route-roomId="@Model.Room.Id" asp-route-slotId="@slot.SlotId" class="luxury-slot-btn">@slot.Label</a>
-                                        }
-                                        else
-                                        {
-                                            <span class="luxury-slot-btn booked">@slot.Label</span>
-                                        }
+                                        <div class="luxury-date-chip @(day.Date == Model.SelectedHourlyDate ? "active" : "")"
+                                             data-date="@day.Date.ToString("yyyy-MM-dd")">
+                                            <div class="chip-day-name label" style="font-size: 0.65rem; margin-bottom: 5px;">@day.Date.ToString("ddd").ToUpper()</div>
+                                            <strong class="chip-day-num" style="font-size: 1.2rem;">@day.Date.Day</strong>
+                                            @if (day.Date == DateOnly.FromDateTime(DateTime.Today))
+                                            {
+                                                <div class="chip-today-label">HÔM NAY</div>
+                                            }
+                                        </div>
                                     }
                                 </div>
                             </div>
-                        }
+                        </div>
+                        
+                        <div id="hourly-slots-container">
+                            <partial name="_HourlySlots" model="Model" />
+                        </div>
                     </section>
 
                     <!-- Daily Panel -->
@@ -129,8 +139,24 @@
                             <input type="hidden" name="checkOutDate" id="checkout-input" />
 
                             <div class="calendar-wrapper mb-4">
+                                <div class="lux-manual-range mb-4 p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                                    <div class="small fw-bold text-uppercase mb-3" style="letter-spacing: 0.1em; font-size: 0.65rem; color: var(--luxury-accent);">Đặt ngày xa hơn</div>
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <label class="small text-muted mb-1" style="font-size: 0.6rem; display: block; font-weight: 700;">NGÀY NHẬN</label>
+                                            <input type="date" class="form-control form-control-sm border-0 bg-white" id="manual-checkin" 
+                                                   min="@DateTime.Today.ToString("yyyy-MM-dd")" style="font-size: 0.8rem; font-weight: 600;">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="small text-muted mb-1" style="font-size: 0.6rem; display: block; font-weight: 700;">NGÀY TRẢ</label>
+                                            <input type="date" class="form-control form-control-sm border-0 bg-white" id="manual-checkout" 
+                                                   min="@DateTime.Today.ToString("yyyy-MM-dd")" style="font-size: 0.8rem; font-weight: 600;">
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="d-flex justify-content-between mb-3">
-                                    <span class="small fw-bold text-uppercase" style="letter-spacing: 0.1em; font-size: 0.65rem;" id="range-label">Chọn ngày lưu trú</span>
+                                    <span class="small fw-bold text-uppercase" style="letter-spacing: 0.1em; font-size: 0.65rem;" id="range-label">Hoặc chọn nhanh trên lịch</span>
                                 </div>
                                 
                                 <div class="luxury-calendar-grid">
@@ -139,8 +165,16 @@
                                         <div class="lux-cal-day @(day.Status == "Blocked" ? "blocked" : "available")" 
                                              data-date="@day.Date.ToString("yyyy-MM-dd")"
                                              data-display="@day.Date.ToString("dd/MM")">
-                                            <div class="opacity-50" style="font-size: 0.6rem;">@day.Date.ToString("ddd")</div>
-                                            <div class="fw-bold">@day.Date.Day</div>
+                                            @if (day.Status == "Blocked")
+                                            {
+                                                <span class="booked-label">Đã đặt</span>
+                                                <div class="day-num fw-bold" style="opacity: 0.5; margin-top: -12px;">@day.Date.Day</div>
+                                            }
+                                            else
+                                            {
+                                                <div class="opacity-50" style="font-size: 0.6rem;">@day.Date.ToString("ddd")</div>
+                                                <div class="fw-bold">@day.Date.Day</div>
+                                            }
                                         </div>
                                     }
                                 </div>

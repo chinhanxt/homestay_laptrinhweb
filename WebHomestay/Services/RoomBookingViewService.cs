@@ -127,7 +127,10 @@ public class RoomBookingViewService : IRoomBookingViewService
             SlotLabel = slot.SlotLabel,
             StartTime = slot.StartTime,
             EndTime = slot.EndTime,
-            TotalPrice = slot.Room.PricePerHour // Assuming simple pricing for now
+            TotalPrice = slot.Room.PricePerHour, // Assuming simple pricing for now
+            Capacity = slot.Room.Capacity,
+            MaxGuests = slot.Room.MaxGuests,
+            ExtraGuestFee = slot.Room.ExtraGuestFee
         };
     }
 
@@ -147,7 +150,10 @@ public class RoomBookingViewService : IRoomBookingViewService
             CheckOutDate = checkOutDate,
             StartTime = interval.Start,
             EndTime = interval.End,
-            TotalPrice = room.PricePerDay * Math.Max(1, days)
+            TotalPrice = room.PricePerDay * Math.Max(1, days),
+            Capacity = room.Capacity,
+            MaxGuests = room.MaxGuests,
+            ExtraGuestFee = room.ExtraGuestFee
         };
     }
 }
