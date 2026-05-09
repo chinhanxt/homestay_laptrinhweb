@@ -1,0 +1,198 @@
+@model IEnumerable<WebHomestay.Models.Booking>
+
+@{
+    ViewData["Title"] = "Quản lý Đơn đặt phòng";
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Lịch sử giao dịch</span>
+                <h1>Quản lý Đơn đặt phòng</h1>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Trash" class="btn-premium-outline">
+                    <i class="fas fa-trash-alt"></i>
+                    <span>Thùng rác</span>
+                </a>
+            </div>
+        </header>
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success border-0 shadow-sm mb-4 d-flex align-items-center">
+                <i class="fas fa-check-circle me-3 fs-4"></i>
+                <div>@TempData["SuccessMessage"]</div>
+            </div>
+        }
+
+        <div class="admin-card">
+            <div class="admin-table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Mã đơn</th>
+                            <th>Khách hàng</th>
+                            <th>Phòng</th>
+                            <th>Thời gian / Số lượng</th>
+                            <th>Minh chứng</th>
+                            <th>Trạng thái</th>
+                            <th class="text-end">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-bold">#@item.Id</div>
+                                    <div class="small text-muted">@item.CreatedAt.ToString("dd/MM HH:mm")</div>
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-primary">@item.CustomerName</div>
+                                    <div class="small text-muted"><i class="fas fa-phone me-1"></i>@item.CustomerPhone</div>
+                                    <div class="small text-muted"><i class="fas fa-envelope me-1"></i>@item.CustomerEmail</div>
+                                </td>
+                                <td>
+                                    <div class="fw-bold">@item.Room?.Name</div>
+                                    <div class="small text-muted">@item.Room?.Branch?.Name</div>
+                                </td>
+                                <td>
+                                    @if (item.BookingMode == WebHomestay.Models.BookingMode.Hourly)
+                                    {
+                                        var label = item.RoomSlotInventory?.Template?.Name ?? item.SlotLabel;
+                                        <div class="fw-bold text-info">Theo giờ @label</div>
+                                        <div class="small">(@item.StartTime.ToString("HH:mm") - @item.EndTime.ToString("HH:mm"))</div>
+                                    }
+                                    else
+                                    {
+                                        var days = (item.EndTime.Date - item.StartTime.Date).Days;
+                                        if (days == 0) days = 1;
+                                        <div class="fw-bold text-primary">Theo ngày @days ngày</div>
+                                        <div class="small">(@item.StartTime.ToString("dd/MM") - @item.EndTime.ToString("dd/MM"))</div>
+                                    }
+                                    <div class="fw-bold mt-1" style="color: #2e7d5a;">@item.TotalPrice.ToString("N0")đ</div>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(item.PaymentProofUrl))
+                                    {
+                                        <a href="#" data-bs-toggle="modal" data-bs-target="#billModal-@item.Id">
+                                            <img src="@item.PaymentProofUrl" class="admin-img-thumb" style="border-radius: 4px;" />
+                                        </a>
+                                        
+                                        <!-- Bill Preview Modal -->
+                                        <div class="modal fade" id="billModal-@item.Id" tabindex="-1">
+                                            <div class="modal-dialog modal-dialog-centered">
+                                                <div class="modal-content border-0 shadow-lg">
+                                                    <div class="modal-header border-0">
+                                                        <h6 class="modal-title fw-bold">Minh chứng #@item.Id</h6>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body p-0">
+                                                        <img src="@item.PaymentProofUrl" class="w-100" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small italic">Chưa có bill</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (item.Status == "AwaitingPayment" || item.Status == "PendingPayment")
+                                    {
+                                        <span class="badge-premium badge-secondary-soft">Chờ thanh toán</span>
+                                    }
+                                    else if (item.Status == "AwaitingApproval")
+                                    {
+                                        <span class="badge-premium badge-warning-soft">Cần duyệt bill</span>
+                                    }
+                                    else if (item.Status == "Confirmed")
+                                    {
+                                        <span class="badge-premium badge-success-soft">Đã xác nhận</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-premium badge-primary-soft">@item.Status</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <div class="admin-actions">
+                                        @if (item.Status == "AwaitingApproval")
+                                        {
+                                            <button type="button" class="btn btn-sm btn-ready py-1 px-3 fw-bold" style="font-size: 0.75rem; border-radius: 6px;" data-bs-toggle="modal" data-bs-target="#approveModal-@item.Id">
+                                                Duyệt & Gửi vé
+                                            </button>
+                                        }
+                                        <a asp-action="Details" asp-route-id="@item.Id" class="admin-btn-icon" title="Chi tiết">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <form asp-action="SoftDelete" method="post" class="d-inline" onsubmit="return confirm('Bạn muốn xóa đơn hàng này?')">
+                                            <input type="hidden" name="id" value="@item.Id" />
+                                            <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    <!-- Approval Modal -->
+                                    <div class="modal fade" id="approveModal-@item.Id" tabindex="-1">
+                                        <div class="modal-dialog modal-dialog-centered text-start">
+                                            <form asp-action="Approve" method="post">
+                                                <input type="hidden" name="id" value="@item.Id" />
+                                                <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+                                                    <div class="modal-header bg-ready text-white border-0 py-3">
+                                                        <h6 class="modal-title fw-bold">Duyệt & Gửi vé điện tử #@item.Id</h6>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body p-4">
+                                                        <div class="mb-3">
+                                                            <label class="form-label small fw-bold text-muted">Mã số cửa (Smart Lock PIN)</label>
+                                                            <input type="text" name="smartLockCode" class="form-control border-light-subtle" placeholder="Ví dụ: 123456" required />
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label small fw-bold text-muted">Mật khẩu Wifi</label>
+                                                            <input type="text" name="wifiPassword" class="form-control border-light-subtle" value="StayEasy@2026" required />
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label small fw-bold text-muted">Hướng dẫn nhận phòng</label>
+                                                            <textarea name="instructions" class="form-control border-light-subtle" rows="3">Lấy chìa khóa trong hộp box cạnh cửa hoặc dùng mã PIN trên.</textarea>
+                                                        </div>
+                                                        <div class="alert alert-warning border-0 small py-2 px-3 mb-0" style="background: #fff8e1;">
+                                                            <i class="fas fa-magic me-2"></i>
+                                                            Email xác nhận và vé điện tử sẽ được gửi ngay lập tức.
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer border-0 p-4 pt-0">
+                                                        <button type="button" class="btn btn-light fw-bold" data-bs-dismiss="modal" style="font-size: 0.85rem;">Hủy</button>
+                                                        <button type="submit" class="btn btn-ready fw-bold px-4" style="font-size: 0.85rem;">XÁC NHẬN & GỬI VÉ</button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5">
+                                    <div class="text-muted opacity-50">
+                                        <i class="fas fa-receipt fa-3x mb-3"></i>
+                                        <p>Chưa có đơn đặt phòng nào.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

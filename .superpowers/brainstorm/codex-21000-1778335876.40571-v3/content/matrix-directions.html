@@ -1,0 +1,396 @@
+<style>
+  .cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .matrix-shell {
+    border: 1px solid #d9e0e7;
+    border-radius: 22px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,249,251,0.98)),
+      #fff;
+    overflow: hidden;
+    min-height: 280px;
+  }
+
+  .shell-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e6ebf0;
+    background: #fbfcfd;
+  }
+
+  .shell-title {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .shell-title strong {
+    font-size: 13px;
+    color: #14213d;
+  }
+
+  .shell-title span {
+    font-size: 11px;
+    color: #6b7a8c;
+  }
+
+  .shell-chip {
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 11px;
+    background: #eef3f7;
+    color: #415469;
+    border: 1px solid #dde5ec;
+  }
+
+  .shell-grid {
+    display: grid;
+    grid-template-columns: 118px 1fr;
+    min-height: 210px;
+  }
+
+  .shell-rooms {
+    border-right: 1px solid #e6ebf0;
+    background: #f7f9fb;
+    padding: 12px 10px;
+    display: grid;
+    gap: 10px;
+  }
+
+  .room-pill {
+    height: 34px;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid #dfe6ec;
+  }
+
+  .timeline {
+    padding: 12px;
+    display: grid;
+    gap: 8px;
+    background:
+      linear-gradient(to right, transparent 0, transparent calc(14.28% - 1px), #edf1f4 calc(14.28% - 1px), #edf1f4 14.28%);
+    background-size: 14.28% 100%;
+  }
+
+  .timeline-row {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .cell {
+    height: 34px;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid #edf2f6;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cell::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border-radius: 8px;
+    opacity: 0.95;
+  }
+
+  .cell.empty::after {
+    background: transparent;
+  }
+
+  .cell.ok::after {
+    background: linear-gradient(90deg, #dff6e9, #c8ebd9);
+  }
+
+  .cell.warn::after {
+    background: linear-gradient(90deg, #fbe8bf, #f7d983);
+  }
+
+  .cell.busy::after {
+    background: linear-gradient(90deg, #dbe5f3, #b9c8dd);
+  }
+
+  .cell.alert::after {
+    background: linear-gradient(90deg, #f8d9d6, #efbab6);
+  }
+
+  .shell-footer {
+    padding: 12px 16px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    border-top: 1px solid #e6ebf0;
+    background: #fcfdfe;
+  }
+
+  .legend {
+    border-radius: 999px;
+    padding: 5px 9px;
+    font-size: 11px;
+    color: #425265;
+    border: 1px solid #dde5ec;
+    background: white;
+  }
+
+  .legend::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  .legend.ok::before { background: #84c6a2; }
+  .legend.warn::before { background: #e0b84a; }
+  .legend.busy::before { background: #7f99bb; }
+  .legend.alert::before { background: #d97b73; }
+
+  .detail-drawer {
+    position: absolute;
+    right: 14px;
+    top: 62px;
+    width: 120px;
+    border-radius: 16px;
+    border: 1px solid #dce4ea;
+    background: rgba(255,255,255,0.95);
+    box-shadow: 0 12px 24px rgba(30, 52, 73, 0.08);
+    padding: 10px;
+    display: grid;
+    gap: 8px;
+  }
+
+  .detail-line {
+    height: 10px;
+    border-radius: 999px;
+    background: #e8eef3;
+  }
+
+  .detail-line.dark {
+    background: #c2cfdb;
+    width: 76%;
+  }
+
+  .insight-rail {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 82px;
+    border-left: 1px solid #e6ebf0;
+    background: linear-gradient(180deg, #fafcfd, #f3f6f9);
+    padding: 12px 10px;
+    display: grid;
+    gap: 8px;
+  }
+
+  .insight-block {
+    border-radius: 12px;
+    background: white;
+    border: 1px solid #e0e7ee;
+    height: 44px;
+  }
+
+  .card-body h3 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .tag {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid #d6e3db;
+    color: #335c45;
+    background: #eef9f2;
+  }
+
+  .micro-list {
+    margin: 0;
+    padding-left: 18px;
+    color: #556476;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 1100px) {
+    .cards {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<h2>Hướng Đại Tu Ma Trận Phòng</h2>
+<p class="subtitle">Mục tiêu đang khóa: dễ nhìn suốt ngày, nhìn được toàn cảnh nhanh, và vẫn mở sâu vào từng ô khi cần.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="matrix-shell" style="position:relative">
+        <div class="shell-top">
+          <div class="shell-title">
+            <strong>Panorama Board</strong>
+            <span>Matrix là trung tâm tuyệt đối</span>
+          </div>
+          <div class="shell-chip">14 ngày</div>
+        </div>
+        <div class="shell-grid">
+          <div class="shell-rooms">
+            <div class="room-pill"></div>
+            <div class="room-pill"></div>
+            <div class="room-pill"></div>
+            <div class="room-pill"></div>
+          </div>
+          <div class="timeline">
+            <div class="timeline-row">
+              <div class="cell busy"></div><div class="cell busy"></div><div class="cell ok"></div><div class="cell ok"></div><div class="cell warn"></div><div class="cell empty"></div><div class="cell ok"></div>
+            </div>
+            <div class="timeline-row">
+              <div class="cell ok"></div><div class="cell ok"></div><div class="cell ok"></div><div class="cell empty"></div><div class="cell busy"></div><div class="cell busy"></div><div class="cell warn"></div>
+            </div>
+            <div class="timeline-row">
+              <div class="cell empty"></div><div class="cell warn"></div><div class="cell ok"></div><div class="cell ok"></div><div class="cell alert"></div><div class="cell ok"></div><div class="cell empty"></div>
+            </div>
+            <div class="timeline-row">
+              <div class="cell busy"></div><div class="cell busy"></div><div class="cell ok"></div><div class="cell ok"></div><div class="cell ok"></div><div class="cell empty"></div><div class="cell empty"></div>
+            </div>
+          </div>
+        </div>
+        <div class="detail-drawer">
+          <div class="detail-line dark"></div>
+          <div class="detail-line"></div>
+          <div class="detail-line"></div>
+          <div class="detail-line" style="width:58%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Hướng A <span style="font-size:12px;color:#7a8796;font-weight:600">Overview mạnh nhất</span></h3>
+      <p>Toàn màn ưu tiên ma trận lớn, detail bật nổi như lớp phủ nhỏ khi click ô.</p>
+      <ul class="micro-list">
+        <li>Rất hợp khi người vận hành chủ yếu quét nhanh tình trạng phòng.</li>
+        <li>Nhìn thoáng và yên mắt, nhưng phần chi tiết dễ thành hơi nông.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="matrix-shell" style="position:relative">
+        <div class="shell-top">
+          <div class="shell-title">
+            <strong>Focused Command Grid</strong>
+            <span>Overview trước, detail sheet sau</span>
+          </div>
+          <div class="shell-chip">Khuyến nghị</div>
+        </div>
+        <div style="padding:12px 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;border-bottom:1px solid #e6ebf0;background:#fff">
+          <div class="insight-block"></div>
+          <div class="insight-block"></div>
+          <div class="insight-block"></div>
+          <div class="insight-block"></div>
+        </div>
+        <div class="shell-grid">
+          <div class="shell-rooms">
+            <div class="room-pill" style="background:#eef5f1"></div>
+            <div class="room-pill"></div>
+            <div class="room-pill"></div>
+            <div class="room-pill" style="background:#f9f0df"></div>
+          </div>
+          <div class="timeline">
+            <div class="timeline-row">
+              <div class="cell busy"></div><div class="cell busy"></div><div class="cell ok"></div><div class="cell ok"></div><div class="cell ok"></div><div class="cell warn"></div><div class="cell empty"></div>
+            </div>
+            <div class="timeline-row">
+              <div class="cell empty"></div><div class="cell ok"></div><div class="cell ok"></div><div class="cell warn"></div><div class="cell busy"></div><div class="cell busy"></div><div class="cell ok"></div>
+            </div>
+            <div class="timeline-row">
+              <div class="cell ok"></div><div class="cell ok"></div><div class="cell alert"></div><div class="cell busy"></div><div class="cell warn"></div><div class="cell empty"></div><div class="cell empty"></div>
+            </div>
+            <div class="timeline-row">
+              <div class="cell busy"></div><div class="cell busy"></div><div class="cell ok"></div><div class="cell ok"></div><div class="cell empty"></div><div class="cell empty"></div><div class="cell ok"></div>
+            </div>
+          </div>
+        </div>
+        <div class="shell-footer">
+          <span class="legend ok">Sẵn sàng</span>
+          <span class="legend busy">Có khách</span>
+          <span class="legend warn">Sắp đến / chờ duyệt</span>
+          <span class="legend alert">Sự cố / chặn bán</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Hướng B <span class="tag">Mình đề xuất</span></h3>
+      <p>Tầng trên là số liệu và filter nhẹ, giữa là matrix rõ ràng, click ô mở sheet chi tiết đầy đủ hơn thay vì nhét mọi thứ vào bảng.</p>
+      <ul class="micro-list">
+        <li>Cân bằng tốt giữa quét toàn cảnh và đào sâu theo ô/phòng.</li>
+        <li>Rất hợp với tiêu chí dùng cả ngày: ít mệt mắt, ít ồn, hierarchy rõ.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="matrix-shell" style="position:relative">
+        <div class="shell-top">
+          <div class="shell-title">
+            <strong>Split Operations Desk</strong>
+            <span>Matrix + activity rail luôn mở</span>
+          </div>
+          <div class="shell-chip">Realtime</div>
+        </div>
+        <div class="shell-grid" style="grid-template-columns:96px 1fr 82px">
+          <div class="shell-rooms">
+            <div class="room-pill"></div>
+            <div class="room-pill"></div>
+            <div class="room-pill"></div>
+            <div class="room-pill"></div>
+          </div>
+          <div class="timeline">
+            <div class="timeline-row">
+              <div class="cell busy"></div><div class="cell busy"></div><div class="cell warn"></div><div class="cell ok"></div><div class="cell ok"></div><div class="cell alert"></div><div class="cell empty"></div>
+            </div>
+            <div class="timeline-row">
+              <div class="cell ok"></div><div class="cell ok"></div><div class="cell ok"></div><div class="cell busy"></div><div class="cell busy"></div><div class="cell warn"></div><div class="cell empty"></div>
+            </div>
+            <div class="timeline-row">
+              <div class="cell empty"></div><div class="cell warn"></div><div class="cell busy"></div><div class="cell busy"></div><div class="cell ok"></div><div class="cell ok"></div><div class="cell ok"></div>
+            </div>
+            <div class="timeline-row">
+              <div class="cell ok"></div><div class="cell empty"></div><div class="cell ok"></div><div class="cell warn"></div><div class="cell busy"></div><div class="cell empty"></div><div class="cell ok"></div>
+            </div>
+          </div>
+          <div class="insight-rail">
+            <div class="insight-block"></div>
+            <div class="insight-block"></div>
+            <div class="insight-block"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Hướng C <span style="font-size:12px;color:#7a8796;font-weight:600">Nhiều công cụ hơn</span></h3>
+      <p>Luôn mở thêm rail sự kiện, cảnh báo, và việc cần xử lý ngay bên cạnh ma trận.</p>
+      <ul class="micro-list">
+        <li>Mạnh cho đội vận hành dày việc và cần realtime.</li>
+        <li>Dễ nặng mắt hơn hai hướng còn lại nếu dữ liệu tăng nhanh.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Khuyến nghị hiện tại</h3>
+  <p class="subtitle">Mình nghiêng về <strong>Hướng B</strong>: giữ ma trận là hero, nhưng không bắt người dùng đọc detail ngay trên ô. Detail nên mở thành sheet/sidebar riêng để màn chính luôn sạch, dễ thở, và ổn định khi dùng dài giờ.</p>
+</div>

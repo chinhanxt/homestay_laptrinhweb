@@ -1,0 +1,255 @@
+@model WebHomestay.Models.ViewModels.PublicMatrixViewModel
+
+@{
+    ViewData["Title"] = "Lịch trống Homestay";
+}
+
+<style>
+    .matrix-container {
+        overflow-x: auto;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 20px;
+        margin-top: 20px;
+        position: relative;
+    }
+
+    .matrix-table {
+        border-collapse: separate;
+        border-spacing: 4px;
+        width: 100%;
+        min-width: 1200px;
+    }
+
+    .matrix-table th, .matrix-table td {
+        text-align: center;
+        padding: 10px;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .sticky-col {
+        position: sticky;
+        left: 0;
+        background: #fff;
+        z-index: 10;
+        text-align: left !important;
+        min-width: 200px;
+        box-shadow: 4px 0 10px rgba(0,0,0,0.05);
+    }
+
+    .matrix-header-date {
+        font-size: 0.8rem;
+        font-weight: bold;
+        color: #666;
+    }
+
+    .date-num {
+        font-size: 1.2rem;
+        display: block;
+        color: #333;
+    }
+
+    .branch-header {
+        background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+        color: white;
+        text-align: left !important;
+        padding: 15px !important;
+        font-weight: bold;
+        font-size: 1.1rem;
+        border-radius: 12px !important;
+    }
+
+    .cell-available {
+        background: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+        cursor: pointer;
+        border: 1px solid rgba(40, 167, 69, 0.2);
+    }
+
+    .cell-available:hover {
+        background: #28a745;
+        color: white;
+        transform: scale(1.05);
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    }
+
+    .cell-booked {
+        background: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    .cell-awaiting {
+        background: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+        cursor: not-allowed;
+    }
+
+    .legend-item {
+        display: inline-flex;
+        align-items: center;
+        margin-right: 20px;
+        font-size: 0.9rem;
+    }
+
+    .legend-color {
+        width: 15px;
+        height: 15px;
+        border-radius: 4px;
+        margin-right: 8px;
+    }
+
+    /* Animation */
+    @@keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.02); }
+        100% { transform: scale(1); }
+    }
+
+    .matrix-container::-webkit-scrollbar {
+        height: 8px;
+    }
+    .matrix-container::-webkit-scrollbar-thumb {
+        background: rgba(0, 123, 255, 0.3);
+        border-radius: 10px;
+    }
+</style>
+
+<div class="container-fluid py-5" style="background: #fdfdfd;">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h1 class="display-5 fw-bold mb-3">Lịch trống & Đặt phòng</h1>
+            <p class="text-muted fs-5">Xem nhanh tình trạng phòng của tất cả chi nhánh và đặt ngay chỉ với 1 cú click.</p>
+            
+            <div class="mt-4">
+                <div class="legend-item"><div class="legend-color" style="background: #28a745;"></div> Còn trống</div>
+                <div class="legend-item"><div class="legend-color" style="background: #dc3545;"></div> Đã đặt</div>
+                <div class="legend-item"><div class="legend-color" style="background: #ffc107;"></div> Đang chờ duyệt</div>
+            </div>
+        </div>
+
+        <div class="matrix-container shadow-lg bg-white">
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        <th class="sticky-col bg-light">Phòng \ Ngày</th>
+                        @foreach (var date in Model.Dates)
+                        {
+                            <th class="matrix-header-date">
+                                <div>@date.ToString("ddd")</div>
+                                <span class="date-num">@date.Day</span>
+                                <div class="small">T.@date.Month</div>
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var branchGroup in Model.Branches)
+                    {
+                        <tr>
+                            <td colspan="@(Model.Dates.Count + 1)" class="branch-header">
+                                <i class="fas fa-map-marker-alt me-2"></i> @branchGroup.Branch.Name - @branchGroup.Branch.Address
+                            </td>
+                        </tr>
+                        @foreach (var roomData in branchGroup.Rooms)
+                        {
+                            <tr>
+                                <td class="sticky-col fw-bold">
+                                    @roomData.Room.Name
+                                    <div class="small text-primary">@roomData.Room.PricePerDay.ToString("N0")đ/đêm</div>
+                                </td>
+                                @foreach (var date in Model.Dates)
+                                {
+                                    var status = roomData.Availability[date];
+                                    var cellClass = status switch
+                                    {
+                                        "Available" => "cell-available",
+                                        "Booked" => "cell-booked",
+                                        "AwaitingApproval" => "cell-awaiting",
+                                        _ => ""
+                                    };
+                                    var tooltip = status switch
+                                    {
+                                        "Available" => "Còn trống - Bấm để đặt",
+                                        "Booked" => "Đã có khách",
+                                        "AwaitingApproval" => "Đang chờ thanh toán",
+                                        _ => ""
+                                    };
+
+                                    <td class="@cellClass" 
+                                        title="@tooltip"
+                                        @(status == "Available" ? Html.Raw($"onclick=\"openBookingModal({roomData.Room.Id}, '{date:yyyy-MM-dd}', '{roomData.Room.Name}')\"") : "")>
+                                        @if (status == "Available")
+                                        {
+                                            <i class="fas fa-plus small"></i>
+                                        }
+                                        else if (status == "Booked")
+                                        {
+                                            <i class="fas fa-user-lock small"></i>
+                                        }
+                                        else
+                                        {
+                                            <i class="fas fa-clock small"></i>
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Booking Modal -->
+<div class="modal fade" id="quickBookingModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+            <div class="modal-header bg-primary text-white" style="border-radius: 20px 20px 0 0;">
+                <h5 class="modal-title fw-bold">Tiếp tục đặt phòng</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <div class="h4 fw-bold text-primary" id="modalRoomName">Tên phòng</div>
+                    <p class="text-muted">Ngày bắt đầu: <strong id="modalStartDate">01/01/2026</strong></p>
+                </div>
+                <form id="bookingForm" method="get" action="/Bookings/Checkout">
+                    <input type="hidden" name="roomId" id="formRoomId" />
+                    <input type="hidden" name="start" id="formStartDate" />
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Chọn ngày trả phòng (End Date)</label>
+                        <input type="date" name="end" id="formEndDate" class="form-control form-control-lg" required />
+                        <div class="small text-muted mt-2">Mặc định chúng tôi chọn giúp bạn ở 1 đêm.</div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold py-3">XÁC NHẬN & TỚI TRANG THANH TOÁN</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openBookingModal(roomId, startDate, roomName) {
+        document.getElementById('formRoomId').value = roomId;
+        document.getElementById('formStartDate').value = startDate;
+        document.getElementById('modalRoomName').innerText = roomName;
+        document.getElementById('modalStartDate').innerText = new Date(startDate).toLocaleDateString('vi-VN');
+        
+        // Set default end date to start date + 1 day
+        let end = new Date(startDate);
+        end.setDate(end.getDate() + 1);
+        document.getElementById('formEndDate').value = end.toISOString().split('T')[0];
+        document.getElementById('formEndDate').min = end.toISOString().split('T')[0];
+
+        var myModal = new bootstrap.Modal(document.getElementById('quickBookingModal'));
+        myModal.show();
+    }
+</script>

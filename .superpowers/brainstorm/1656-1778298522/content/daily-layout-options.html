@@ -1,0 +1,129 @@
+<h2>Mockup Màn Chọn Slot Của 1 Phòng</h2>
+<p class="subtitle">Cùng một flow: khách chọn phòng trước, sau đó vào màn hình này để chọn khung giờ còn trống</p>
+
+<div class="cards">
+  <div class="card" data-choice="layout-a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Phương án A: Cột "Theo ngày" cùng hàng</div>
+        <div class="mockup-body">
+          <div style="display:grid;grid-template-columns:88px 130px repeat(6, 1fr);font-size:12px;border:1px solid #555;">
+            <div style="padding:10px;border-right:1px solid #555;border-bottom:1px solid #555;font-weight:700;">Thứ</div>
+            <div style="padding:10px;border-right:1px solid #555;border-bottom:1px solid #555;font-weight:700;">Ngày</div>
+            <div style="padding:10px;border-right:1px solid #555;border-bottom:1px solid #555;text-align:center;">2h</div>
+            <div style="padding:10px;border-right:1px solid #555;border-bottom:1px solid #555;text-align:center;">4h</div>
+            <div style="padding:10px;border-right:1px solid #555;border-bottom:1px solid #555;text-align:center;">6h</div>
+            <div style="padding:10px;border-right:1px solid #555;border-bottom:1px solid #555;text-align:center;">Ban ngày</div>
+            <div style="padding:10px;border-right:1px solid #555;border-bottom:1px solid #555;text-align:center;">Ban đêm</div>
+            <div style="padding:10px;border-bottom:1px solid #555;text-align:center;background:#3f3320;color:#ffd98a;font-weight:700;">Theo ngày</div>
+
+            <div style="padding:10px;border-right:1px solid #555;border-bottom:1px solid #555;">T7</div>
+            <div style="padding:10px;border-right:1px solid #555;border-bottom:1px solid #555;">09-05</div>
+            <div style="padding:10px;border-right:1px solid #555;border-bottom:1px solid #555;"><div style="height:22px;border-radius:6px;background:#36df3a;"></div></div>
+            <div style="padding:10px;border-right:1px solid #555;border-bottom:1px solid #555;"><div style="height:22px;border-radius:6px;border:1px solid #dcdcdc;"></div></div>
+            <div style="padding:10px;border-right:1px solid #555;border-bottom:1px solid #555;"><div style="height:22px;border-radius:6px;border:1px solid #dcdcdc;"></div></div>
+            <div style="padding:10px;border-right:1px solid #555;border-bottom:1px solid #555;"><div style="height:22px;border-radius:6px;background:#36df3a;"></div></div>
+            <div style="padding:10px;border-right:1px solid #555;border-bottom:1px solid #555;"><div style="height:22px;border-radius:6px;border:1px solid #dcdcdc;"></div></div>
+            <div style="padding:10px;border-bottom:1px solid #555;background:#2a2317;"><div style="height:22px;border-radius:6px;border:1px solid #d9ba6a;"></div></div>
+
+            <div style="padding:10px;border-right:1px solid #555;">CN</div>
+            <div style="padding:10px;border-right:1px solid #555;">10-05</div>
+            <div style="padding:10px;border-right:1px solid #555;"><div style="height:22px;border-radius:6px;border:1px solid #dcdcdc;"></div></div>
+            <div style="padding:10px;border-right:1px solid #555;"><div style="height:22px;border-radius:6px;border:1px solid #dcdcdc;"></div></div>
+            <div style="padding:10px;border-right:1px solid #555;"><div style="height:22px;border-radius:6px;background:#36df3a;"></div></div>
+            <div style="padding:10px;border-right:1px solid #555;"><div style="height:22px;border-radius:6px;border:1px solid #dcdcdc;"></div></div>
+            <div style="padding:10px;border-right:1px solid #555;"><div style="height:22px;border-radius:6px;border:1px solid #dcdcdc;"></div></div>
+            <div style="padding:10px;background:#2a2317;"><div style="height:22px;border-radius:6px;border:1px solid #dcdcdc;"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. Một bảng duy nhất</h3>
+      <p>Dễ so sánh mọi loại combo trong cùng 1 dòng ngày. Admin và khách đều nhìn được toàn cảnh nhanh.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="layout-b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Phương án B: "Theo ngày" là thanh riêng của mỗi ngày</div>
+        <div class="mockup-body">
+          <div style="display:flex;flex-direction:column;gap:10px;font-size:12px;">
+            <div style="border:1px solid #555;padding:10px;border-radius:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <strong>T7 - 09-05</strong>
+                <div style="background:#3f3320;color:#ffd98a;border:1px solid #d9ba6a;padding:6px 10px;border-radius:999px;">Theo ngày 14:00 - 12:00</div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+                <div style="padding:12px;border-radius:8px;background:#36df3a;text-align:center;">2h</div>
+                <div style="padding:12px;border-radius:8px;border:1px solid #dcdcdc;text-align:center;">4h</div>
+                <div style="padding:12px;border-radius:8px;border:1px solid #dcdcdc;text-align:center;">6h</div>
+                <div style="padding:12px;border-radius:8px;background:#36df3a;text-align:center;">Ban ngày</div>
+                <div style="padding:12px;border-radius:8px;border:1px solid #dcdcdc;text-align:center;">Ban đêm</div>
+              </div>
+            </div>
+            <div style="border:1px solid #555;padding:10px;border-radius:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <strong>CN - 10-05</strong>
+                <div style="background:#242424;border:1px solid #666;padding:6px 10px;border-radius:999px;">Chưa chọn theo ngày</div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+                <div style="padding:12px;border-radius:8px;border:1px solid #dcdcdc;text-align:center;">2h</div>
+                <div style="padding:12px;border-radius:8px;border:1px solid #dcdcdc;text-align:center;">4h</div>
+                <div style="padding:12px;border-radius:8px;background:#36df3a;text-align:center;">6h</div>
+                <div style="padding:12px;border-radius:8px;border:1px solid #dcdcdc;text-align:center;">Ban ngày</div>
+                <div style="padding:12px;border-radius:8px;border:1px solid #dcdcdc;text-align:center;">Ban đêm</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. Tách "Theo ngày" thành thanh riêng</h3>
+      <p>Nhìn hiện đại hơn, nhấn mạnh booking ngày là một sản phẩm khác. Dễ làm UI rõ nghĩa nhưng tốn chiều cao màn hình hơn.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="layout-c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Phương án C: Hàng ngày + panel chi tiết mở rộng</div>
+        <div class="mockup-body">
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:12px;">
+            <div style="display:grid;grid-template-columns:120px 1fr 150px;gap:8px;align-items:center;border:1px solid #555;border-radius:10px;padding:10px;">
+              <strong>09-05-2026</strong>
+              <div style="display:flex;gap:6px;">
+                <div style="flex:1;height:22px;border-radius:999px;background:#36df3a;"></div>
+                <div style="flex:1;height:22px;border-radius:999px;border:1px solid #dcdcdc;"></div>
+                <div style="flex:1;height:22px;border-radius:999px;border:1px solid #dcdcdc;"></div>
+                <div style="flex:1;height:22px;border-radius:999px;background:#36df3a;"></div>
+                <div style="flex:1;height:22px;border-radius:999px;border:1px solid #dcdcdc;"></div>
+              </div>
+              <div style="background:#3f3320;color:#ffd98a;border:1px solid #d9ba6a;padding:8px 10px;border-radius:8px;text-align:center;">Theo ngày trống</div>
+            </div>
+            <div style="border:1px dashed #777;border-radius:10px;padding:12px;background:#1f1f1f;">
+              <div style="margin-bottom:8px;font-weight:700;">Khung giờ chi tiết của ngày 09-05</div>
+              <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+                <div style="padding:10px;border-radius:8px;background:#36df3a;text-align:center;">09:30-11:30</div>
+                <div style="padding:10px;border-radius:8px;border:1px solid #dcdcdc;text-align:center;">13:00-17:00</div>
+                <div style="padding:10px;border-radius:8px;border:1px solid #dcdcdc;text-align:center;">13:00-19:00</div>
+                <div style="padding:10px;border-radius:8px;background:#36df3a;text-align:center;">10:00-19:00</div>
+                <div style="padding:10px;border-radius:8px;border:1px solid #dcdcdc;text-align:center;">20:00-09:00</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Gọn ở mức ngày, mở rộng khi cần</h3>
+      <p>Hợp nếu sau này mỗi phòng có rất nhiều slot cấu hình khác nhau. Bù lại sẽ ít “nhìn phát hiểu ngay” hơn kiểu bảng thuần.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <p><strong>Chọn giúp mình layout nào gần nhất với trải nghiệm anh muốn.</strong> Nếu cần, anh cũng có thể nói “lấy A nhưng sửa phần nào”.</p>
+</div>

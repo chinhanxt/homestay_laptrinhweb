@@ -1,0 +1,219 @@
+@model WebHomestay.Models.Booking
+@{
+    ViewData["Title"] = "Thanh toán & Xác nhận";
+}
+
+<div class="container py-5 mt-5">
+    <div class="mb-4 reveal-up">
+        <a asp-controller="Home" asp-action="Index" class="text-decoration-none text-muted small fw-bold text-uppercase" style="letter-spacing: 0.1em;">
+            <i class="fas fa-home me-1"></i> Quay lại trang chủ
+        </a>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-10 reveal-up">
+            <div class="text-center mb-5">
+                <span class="luxury-kicker">Bước cuối cùng</span>
+                <h1 class="display-5 fw-bold" style="font-family: var(--luxury-font-heading);">Xác nhận Thanh toán</h1>
+                <p class="text-muted">Mã đơn hàng: <span class="fw-bold text-accent" style="color: var(--luxury-accent);">#@Model.Id</span></p>
+            </div>
+
+            @if (Model.Status == "Cancelled")
+            {
+                <div class="luxury-modal-content mx-auto" style="border-color: #fee2e2; background: #fff5f5;">
+                    <i class="fas fa-exclamation-triangle fa-3x text-danger mb-4"></i>
+                    <h2 class="fw-bold mb-3">Đơn hàng đã hết hạn</h2>
+                    <p class="text-muted mb-4">Rất tiếc, thời gian giữ chỗ của bạn đã kết thúc. Vui lòng quay lại trang chủ để chọn lại.</p>
+                    <a href="/" class="lux-btn-ghost">Quay về Trang chủ</a>
+                </div>
+            }
+            else
+            {
+                <div class="row g-5">
+                    <!-- Left: QR & Bank Info -->
+                    <div class="col-md-6 border-end">
+                        <div class="p-4">
+                            <h5 class="fw-bold text-uppercase mb-4" style="font-size: 0.8rem; letter-spacing: 0.1em;">Thông tin chuyển khoản</h5>
+                            
+                            <div class="mb-4 text-center">
+                                <div class="bg-white p-3 d-inline-block shadow-sm border">
+                                    <img src="https://img.vietqr.io/image/MB-123456789-compact.png?amount=@Model.TotalPrice.ToString("0")&addInfo=STAYEASY%20@Model.Id" 
+                                         alt="QR Code" class="img-fluid" style="max-width: 200px;" />
+                                </div>
+                            </div>
+
+                            <div class="space-y-4">
+                                <div class="pb-3 border-bottom">
+                                    <div class="small text-muted text-uppercase" style="font-size: 0.65rem;">Ngân hàng</div>
+                                    <div class="fw-bold">MB BANK (Ngân hàng Quân Đội)</div>
+                                </div>
+                                <div class="pb-3 border-bottom">
+                                    <div class="small text-muted text-uppercase" style="font-size: 0.65rem;">Số tài khoản</div>
+                                    <div class="fw-bold fs-5">123456789</div>
+                                </div>
+                                <div class="pb-3 border-bottom">
+                                    <div class="small text-muted text-uppercase" style="font-size: 0.65rem;">Chủ tài khoản</div>
+                                    <div class="fw-bold">NGUYEN VAN A</div>
+                                </div>
+                                <div class="pb-3">
+                                    <div class="small text-muted text-uppercase" style="font-size: 0.65rem;">Nội dung chuyển khoản</div>
+                                    <div class="fw-bold text-accent fs-5" style="color: var(--luxury-accent);">STAYEASY @Model.Id</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Payment Action -->
+                    <div class="col-md-6">
+                        <div class="p-4">
+                            @if (Model.Status == "AwaitingPayment")
+                            {
+                                <div class="text-center mb-5">
+                                    <div class="small text-uppercase text-muted mb-2" style="letter-spacing: 0.1em;">Thời gian giữ chỗ còn lại</div>
+                                    <div id="countdown" class="display-4 fw-bold mb-3" style="font-family: var(--luxury-font-heading); color: var(--luxury-primary);">05:00</div>
+                                    
+                                    <form asp-action="Cancel" method="post" onsubmit="return confirm('Bạn có chắc chắn muốn hủy đơn hàng này không?')">
+                                        <input type="hidden" name="id" value="@Model.Id" />
+                                        <button type="submit" class="btn btn-link text-danger text-decoration-none small text-uppercase fw-bold" style="letter-spacing: 0.05em; font-size: 0.7rem;">
+                                            <i class="fas fa-times-circle me-1"></i> Hủy đơn hàng này
+                                        </button>
+                                    </form>
+                                </div>
+
+                                <div class="mb-5 pt-4 border-top">
+                                    <h5 class="fw-bold text-uppercase mb-3" style="font-size: 0.8rem; letter-spacing: 0.1em;">Xác nhận thanh toán</h5>
+                                    <p class="text-muted small mb-4">Vui lòng tải lên ảnh chụp màn hình bill thanh toán thành công để chúng tôi xác nhận nhanh nhất.</p>
+                                    
+                                    <form asp-action="UploadPaymentProof" method="post" enctype="multipart/form-data">
+                                        <input type="hidden" name="bookingId" value="@Model.Id" />
+                                        <div class="lux-file-upload mb-4" id="upload-bill">
+                                            <i class="fas fa-cloud-upload-alt mb-2 text-accent icon-status" style="color: var(--luxury-accent);"></i>
+                                            <p class="small m-0 fw-bold text-status">Chọn ảnh Bill thanh toán</p>
+                                            <input type="file" name="paymentProof" class="lux-file-input" accept="image/*" required onchange="previewFile(this, 'bill')" />
+                                            <div class="lux-file-preview-container" id="preview-bill">
+                                                <img src="" alt="Preview Bill" />
+                                            </div>
+                                            <div class="lux-file-info" id="info-bill"></div>
+                                        </div>
+                                        <button type="submit" class="btn-auth-gold w-100 py-3">GỬI MINH CHỨNG THANH TOÁN</button>
+                                    </form>
+                                </div>
+                            }
+                            else if (Model.Status == "AwaitingApproval")
+                            {
+                                <div class="text-center py-5">
+                                    <div class="success-icon-wrap" style="width: 60px; height: 60px;">
+                                        <i class="fas fa-clock"></i>
+                                    </div>
+                                    <h5 class="fw-bold mb-3">Đang chờ xác nhận</h5>
+                                    <p class="text-muted small">Chúng tôi đã nhận được Bill của bạn. Nhân viên sẽ đối soát và gửi mã phòng qua Email sớm nhất.</p>
+                                    <a href="/" class="lux-btn-ghost mt-3">Về Trang chủ</a>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal Overlay (Floating Popup) -->
+<div class="luxury-modal-overlay" id="paymentSuccessModal">
+    <div class="luxury-modal-content">
+        <div class="success-icon-wrap">
+            <i class="fas fa-check fa-2x"></i>
+        </div>
+        <h2 class="display-6 fw-bold mb-3" style="font-family: var(--luxury-font-heading);">Gửi Bill thành công!</h2>
+        <p class="text-muted mb-4">Cảm ơn quý khách đã tin tưởng STAYLUXE. Chúng tôi đang xử lý đơn hàng của bạn.</p>
+        
+        <div class="bg-light p-4 mb-4 text-start">
+            <div class="d-flex align-items-center gap-3 mb-3 pb-3 border-bottom">
+                <div class="success-icon-wrap m-0" style="width: 40px; height: 40px; font-size: 0.8rem;">
+                    <i class="fas fa-phone"></i>
+                </div>
+                <div>
+                    <div class="small text-muted">Hỗ trợ chi nhánh @Model.Room.Branch?.Name</div>
+                    <div class="fw-bold">@Model.Room.Branch?.Hotline</div>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <div class="success-icon-wrap m-0" style="width: 40px; height: 40px; font-size: 0.8rem;">
+                    <i class="fas fa-envelope"></i>
+                </div>
+                <div>
+                    <div class="small text-muted">Xác nhận đơn hàng</div>
+                    <div class="fw-bold">Vui lòng kiểm tra Email của bạn</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex flex-column gap-3">
+            <p class="small text-muted m-0">Đơn hàng sẽ được xác nhận trong ít phút.</p>
+            <a href="/" class="btn-auth-gold py-3 text-decoration-none">VỀ TRANG CHỦ</a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function previewFile(input, id) {
+            const container = document.getElementById('upload-' + id);
+            const previewContainer = document.getElementById('preview-' + id);
+            const previewImg = previewContainer.querySelector('img');
+            const info = document.getElementById('info-' + id);
+            const textStatus = container.querySelector('.text-status');
+            const iconStatus = container.querySelector('.icon-status');
+
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    previewContainer.style.display = 'block';
+                    container.classList.add('selected');
+                    info.innerHTML = '<i class="fas fa-check-circle me-1"></i> Đã chọn: ' + input.files[0].name;
+                    textStatus.style.display = 'none';
+                    iconStatus.className = 'fas fa-check-circle mb-2 text-accent';
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        @if (TempData["PaymentSuccess"] != null)
+        {
+            <text>
+            document.getElementById('paymentSuccessModal').classList.add('show');
+            </text>
+        }
+
+        @if (Model.Status == "AwaitingPayment")
+        {
+            <text>
+            var createdAt = new Date("@Model.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")");
+            var expireAt = new Date(createdAt.getTime() + 5 * 60000);
+
+            function updateTimer() {
+                var now = new Date();
+                var timeLeft = expireAt - now;
+
+                if (!(timeLeft > 0)) {
+                    document.getElementById("countdown").innerHTML = "00:00";
+                    clearInterval(timerInterval);
+                    setTimeout(() => location.reload(), 1500);
+                    return;
+                }
+
+                var minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                var seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+                var minutesStr = !(minutes > 9) ? "0" + minutes : minutes;
+                var secondsStr = !(seconds > 9) ? "0" + seconds : seconds;
+                document.getElementById("countdown").innerHTML = minutesStr + ":" + secondsStr;
+            }
+
+            updateTimer();
+            var timerInterval = setInterval(updateTimer, 1000);
+            </text>
+        }
+    </script>
+}

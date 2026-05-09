@@ -1,0 +1,69 @@
+@model WebHomestay.Models.AdminUser
+@{
+    ViewData["Title"] = "Thêm nhân sự mới";
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Quản trị nhân lực</span>
+                <h1>Thêm nhân sự mới</h1>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Index" class="btn-premium-outline">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Quay lại</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="admin-form-card" style="max-width: 600px;">
+            <form asp-action="Create" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+                
+                <div class="admin-form-group">
+                    <label class="admin-form-label">Tên đăng nhập (Username)</label>
+                    <input name="Username" class="admin-form-input" placeholder="VD: nguyenvan_a" required />
+                </div>
+
+                <div class="admin-form-group">
+                    <label class="admin-form-label">Mật khẩu khởi tạo</label>
+                    <input name="password" type="password" class="admin-form-input" placeholder="••••••••" required />
+                </div>
+
+                <div class="admin-form-group">
+                    <label class="admin-form-label">Họ và tên</label>
+                    <input name="FullName" class="admin-form-input" placeholder="VD: Nguyễn Văn A" required />
+                </div>
+
+                <div class="admin-form-group">
+                    <label class="admin-form-label">Vai trò (Role)</label>
+                    <select name="Role" class="admin-form-input">
+                        <option value="Staff">Nhân viên (Staff)</option>
+                        <option value="Manager">Quản lý chi nhánh (Manager)</option>
+                        <option value="SuperAdmin">Quản trị tối cao (SuperAdmin)</option>
+                    </select>
+                </div>
+
+                <div class="admin-form-group mb-4">
+                    <label class="admin-form-label">Chi nhánh quản lý</label>
+                    <select name="BranchId" class="admin-form-input" asp-items="ViewBag.Branches">
+                        <option value="">-- Tất cả chi nhánh (Global) --</option>
+                    </select>
+                    <p class="small text-muted mt-2">Dành cho cấp bậc Manager và Staff để giới hạn phạm vi quản lý.</p>
+                </div>
+
+                <div class="mt-5 d-grid gap-2">
+                    <button type="submit" class="btn-premium py-2 justify-content-center">
+                        <i class="fas fa-user-plus"></i>
+                        <span>TẠO TÀI KHOẢN NHÂN SỰ</span>
+                    </button>
+                    <a asp-action="Index" class="btn-premium-outline justify-content-center">Hủy bỏ</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

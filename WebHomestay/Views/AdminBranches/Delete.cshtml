@@ -1,0 +1,38 @@
+@model WebHomestay.Models.Branch
+
+@{
+    ViewData["Title"] = "Xóa Chi nhánh";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow border-danger">
+                <div class="card-header bg-danger text-white py-3">
+                    <h6 class="m-0 font-weight-bold">Xác nhận xóa chi nhánh</h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-center fs-5 mb-4">Bạn có chắc chắn muốn xóa chi nhánh này không?</p>
+                    
+                    <div class="alert alert-warning">
+                        <strong>@Model.Name</strong><br />
+                        @Model.Address
+                    </div>
+
+                    <p class="text-muted small">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Lưu ý: Hành động này sẽ xóa toàn bộ các phòng và dữ liệu liên quan thuộc chi nhánh này.
+                    </p>
+
+                    <form asp-action="Delete">
+                        <input type="hidden" asp-for="Id" />
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger">Xác nhận Xóa</button>
+                            <a asp-action="Index" class="btn btn-outline-secondary">Hủy bỏ</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

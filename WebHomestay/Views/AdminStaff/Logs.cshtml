@@ -1,0 +1,80 @@
+@model IEnumerable<WebHomestay.Models.ActivityLog>
+@{
+    ViewData["Title"] = "Nhật ký hệ thống";
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">An ninh & Bảo mật</span>
+                <h1>Nhật ký hoạt động (Audit Trail)</h1>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Index" class="btn-premium-outline">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Quay lại</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="admin-card">
+            <div class="admin-table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">Thời gian</th>
+                            <th>Nhân viên</th>
+                            <th>Hành động</th>
+                            <th>Đối tượng tác động</th>
+                            <th>Chi tiết</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in Model)
+                        {
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="small fw-bold">@log.Timestamp.ToLocalTime().ToString("dd/MM/yyyy")</div>
+                                    <div class="small text-muted">@log.Timestamp.ToLocalTime().ToString("HH:mm:ss")</div>
+                                </td>
+                                <td>
+                                    <div class="fw-bold">@log.AdminUser?.FullName</div>
+                                    <div class="small text-muted">@@@log.AdminUser?.Username</div>
+                                </td>
+                                <td>
+                                    @{
+                                        var badgeClass = "badge-info-soft";
+                                        if (log.Action.Contains("Tạo") || log.Action.Contains("Create")) badgeClass = "badge-success-soft";
+                                        if (log.Action.Contains("Xóa") || log.Action.Contains("Delete")) badgeClass = "badge-danger-soft";
+                                        if (log.Action.Contains("Sửa") || log.Action.Contains("Edit")) badgeClass = "badge-warning-soft";
+                                    }
+                                    <span class="badge-premium @badgeClass">@log.Action</span>
+                                </td>
+                                <td>
+                                    <span class="text-primary fw-bold" style="font-size: 0.85rem;">@log.Target</span>
+                                </td>
+                                <td class="small text-muted">
+                                    <div style="max-width: 400px; line-height: 1.4;">@log.Details</div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="5" class="text-center py-5">
+                                    <div class="text-muted opacity-50">
+                                        <i class="fas fa-stream fa-3x mb-3"></i>
+                                        <p>Không tìm thấy bản ghi nhật ký nào.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

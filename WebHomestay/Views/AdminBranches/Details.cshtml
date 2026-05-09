@@ -1,0 +1,127 @@
+@model WebHomestay.Models.Branch
+@{
+    ViewData["Title"] = "Chi tiết Chi nhánh";
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Cơ sở vận hành</span>
+                <h1>Chi nhánh: @Model.Name</h1>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn-premium me-2">
+                    <i class="fas fa-edit"></i>
+                    <span>Chỉnh sửa</span>
+                </a>
+                <a asp-action="Index" class="btn-premium-outline">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Quay lại</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="admin-card p-4">
+                    <h5 class="fw-bold text-primary mb-4"><i class="fas fa-info-circle me-2"></i>Thông tin cơ bản</h5>
+                    
+                    <div class="mb-4">
+                        <label class="admin-form-label">Địa chỉ</label>
+                        <div class="fw-bold">@Model.Address</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="admin-form-label">Hotline</label>
+                        <div class="fw-bold fs-5 text-primary">@Model.Hotline</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="admin-form-label">Mô tả</label>
+                        <div class="text-muted small">@Model.Description</div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(Model.MapUrl))
+                    {
+                        <div class="mt-4">
+                            <label class="admin-form-label">Vị trí Map</label>
+                            <div class="rounded overflow-hidden border" style="height: 200px; background: #eee;">
+                                <div class="w-100 h-100 d-flex align-items-center justify-content-center text-muted small">
+                                    [Bản đồ tích hợp]
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="col-lg-8">
+                <div class="admin-card">
+                    <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold mb-0">Danh sách Phòng (@Model.Rooms.Count)</h5>
+                        <a asp-controller="AdminRooms" asp-action="Create" asp-route-branchId="@Model.Id" class="btn-premium-outline py-1 px-3" style="font-size: 0.75rem;">
+                            <i class="fas fa-plus"></i> Thêm phòng
+                        </a>
+                    </div>
+                    <div class="admin-table-responsive">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Tên phòng</th>
+                                    <th>Giá lưu trú</th>
+                                    <th>Sức chứa</th>
+                                    <th>Trạng thái</th>
+                                    <th class="text-end">Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var room in Model.Rooms)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-bold">@room.Name</div>
+                                            <div class="small text-muted">ID: #@room.Id</div>
+                                        </td>
+                                        <td>
+                                            <div class="small fw-bold text-primary">@room.PricePerDay.ToString("N0")đ / ngày</div>
+                                            <div class="small text-muted">@room.PricePerHour.ToString("N0")đ / giờ</div>
+                                        </td>
+                                        <td>
+                                            <div class="small">@room.Capacity khách (Max @room.MaxGuests)</div>
+                                        </td>
+                                        <td>
+                                            <span class="badge-premium @(room.Status == "Available" ? "badge-success-soft" : "badge-danger-soft")">
+                                                @room.Status
+                                            </span>
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="admin-actions">
+                                                <a asp-controller="AdminRooms" asp-action="Details" asp-route-id="@room.Id" class="admin-btn-icon" title="Chi tiết">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a asp-controller="AdminRooms" asp-action="Edit" asp-route-id="@room.Id" class="admin-btn-icon" title="Sửa">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!Model.Rooms.Any())
+                                {
+                                    <tr>
+                                        <td colspan="5" class="text-center py-5 text-muted small">
+                                            Chi nhánh này hiện chưa có phòng nào.
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

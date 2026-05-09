@@ -1,0 +1,348 @@
+:root {
+  --primary-color: #6366f1;
+  --primary-glow: rgba(99, 102, 241, 0.5);
+  --secondary-color: #f43f5e;
+  --bg-dark: #0f172a;
+  --bg-dark-soft: #1e293b;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+}
+
+/* Daily Calendar Grid */
+.daily-calendar-grid {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 5px 2px 15px 2px;
+  scrollbar-width: thin;
+}
+
+.calendar-day-item {
+  flex: 0 0 70px;
+  height: 90px;
+  border: 2px solid #eee;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.calendar-day-item:hover:not(.day-blocked) {
+  border-color: #007bff;
+  transform: translateY(-2px);
+}
+
+.calendar-day-item .day-name {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 5px;
+}
+
+.calendar-day-item .day-number {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.calendar-day-item.day-blocked {
+  background: #f8f8f8;
+  color: #ccc;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.calendar-day-item.selected {
+  background: #007bff;
+  border-color: #007bff;
+  color: white;
+}
+
+.calendar-day-item.selected .day-name {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.calendar-day-item.in-range {
+  background: rgba(0, 123, 255, 0.1);
+  border-color: #007bff;
+}
+
+/* Booked Slots */
+.slot-card.booked {
+  background: #ffecec;
+  border-color: #ffc1c1;
+  color: #dc3545;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+/* Typography & Effects */
+.text-gradient {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.tracking-widest {
+  letter-spacing: 0.1em;
+}
+
+/* Sections */
+.hero-section {
+  padding: 140px 0 100px;
+  position: relative;
+  background: radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.05) 0%, transparent 50%);
+}
+
+.bg-dark-soft {
+  background-color: var(--bg-dark-soft);
+}
+
+/* Glassmorphism */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+}
+
+.search-glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  max-width: 650px;
+}
+
+/* Cards */
+.room-card {
+  background: var(--bg-card);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--glass-border);
+}
+
+.room-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 20px 30px rgba(0, 0, 0, 0.3);
+}
+
+.room-img {
+  height: 240px;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+
+.room-card:hover .room-img {
+  transform: scale(1.1);
+}
+
+.room-badge {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: var(--gradient-primary);
+  color: white;
+  padding: 5px 15px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.amenity-tag {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border: 1px solid var(--glass-border);
+}
+
+.branch-card {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.branch-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--primary-color);
+}
+
+/* Buttons */
+.btn-primary {
+  background: var(--gradient-primary);
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 20px var(--primary-glow);
+  transform: scale(1.05);
+}
+
+.shadow-glow {
+  box-shadow: 0 4px 15px var(--primary-glow);
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-up {
+  animation: fadeInUp 0.8s ease forwards;
+}
+
+.animate-up-delay-1 {
+  animation: fadeInUp 0.8s ease 0.2s forwards;
+  opacity: 0;
+}
+
+.animate-up-delay-2 {
+  animation: fadeInUp 0.8s ease 0.4s forwards;
+  opacity: 0;
+}
+
+/* Abstract shapes */
+.abstract-circle {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  z-index: 1;
+}
+
+.circle-1 {
+  width: 300px;
+  height: 300px;
+  background: rgba(99, 102, 241, 0.1);
+  top: 10%;
+  right: 5%;
+}
+
+.circle-2 {
+  width: 400px;
+  height: 400px;
+  background: rgba(168, 85, 247, 0.1);
+  bottom: -10%;
+  left: -5%;
+}
+
+.hero-image-stack {
+  position: relative;
+  padding: 20px;
+}
+
+.floating-card {
+  position: absolute;
+  bottom: 40px;
+  left: -30px;
+  min-width: 200px;
+  z-index: 10;
+}
+
+/* Booking Space */
+.booking-mode-switch {
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.mode-btn {
+  background: transparent;
+  border: none;
+  padding: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  transition: all 0.3s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.mode-btn.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.date-chip {
+  flex: 0 0 auto;
+  width: 60px;
+  padding: 10px 5px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  color: var(--text-main);
+  transition: all 0.2s ease;
+}
+
+.date-chip.active {
+  background: var(--gradient-primary);
+  border-color: transparent;
+  box-shadow: 0 5px 15px var(--primary-glow);
+}
+
+.date-chip:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.slot-card {
+  display: block;
+  padding: 8px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  color: var(--text-main);
+  text-decoration: none;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.slot-card:hover {
+  border-color: var(--primary-color);
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--primary-color);
+}
+
+.slot-card.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.hourly-date-strip::-webkit-scrollbar {
+  height: 4px;
+}
+
+.hourly-date-strip::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: 10px;
+}

@@ -1,0 +1,148 @@
+<h2>Hai Mode Đặt Phòng Tách Riêng</h2>
+<p class="subtitle">Flow chung: <strong>Chọn phòng trước</strong> rồi chuyển giữa <strong>Theo giờ</strong> và <strong>Theo ngày</strong></p>
+
+<div class="split">
+  <div class="mockup" data-choice="mode-hour" onclick="toggleSelect(this)">
+    <div class="mockup-header">Mode 1: Theo giờ</div>
+    <div class="mockup-body">
+      <div style="padding:14px;border:1px solid #4f4f4f;border-radius:14px;background:#181818;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+          <div>
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#b5b5b5;">Phong khong gian</div>
+            <div style="font-size:20px;font-weight:800;">THIEN YET 1</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <div style="padding:8px 12px;border-radius:999px;background:#2a2a2a;border:1px solid #555;">Theo loai combo</div>
+            <div style="padding:8px 12px;border-radius:999px;border:1px solid #777;">Timeline</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+          <button class="mock-button" style="background:#f1d088;color:#241f12;">09-05-2026</button>
+          <button class="mock-button" style="background:#222;border:1px solid #666;">10-05-2026</button>
+          <button class="mock-button" style="background:#222;border:1px solid #666;">11-05-2026</button>
+          <div style="margin-left:auto;font-size:12px;color:#bdbdbd;">Chon ngay truoc, xem tat ca combo con trong</div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="padding:12px;border:1px solid #3f3f3f;border-radius:12px;background:#202020;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <strong>Combo 2 tieng</strong>
+              <span style="font-size:12px;color:#bdbdbd;">Tu template 00:00 -> 24:00</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+              <div style="padding:12px;border-radius:10px;background:#34e635;color:#091509;text-align:center;font-weight:700;">09:30 - 11:30</div>
+              <div style="padding:12px;border-radius:10px;border:1px solid #d8d8d8;text-align:center;">11:30 - 13:30</div>
+              <div style="padding:12px;border-radius:10px;background:#b18a35;color:#fff5d2;text-align:center;font-weight:700;">13:30 - 15:30</div>
+              <div style="padding:12px;border-radius:10px;border:1px solid #d8d8d8;text-align:center;">15:30 - 17:30</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div style="padding:12px;border:1px solid #3f3f3f;border-radius:12px;background:#202020;">
+              <div style="font-weight:700;margin-bottom:10px;">Combo dac biet</div>
+              <div style="display:grid;gap:8px;">
+                <div style="padding:12px;border-radius:10px;background:#34e635;color:#091509;text-align:center;font-weight:700;">Ban ngay 10:00 - 19:00</div>
+                <div style="padding:12px;border-radius:10px;border:1px solid #d8d8d8;text-align:center;">Ban dem 20:00 - 09:00</div>
+              </div>
+            </div>
+
+            <div style="padding:12px;border:1px solid #3f3f3f;border-radius:12px;background:#202020;">
+              <div style="font-weight:700;margin-bottom:10px;">Chi tiet slot dang chon</div>
+              <div style="font-size:13px;color:#cfcfcf;line-height:1.6;">
+                <div>Phong: THIEN YET 1</div>
+                <div>Ngay: 09-05-2026</div>
+                <div>Combo: 2 tieng</div>
+                <div>Khung gio: 13:30 - 15:30</div>
+              </div>
+              <div style="margin-top:12px;">
+                <button class="mock-button" style="width:100%;background:#f1d088;color:#241f12;">Tiep tuc dat phong</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup" data-choice="mode-day" onclick="toggleSelect(this)">
+    <div class="mockup-header">Mode 2: Theo ngày</div>
+    <div class="mockup-body">
+      <div style="padding:14px;border:1px solid #4f4f4f;border-radius:14px;background:#181818;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+          <div>
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#b5b5b5;">Phong khong gian</div>
+            <div style="font-size:20px;font-weight:800;">THIEN YET 1</div>
+          </div>
+          <div style="padding:8px 12px;border-radius:999px;background:#2f2618;border:1px solid #b89a59;color:#f5ddaa;">
+            Check-in 14:00 / Check-out 12:00
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.3fr .9fr;gap:14px;">
+          <div style="border:1px solid #3f3f3f;border-radius:12px;padding:12px;background:#202020;">
+            <div style="font-weight:700;margin-bottom:10px;">Lich ngay con trong</div>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;font-size:12px;text-align:center;">
+              <div style="color:#999;">T2</div>
+              <div style="color:#999;">T3</div>
+              <div style="color:#999;">T4</div>
+              <div style="color:#999;">T5</div>
+              <div style="color:#999;">T6</div>
+              <div style="color:#999;">T7</div>
+              <div style="color:#999;">CN</div>
+
+              <div style="padding:12px 0;border-radius:10px;background:#2a2a2a;color:#666;">5</div>
+              <div style="padding:12px 0;border-radius:10px;background:#2a2a2a;color:#666;">6</div>
+              <div style="padding:12px 0;border-radius:10px;background:#2a2a2a;color:#666;">7</div>
+              <div style="padding:12px 0;border-radius:10px;background:#2a2a2a;color:#666;">8</div>
+              <div style="padding:12px 0;border-radius:10px;background:#34e635;color:#091509;font-weight:800;">9</div>
+              <div style="padding:12px 0;border-radius:10px;background:#b18a35;color:#fff5d2;font-weight:800;">10</div>
+              <div style="padding:12px 0;border-radius:10px;background:#34e635;color:#091509;font-weight:800;">11</div>
+
+              <div style="padding:12px 0;border-radius:10px;background:#34e635;color:#091509;font-weight:800;">12</div>
+              <div style="padding:12px 0;border-radius:10px;background:#ff5b5b22;border:1px solid #ff6a6a;color:#ff9f9f;">13</div>
+              <div style="padding:12px 0;border-radius:10px;background:#34e635;color:#091509;font-weight:800;">14</div>
+              <div style="padding:12px 0;border-radius:10px;background:#34e635;color:#091509;font-weight:800;">15</div>
+              <div style="padding:12px 0;border-radius:10px;background:#34e635;color:#091509;font-weight:800;">16</div>
+              <div style="padding:12px 0;border-radius:10px;background:#34e635;color:#091509;font-weight:800;">17</div>
+              <div style="padding:12px 0;border-radius:10px;background:#34e635;color:#091509;font-weight:800;">18</div>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:#bdbdbd;">
+              <div><span style="display:inline-block;width:10px;height:10px;background:#34e635;border-radius:50%;margin-right:6px;"></span>Con trong</div>
+              <div><span style="display:inline-block;width:10px;height:10px;background:#b18a35;border-radius:50%;margin-right:6px;"></span>Dang chon</div>
+              <div><span style="display:inline-block;width:10px;height:10px;border:1px solid #ff6a6a;border-radius:50%;margin-right:6px;"></span>Da dat</div>
+            </div>
+          </div>
+
+          <div style="border:1px solid #3f3f3f;border-radius:12px;padding:12px;background:#202020;">
+            <div style="font-weight:700;margin-bottom:10px;">Tom tat ky nghi</div>
+            <div style="font-size:13px;color:#d0d0d0;line-height:1.7;">
+              <div>Check-in: 10-05-2026</div>
+              <div>Check-out: 12-05-2026</div>
+              <div>2 dem</div>
+              <div>Khung ap dung: 14:00 -> 12:00</div>
+            </div>
+            <div style="margin-top:12px;padding:10px;border-radius:10px;background:#2b2418;color:#f0d9a5;font-size:12px;line-height:1.6;">
+              Booking theo ngay co the an qua nhieu ngay, nen tach khoi bang slot gio de khach khong nham rang moi ngay la 1 combo doc lap.
+            </div>
+            <div style="margin-top:12px;">
+              <button class="mock-button" style="width:100%;background:#f1d088;color:#241f12;">Tiep tuc dat phong</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:22px;">
+  <div class="options">
+    <div class="option" data-choice="rule-view" onclick="toggleSelect(this)">
+      <div class="letter">R</div>
+      <div class="content">
+        <h3>Rule chong trung lich</h3>
+        <p>Theo gio va theo ngay la 2 mode hien thi rieng, nhung van can mot rule overlap chung ben duoi de khoa slot dung cach.</p>
+      </div>
+    </div>
+  </div>
+</div>

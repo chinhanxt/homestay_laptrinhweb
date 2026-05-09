@@ -1,0 +1,109 @@
+@model IEnumerable<WebHomestay.Models.Room>
+
+@{
+    ViewData["Title"] = "Quản lý Phòng";
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Cơ sở lưu trú</span>
+                <h1>Quản lý Danh sách Phòng</h1>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Create" class="btn-premium">
+                    <i class="fas fa-plus"></i>
+                    <span>Thêm phòng mới</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="admin-card">
+            <div class="admin-table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Ảnh</th>
+                            <th>Thông tin phòng</th>
+                            <th>Chi nhánh</th>
+                            <th>Đơn giá (Ngày/Giờ)</th>
+                            <th>Sức chứa</th>
+                            <th>Trạng thái</th>
+                            <th class="text-end">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(item.ImageUrl))
+                                    {
+                                        <img src="@item.ImageUrl" alt="@item.Name" class="admin-img-thumb" />
+                                    }
+                                    else
+                                    {
+                                        <div class="admin-img-thumb d-flex align-items-center justify-content-center text-muted">
+                                            <i class="fas fa-image"></i>
+                                        </div>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-primary">@item.Name</div>
+                                    <div class="small text-muted">@item.Capacity - @item.MaxGuests khách</div>
+                                </td>
+                                <td>
+                                    <span class="badge-premium badge-primary-soft">@item.Branch?.Name</span>
+                                </td>
+                                <td>
+                                    <div class="small">Ngày: <strong class="text-primary">@item.PricePerDay.ToString("N0")đ</strong></div>
+                                    <div class="small text-muted">Giờ: @item.PricePerHour.ToString("N0")đ</div>
+                                </td>
+                                <td>
+                                    <div class="small">@item.Capacity người</div>
+                                </td>
+                                <td>
+                                    @if (item.Status == "Available")
+                                    {
+                                        <span class="badge-premium badge-success-soft">Sẵn sàng</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-premium badge-warning-soft">Đang bảo trì</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <div class="admin-actions">
+                                        <a asp-controller="AdminSlots" asp-action="RoomSchedules" asp-route-roomId="@item.Id" class="admin-btn-icon" title="Quản lý lịch trình">
+                                            <i class="fas fa-clock"></i>
+                                        </a>
+                                        <a asp-action="Edit" asp-route-id="@item.Id" class="admin-btn-icon" title="Chỉnh sửa">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a asp-action="Delete" asp-route-id="@item.Id" class="admin-btn-icon is-danger" title="Xóa">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-5">
+                                    <div class="text-muted">
+                                        <i class="fas fa-bed fa-3x mb-3 opacity-20"></i>
+                                        <p>Chưa có phòng nào được tạo.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,155 @@
+@model WebHomestay.Models.Room
+
+@{
+    ViewData["Title"] = "Lịch trình phòng " + Model.Name;
+    var templates = ViewBag.Templates as List<WebHomestay.Models.RoomSlotTemplate>;
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Cấu hình vận hành</span>
+                <h1>Lịch trình: @Model.Name</h1>
+                <p class="text-muted small mt-1">Hệ thống sinh khung giờ đặt phòng tự động dựa trên mẫu cấu hình.</p>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Index" class="btn-premium-outline">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Quay lại</span>
+                </a>
+            </div>
+        </header>
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success border-0 shadow-sm mb-4 d-flex align-items-center" style="border-radius: 12px; background: #ecfdf5; color: #065f46;">
+                <i class="fas fa-check-circle me-3 fs-4"></i>
+                <div class="fw-bold">@TempData["SuccessMessage"]</div>
+                <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="admin-card p-4">
+                    <h5 class="fw-bold text-primary mb-4"><i class="fas fa-magic me-2"></i>Áp dụng mẫu mới</h5>
+                    <form asp-action="ApplyTemplate" method="post">
+                        <input type="hidden" name="roomId" value="@Model.Id" />
+                        
+                        <div class="admin-form-group">
+                            <label class="admin-form-label">Chọn mẫu khung giờ</label>
+                            <select name="templateId" class="admin-form-input" required>
+                                <option value="">-- Chọn mẫu cấu hình --</option>
+                                @foreach (var t in templates ?? new())
+                                {
+                                    <option value="@t.Id">@t.Name (@t.DurationMinutes phút)</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <div class="admin-form-group">
+                                    <label class="admin-form-label">Từ ngày</label>
+                                    <input type="date" name="startDate" class="admin-form-input" value="@DateTime.Now.ToString("yyyy-MM-dd")" required />
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="admin-form-group">
+                                    <label class="admin-form-label">Đến ngày</label>
+                                    <input type="date" name="endDate" class="admin-form-input" value="@DateTime.Now.AddDays(7).ToString("yyyy-MM-dd")" required />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 pt-2">
+                            <button type="submit" class="btn-premium w-100 justify-content-center py-2 shadow-sm">
+                                <i class="fas fa-calendar-plus"></i>
+                                <span>SINH LỊCH TỰ ĐỘNG</span>
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="mt-4 p-3 rounded" style="background: var(--admin-bg); border: 1px dashed var(--admin-border);">
+                        <p class="small text-muted mb-0">
+                            <i class="fas fa-info-circle text-primary me-1"></i>
+                            Mẹo: Bạn có thể áp dụng nhiều mẫu khác nhau (ví dụ: Combo 2h và Combo 4h) cho cùng một ngày.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-8">
+                <div class="admin-card">
+                    <div class="p-4 border-bottom">
+                        <h5 class="fw-bold mb-0">Lịch trình đã gán cho phòng</h5>
+                    </div>
+                    <div class="admin-table-responsive">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Mẫu cấu hình</th>
+                                    <th>Thời gian hiệu lực</th>
+                                    <th>Trạng thái</th>
+                                    <th class="text-end">Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var assignment in Model.SlotAssignments)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-bold">@assignment.Template?.Name</div>
+                                            <div class="small text-muted">@assignment.Template?.DurationMinutes phút / slot</div>
+                                        </td>
+                                        <td>
+                                            <div class="small fw-bold">@assignment.EffectiveFrom.ToString("dd/MM/yyyy")</div>
+                                            <div class="small text-muted">đến @(assignment.EffectiveTo?.ToString("dd/MM/yyyy") ?? "Vĩnh viễn")</div>
+                                        </td>
+                                        <td>
+                                            @if (assignment.IsActive)
+                                            {
+                                                <span class="badge-premium badge-success-soft">Đang vận hành</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge-premium badge-secondary-soft">Tạm ngưng</span>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="admin-actions">
+                                                <button class="admin-btn-icon" title="Tạm dừng">
+                                                    <i class="fas fa-pause-circle"></i>
+                                                </button>
+                                                <form asp-action="RemoveAssignment" method="post" class="d-inline" onsubmit="return confirm('Gỡ lịch này sẽ xóa tất cả các ô lịch TRỐNG liên quan trong tương lai của phòng này. Bạn chắc chắn chứ?')">
+                                                    <input type="hidden" name="assignmentId" value="@assignment.Id" />
+                                                    <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent" title="Gỡ lịch">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!Model.SlotAssignments.Any())
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-center py-5">
+                                            <div class="text-muted opacity-50">
+                                                <i class="fas fa-calendar-times fa-3x mb-3"></i>
+                                                <p>Chưa có lịch trình nào được áp dụng.</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

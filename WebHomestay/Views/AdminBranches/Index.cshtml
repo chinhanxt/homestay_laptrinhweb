@@ -1,0 +1,80 @@
+@model IEnumerable<WebHomestay.Models.Branch>
+
+@{
+    ViewData["Title"] = "Quản lý Chi nhánh";
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Hệ thống vận hành</span>
+                <h1>Quản lý Chi nhánh</h1>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Create" class="btn-premium">
+                    <i class="fas fa-plus"></i>
+                    <span>Thêm chi nhánh mới</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="admin-card">
+            <div class="admin-table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Tên chi nhánh</th>
+                            <th>Địa chỉ</th>
+                            <th>Hotline</th>
+                            <th class="text-end">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-primary">@item.Name</div>
+                                    <div class="small text-muted">ID: #@item.Id</div>
+                                </td>
+                                <td>
+                                    <div class="small"><i class="fas fa-map-marker-alt me-2 text-muted"></i>@item.Address</div>
+                                </td>
+                                <td>
+                                    <div class="small"><i class="fas fa-phone me-2 text-muted"></i>@item.Hotline</div>
+                                </td>
+                                <td class="text-end">
+                                    <div class="admin-actions">
+                                        <a asp-action="Edit" asp-route-id="@item.Id" class="admin-btn-icon" title="Chỉnh sửa">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a asp-action="Details" asp-route-id="@item.Id" class="admin-btn-icon" title="Chi tiết">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a asp-action="Delete" asp-route-id="@item.Id" class="admin-btn-icon is-danger" title="Xóa">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center py-5">
+                                    <div class="text-muted">
+                                        <i class="fas fa-building fa-3x mb-3 opacity-20"></i>
+                                        <p>Chưa có chi nhánh nào trong hệ thống.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

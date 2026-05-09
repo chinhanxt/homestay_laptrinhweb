@@ -1,0 +1,76 @@
+@model WebHomestay.Models.RoomSlotTemplate
+
+@{
+    ViewData["Title"] = "Chỉnh sửa Mẫu khung giờ";
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Cấu hình thời gian</span>
+                <h1>Sửa mẫu: @Model.Name</h1>
+                <p class="text-danger small mt-1"><i class="fas fa-exclamation-triangle me-1"></i> Lưu ý: Mọi thay đổi sẽ được đồng bộ tự động tới lịch trình của tất cả các phòng đang sử dụng mẫu này.</p>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Index" class="btn-premium-outline">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Hủy và Quay lại</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="admin-card p-5">
+            <form asp-action="EditTemplate" method="post">
+                <input type="hidden" asp-for="Id" />
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="admin-form-group">
+                            <label class="admin-form-label" asp-for="Name">Tên mẫu (Ví dụ: Combo 4 tiếng)</label>
+                            <input asp-for="Name" class="admin-form-input" placeholder="Nhập tên mẫu..." required />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="admin-form-group">
+                            <label class="admin-form-label" asp-for="Code">Mã định danh (Slug)</label>
+                            <input asp-for="Code" class="admin-form-input" placeholder="ví dụ: combo_4h" required />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="admin-form-group">
+                            <label class="admin-form-label" asp-for="DurationMinutes">Thời lượng (Phút)</label>
+                            <input type="number" asp-for="DurationMinutes" class="admin-form-input" required />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="admin-form-group">
+                            <label class="admin-form-label" asp-for="CleanupMinutes">Thời gian dọn dẹp (Phút)</label>
+                            <input type="number" asp-for="CleanupMinutes" class="admin-form-input" required />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="admin-form-group">
+                            <label class="admin-form-label" asp-for="SeedStartTime">Bắt đầu dự kiến</label>
+                            <input type="time" asp-for="SeedStartTime" class="admin-form-input" />
+                        </div>
+                    </div>
+                    <div class="col-md-12">
+                        <div class="admin-form-group d-flex align-items-center gap-3">
+                            <input type="checkbox" asp-for="IsActive" class="form-check-input" style="width: 20px; height: 20px;" />
+                            <label class="admin-form-label mb-0" asp-for="IsActive">Kích hoạt mẫu này</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-5 pt-3 border-top d-flex gap-3">
+                    <button type="submit" class="btn-premium px-5">
+                        <i class="fas fa-save"></i>
+                        <span>CẬP NHẬT & ĐỒNG BỘ</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

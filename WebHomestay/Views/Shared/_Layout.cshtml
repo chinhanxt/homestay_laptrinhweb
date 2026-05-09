@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Homestay Self Check-in</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/user-premium.css" asp-append-version="true" />
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm premium-nav fixed-top">
+            <div class="container">
+                <a class="navbar-brand fw-bold" asp-area="" asp-controller="Home" asp-action="Index" style="font-family: var(--luxury-font-heading); letter-spacing: 0.1em; color: var(--luxury-primary);">
+                    <i class="fas fa-thin fa-hotel me-2" style="color: var(--luxury-accent);"></i>STAY<span style="color: var(--luxury-accent);">LUXE</span>
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                    <ul class="navbar-nav flex-grow-1">
+                        @if (Context.Session.GetString("AdminUser") != null)
+                        {
+                            <li class="nav-item dropdown">
+                                <a class="nav-link-premium dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" style="color: var(--luxury-accent);">
+                                    Hệ thống Quản trị
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-0 p-3">
+                                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "matrix.view"))
+                                    {
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminMatrix" asp-action="Index"><i class="fas fa-th me-2 text-muted"></i>Ma trận vận hành</a></li>
+                                    }
+                                    
+                                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "branches.view") || 
+                                         WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.view") ||
+                                         WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "bookings.view"))
+                                    {
+                                        <li><hr class="dropdown-divider"></li>
+                                    }
+
+                                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "branches.view"))
+                                    {
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminBranches" asp-action="Index">Quản lý Chi nhánh</a></li>
+                                    }
+                                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.view"))
+                                    {
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminRooms" asp-action="Index">Quản lý Phòng</a></li>
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminSlots" asp-action="Index">Mẫu khung giờ</a></li>
+                                    }
+                                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "bookings.view"))
+                                    {
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminBookings" asp-action="Index">Đơn đặt phòng</a></li>
+                                    }
+                                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.view"))
+                                    {
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminStaff" asp-action="Index">Nhân sự & Bảo mật</a></li>
+                                    }
+                                    @if (Context.Session.GetString("AdminRole") == "SuperAdmin")
+                                    {
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminSettings" asp-action="Index">Cấu hình hệ thống</a></li>
+                                    }
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item py-2 text-danger" asp-controller="AdminAccount" asp-action="Logout">Thoát quản trị</a></li>
+                                </ul>
+                            </li>
+                        }
+                    </ul>
+                    <div class="d-flex align-items-center gap-3">
+                        @* Auth buttons removed as per request *@
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main role="main" style="margin-top: 70px;">
+        @RenderBody()
+    </main>
+
+    <footer class="border-top footer text-muted mt-5 py-4">
+        <div class="container text-center">
+            &copy; 2026 - WebHomestay - Tự động hóa trải nghiệm lưu trú
+        </div>
+    </footer>
+
+    <!-- AI Assistant Widget -->
+    <div class="ai-widget">
+        <i class="fas fa-robot text-white fs-4"></i>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

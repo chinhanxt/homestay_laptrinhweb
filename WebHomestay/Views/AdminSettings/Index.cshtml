@@ -1,0 +1,179 @@
+@model IEnumerable<WebHomestay.Models.SystemSetting>
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Cấu hình hệ thống";
+    var branches = ViewBag.Branches as List<WebHomestay.Models.Branch> ?? new List<WebHomestay.Models.Branch>();
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Sidebar: Danh sách chi nhánh (Bên trái) -->
+        <div class="col-md-4 col-lg-3 mb-4">
+            <div class="card border-0 shadow-sm sticky-top" style="top: 90px; border-radius: 15px;">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="fas fa-store me-2"></i>Chi nhánh</h6>
+                </div>
+                <div class="list-group list-group-flush" id="branch-list" role="tablist">
+                    <a class="list-group-item list-group-item-action active border-0 py-3" id="tab-global" data-bs-toggle="list" href="#global-settings" role="tab">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-primary bg-opacity-10 p-2 rounded-3 me-3 text-primary">
+                                <i class="fas fa-globe"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold small">Toàn hệ thống</div>
+                                <div class="text-muted" style="font-size: 0.7rem;">Cấu hình mặc định</div>
+                            </div>
+                        </div>
+                    </a>
+                    @foreach (var branch in branches)
+                    {
+                        <a class="list-group-item list-group-item-action border-0 py-3" id="tab-branch-@branch.Id" data-bs-toggle="list" href="#branch-@branch.Id-settings" role="tab">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-light p-2 rounded-3 me-3 text-muted">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold small">@branch.Name</div>
+                                    <div class="text-muted" style="font-size: 0.7rem;">ID: #@branch.Id</div>
+                                </div>
+                            </div>
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Content: Form cấu hình (Bên phải) -->
+        <div class="col-md-8 col-lg-9">
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success border-0 shadow-sm rounded-4 mb-4 animate__animated animate__fadeInDown">
+                    <i class="fas fa-check-circle me-2"></i> @TempData["SuccessMessage"]
+                </div>
+            }
+
+            <div class="tab-content">
+                <!-- Cấu hình toàn hệ thống -->
+                <div class="tab-pane fade show active" id="global-settings" role="tabpanel">
+                    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                        <div class="card-header bg-white border-0 py-3">
+                            <h5 class="mb-0 fw-bold">Cấu hình mặc định toàn cầu</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th class="ps-4 border-0 small fw-bold text-muted">Tham số</th>
+                                            <th class="border-0 small fw-bold text-muted">Giá trị</th>
+                                            <th class="pe-4 border-0 text-end small fw-bold text-muted">Hành động</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var setting in Model)
+                                        {
+                                            <tr>
+                                                <td class="ps-4">
+                                                    <div class="fw-bold text-dark">@setting.SettingKey</div>
+                                                    <div class="text-muted small">@setting.Description</div>
+                                                </td>
+                                                <td style="width: 150px;">
+                                                    <form asp-action="Update" method="post" id="form-global-@setting.Id">
+                                                        <input type="hidden" name="key" value="@setting.SettingKey" />
+                                                        <input type="text" name="value" value="@setting.SettingValue" class="form-control form-control-sm rounded-pill border-0 bg-light px-3" />
+                                                    </form>
+                                                </td>
+                                                <td class="pe-4 text-end">
+                                                    <button type="submit" form="form-global-@setting.Id" class="btn-luxury-save">
+                                                        <span>Lưu thay đổi</span>
+                                                        <i class="fas fa-chevron-right ms-2 small"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cấu hình riêng cho từng chi nhánh -->
+                @foreach (var branch in branches)
+                {
+                    <div class="tab-pane fade" id="branch-@branch.Id-settings" role="tabpanel">
+                        <div class="card border-0 shadow-sm rounded-4">
+                            <div class="card-header bg-white border-0 py-3">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-primary bg-opacity-10 p-2 rounded-3 me-3 text-primary">
+                                        <i class="fas fa-building"></i>
+                                    </div>
+                                    <h5 class="mb-0 fw-bold">Cấu hình: @branch.Name</h5>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <form asp-action="UpdateBranch" method="post" class="row g-3 align-items-end">
+                                    <input type="hidden" name="branchId" value="@branch.Id" />
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">Số giờ đặt trước tối thiểu (Lead Time)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text border-0 bg-light rounded-start-pill"><i class="fas fa-clock text-muted"></i></span>
+                                            <input type="number" name="leadTime" value="@branch.BookingLeadTimeHours" class="form-control border-0 bg-light rounded-end-pill" placeholder="Ví dụ: 2">
+                                        </div>
+                                        <div class="form-text small text-muted mt-2">
+                                            Khách hàng sẽ không thấy các khung giờ bắt đầu sớm hơn hiện tại + số giờ này.
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <button type="submit" class="btn-luxury-save w-100 w-md-auto">
+                                            <i class="fas fa-save me-2"></i> Lưu cấu hình chi nhánh
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .list-group-item.active { background-color: rgba(13, 110, 253, 0.05) !important; border-right: 3px solid #0d6efd !important; color: #0d6efd !important; }
+    .list-group-item { transition: all 0.2s ease; cursor: pointer; }
+    .list-group-item:hover:not(.active) { background-color: #f8f9fa; transform: translateX(5px); }
+    .tab-pane { animation: fadeIn 0.3s ease-in-out; }
+    @@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Luxury Button Style */
+    .btn-luxury-save {
+        background: linear-gradient(135deg, #b8860b 0%, #daa520 100%);
+        color: white;
+        border: none;
+        padding: 0.6rem 1.5rem;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+        box-shadow: 0 4px 15px rgba(184, 134, 11, 0.2);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-transform: uppercase;
+    }
+
+    .btn-luxury-save:hover {
+        background: linear-gradient(135deg, #daa520 0%, #b8860b 100%);
+        box-shadow: 0 6px 20px rgba(184, 134, 11, 0.4);
+        transform: translateY(-2px);
+        color: white;
+    }
+
+    .btn-luxury-save:active {
+        transform: translateY(0);
+    }
+</style>

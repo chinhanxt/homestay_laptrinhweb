@@ -1,0 +1,177 @@
+@model WebHomestay.Models.ViewModels.RoomDetailsViewModel
+@{
+    ViewData["Title"] = Model.Room.Name;
+}
+
+<div class="container py-5 mt-5">
+    <div class="mb-4 reveal-up">
+        <a asp-controller="Home" asp-action="Index" class="text-decoration-none text-muted small fw-bold text-uppercase" style="letter-spacing: 0.1em;">
+            <i class="fas fa-chevron-left me-1"></i> Quay lại tìm kiếm
+        </a>
+    </div>
+
+    <div class="row g-5">
+        <!-- Main Content Column -->
+        <div class="col-lg-8 reveal-up">
+            <div class="mb-5">
+                <span class="luxury-kicker">@Model.Room.Branch?.Name</span>
+                <h1 class="display-4 fw-bold mb-3" style="font-family: var(--luxury-font-heading); letter-spacing: -0.02em;">@Model.Room.Name</h1>
+                <p class="text-muted fs-5"><i class="fas fa-map-marker-alt me-2 text-accent" style="color: var(--luxury-accent);"></i>@Model.Room.Branch?.Address</p>
+            </div>
+            
+            <div class="mb-5 position-relative">
+                <img src="@(string.IsNullOrEmpty(Model.Room.ImageUrl) ? "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80" : Model.Room.ImageUrl)" 
+                     class="img-fluid w-100" style="height: 550px; object-fit: cover;" alt="@Model.Room.Name">
+                <div class="position-absolute bottom-0 start-0 bg-white p-4 d-none d-md-block" style="margin-left: -20px; margin-bottom: -20px; box-shadow: 20px 20px 0 var(--luxury-bg);">
+                    <h5 class="m-0 fw-bold">Tuyệt tác không gian</h5>
+                </div>
+            </div>
+
+            <div class="row mt-5 pt-4">
+                <div class="col-md-4">
+                    <h4 class="h5 fw-bold text-uppercase mb-4" style="letter-spacing: 0.1em; color: var(--luxury-accent);">Mô tả chi tiết</h4>
+                </div>
+                <div class="col-md-8">
+                    <p class="text-muted fs-5" style="line-height: 1.8;">@Model.Room.Description</p>
+                </div>
+            </div>
+
+            <div class="row mt-5 pt-4">
+                <div class="col-md-4">
+                    <h4 class="h5 fw-bold text-uppercase mb-4" style="letter-spacing: 0.1em; color: var(--luxury-accent);">Tiện nghi cao cấp</h4>
+                </div>
+                <div class="col-md-8">
+                    <div class="row g-4">
+                        @foreach (var amenity in Model.Room.Amenities)
+                        {
+                            <div class="col-6 mb-2">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; background: #f8fafc;">
+                                        <i class="fas @amenity.IconClass text-muted"></i>
+                                    </div>
+                                    <span class="fw-medium">@amenity.Name</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar / Booking Column -->
+        <div class="col-lg-4">
+            <div class="luxury-booking-card sticky-top reveal-up" style="top: 100px; animation-delay: 0.2s;">
+                <div class="mode-switcher-editorial">
+                    <button type="button" class="mode-tab-lux active" data-mode="hourly" onclick="switchBookingMode('hourly')">Theo giờ</button>
+                    <button type="button" class="mode-tab-lux" data-mode="daily" onclick="switchBookingMode('daily')">Theo ngày</button>
+                </div>
+
+                <div class="booking-space" data-room-id="@Model.Room.Id">
+                    <!-- Hourly Panel -->
+                    <section class="booking-mode-panel p-3" data-panel="hourly">
+                        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+                            <h6 class="fw-bold mb-0 text-uppercase" style="letter-spacing: 0.1em; font-size: 0.75rem;">Ngày & Khung giờ</h6>
+                            <div class="fw-bold" style="color: var(--luxury-accent);">@Model.Room.PricePerHour.ToString("N0")đ/h</div>
+                        </div>
+
+                        <div class="d-flex overflow-auto mb-4 pb-2 gap-2" style="scrollbar-width: none;">
+                            @foreach (var day in Model.DailyCalendar.Take(7))
+                            {
+                                <a class="luxury-date-chip @(day.Date == Model.SelectedHourlyDate ? "active" : "") text-decoration-none"
+                                   asp-action="Details" asp-route-id="@Model.Room.Id" asp-route-hourlyDate="@day.Date.ToString("yyyy-MM-dd")">
+                                    <div class="small opacity-75">@day.Date.ToString("ddd")</div>
+                                    <div class="fw-bold">@day.Date.ToString("dd/MM")</div>
+                                </a>
+                            }
+                        </div>
+                        
+                        @if (!Model.HourlyGroups.Any())
+                        {
+                            <div class="text-center py-5 border dashed bg-light opacity-50">
+                                <p class="small m-0">Lịch trình đã đầy cho ngày này.</p>
+                            </div>
+                        }
+
+                        @foreach (var group in Model.HourlyGroups)
+                        {
+                            <div class="mb-4">
+                                <div class="small fw-bold text-muted mb-3 text-uppercase" style="letter-spacing: 0.1em; font-size: 0.65rem;">@group.Title</div>
+                                <div class="luxury-slot-grid">
+                                    @foreach (var slot in group.Slots)
+                                    {
+                                        if (slot.Status == "Available")
+                                        {
+                                            <a asp-controller="Bookings" asp-action="CheckoutHourly" asp-route-roomId="@Model.Room.Id" asp-route-slotId="@slot.SlotId" class="luxury-slot-btn">@slot.Label</a>
+                                        }
+                                        else
+                                        {
+                                            <span class="luxury-slot-btn booked">@slot.Label</span>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </section>
+
+                    <!-- Daily Panel -->
+                    <section class="booking-mode-panel p-3 d-none" data-panel="daily">
+                        <div class="mb-4 pb-3 border-bottom d-flex justify-content-between align-items-end">
+                            <div>
+                                <span class="fs-4 fw-bold">@Model.Room.PricePerDay.ToString("N0")đ</span>
+                                <span class="text-muted small"> / ngày</span>
+                            </div>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-muted small text-decoration-none d-none" id="clear-selection-btn">Bỏ chọn</button>
+                        </div>
+
+                        <form asp-controller="Bookings" asp-action="CheckoutDaily" method="get" id="daily-booking-form">
+                            <input type="hidden" name="roomId" value="@Model.Room.Id" />
+                            <input type="hidden" name="checkInDate" id="checkin-input" />
+                            <input type="hidden" name="checkOutDate" id="checkout-input" />
+
+                            <div class="calendar-wrapper mb-4">
+                                <div class="d-flex justify-content-between mb-3">
+                                    <span class="small fw-bold text-uppercase" style="letter-spacing: 0.1em; font-size: 0.65rem;" id="range-label">Chọn ngày lưu trú</span>
+                                </div>
+                                
+                                <div class="luxury-calendar-grid">
+                                    @foreach (var day in Model.DailyCalendar)
+                                    {
+                                        <div class="lux-cal-day @(day.Status == "Blocked" ? "blocked" : "available")" 
+                                             data-date="@day.Date.ToString("yyyy-MM-dd")"
+                                             data-display="@day.Date.ToString("dd/MM")">
+                                            <div class="opacity-50" style="font-size: 0.6rem;">@day.Date.ToString("ddd")</div>
+                                            <div class="fw-bold">@day.Date.Day</div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="p-3 bg-light mb-4 d-none" id="daily-summary" style="border-left: 2px solid var(--luxury-accent);">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="small text-muted">Nhận:</span>
+                                    <span class="small fw-bold" id="display-checkin">-</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="small text-muted">Trả:</span>
+                                    <span class="small fw-bold" id="display-checkout">-</span>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn-auth-gold w-100 py-3" id="daily-submit-btn" disabled>
+                                ĐẶT NGAY
+                            </button>
+                        </form>
+                    </section>
+                </div>
+
+                <div class="text-center p-3 small text-muted border-top bg-light">
+                    <i class="fas fa-shield-alt me-1 text-success"></i> An toàn & Bảo mật tuyệt đối
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/room-booking.js"></script>
+}

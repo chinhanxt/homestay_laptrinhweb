@@ -1,0 +1,152 @@
+@model WebHomestay.Models.Booking
+
+@{
+    ViewData["Title"] = "Chi tiết Đơn hàng #" + Model.Id;
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Hồ sơ giao dịch</span>
+                <h1>Chi tiết Đơn hàng #@Model.Id</h1>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Index" class="btn-premium-outline">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Quay lại</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <!-- Customer Info Card -->
+                <div class="admin-card mb-4 p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="fw-bold text-primary mb-0"><i class="fas fa-user-circle me-2"></i>Thông tin khách hàng</h5>
+                        <span class="badge-premium @(Model.Status == "Confirmed" ? "badge-success-soft" : "badge-warning-soft")">@Model.Status</span>
+                    </div>
+                    
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <label class="admin-form-label">Họ và tên</label>
+                            <div class="fw-bold fs-5">@Model.CustomerName</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="admin-form-label">SĐT Zalo</label>
+                            <div class="fw-bold fs-5 text-primary">@Model.CustomerPhone</div>
+                            @if (!string.IsNullOrEmpty(Model.CustomerZalo) && Model.CustomerZalo != Model.CustomerPhone)
+                            {
+                                <div class="small text-muted mt-1">
+                                    <i class="fab fa-whatsapp me-1"></i> Zalo phụ: @Model.CustomerZalo
+                                </div>
+                            }
+                        </div>
+                        <div class="col-md-6">
+                            <label class="admin-form-label">Email</label>
+                            <div class="text-muted">@(Model.CustomerEmail ?? "Không cung cấp")</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="admin-form-label">Ghi chú từ khách</label>
+                            <div class="p-3 bg-light rounded italic small">
+                                @(Model.CustomerNote ?? "Không có ghi chú thêm.")
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ID Cards Card -->
+                <div class="admin-card p-4">
+                    <h5 class="fw-bold text-primary mb-4"><i class="fas fa-id-card me-2"></i>Hồ sơ định danh (CCCD)</h5>
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <label class="admin-form-label">Mặt trước</label>
+                            <div class="rounded overflow-hidden border shadow-sm bg-light d-flex align-items-center justify-content-center" style="min-height: 200px;">
+                                @if (!string.IsNullOrEmpty(Model.IdCardFrontPath))
+                                {
+                                    <img src="@Url.Action("ViewIDCard", new { fileName = Model.IdCardFrontPath })" class="w-100" />
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">Chưa tải lên</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="admin-form-label">Mặt sau</label>
+                            <div class="rounded overflow-hidden border shadow-sm bg-light d-flex align-items-center justify-content-center" style="min-height: 200px;">
+                                @if (!string.IsNullOrEmpty(Model.IdCardBackPath))
+                                {
+                                    <img src="@Url.Action("ViewIDCard", new { fileName = Model.IdCardBackPath })" class="w-100" />
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">Chưa tải lên</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <!-- Booking Summary Card -->
+                <div class="admin-card p-4 sticky-top" style="top: 100px; z-index: 10;">
+                    <h5 class="fw-bold text-primary mb-4"><i class="fas fa-receipt me-2"></i>Tóm tắt lưu trú</h5>
+                    
+                    <div class="mb-4">
+                        <label class="admin-form-label">Phòng đặt</label>
+                        <div class="fw-bold">@Model.Room?.Name</div>
+                        <div class="small text-muted">@Model.Room?.Branch?.Name</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="admin-form-label">Thời gian lưu trú</label>
+                        @if (Model.BookingMode == WebHomestay.Models.BookingMode.Hourly)
+                        {
+                            <div class="fw-bold text-primary">@Model.SlotLabel</div>
+                            <div class="small">(@Model.StartTime.ToString("HH:mm") - @Model.EndTime.ToString("HH:mm"))</div>
+                            <div class="small text-muted">Ngày: @Model.StartTime.ToString("dd/MM/yyyy")</div>
+                        }
+                        else
+                        {
+                            <div class="fw-bold text-primary">Theo ngày (Overnight)</div>
+                            <div class="small">Từ: @Model.StartTime.ToString("dd/MM/yyyy HH:mm")</div>
+                            <div class="small">Đến: @Model.EndTime.ToString("dd/MM/yyyy HH:mm")</div>
+                        }
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="admin-form-label">Số khách</label>
+                        <div class="fw-bold">@Model.GuestCount người</div>
+                    </div>
+
+                    <div class="py-3 border-top border-bottom mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="fw-bold">Tổng thanh toán</span>
+                            <span class="fs-4 fw-bold text-primary">@Model.TotalPrice.ToString("N0")đ</span>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        @if (Model.Status == "AwaitingApproval")
+                        {
+                             <button type="button" class="btn-ready py-2 fw-bold rounded-pill" data-bs-toggle="modal" data-bs-target="#approveModal-@Model.Id">
+                                <i class="fas fa-check-double me-2"></i>DUYỆT & GỬI VÉ
+                            </button>
+                        }
+                        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn-premium-outline justify-content-center">
+                            <i class="fas fa-edit me-2"></i>Chỉnh sửa
+                        </a>
+                        <button class="btn btn-link text-danger text-decoration-none small">Hủy đơn hàng này</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Duyệt (nếu cần) - Tương tự như trang Index -->

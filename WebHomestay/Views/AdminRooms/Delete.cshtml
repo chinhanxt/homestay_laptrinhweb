@@ -1,0 +1,27 @@
+@model WebHomestay.Models.Room
+@{
+    ViewData["Title"] = "Xác nhận xóa phòng";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="glass p-4 border border-danger border-opacity-25" style="border-radius: 20px;">
+                <h2 class="fw-bold text-danger mb-4 text-center"><i class="fas fa-exclamation-triangle me-2"></i>Xác nhận xóa</h2>
+                <p class="text-center mb-4">Bạn có chắc chắn muốn xóa phòng <strong>@Model.Name</strong> thuộc chi nhánh <strong>@Model.Branch?.Name</strong>?</p>
+                
+                <div class="alert bg-danger bg-opacity-10 text-white border-0 small mb-4">
+                    <i class="fas fa-info-circle me-2"></i> Hành động này không thể hoàn tác. Mọi dữ liệu liên quan đến phòng này sẽ bị ảnh hưởng.
+                </div>
+
+                <form asp-action="Delete">
+                    <input type="hidden" asp-for="Id" />
+                    <div class="d-flex gap-3 justify-content-center">
+                        <button type="submit" class="btn btn-danger rounded-pill px-5 fw-bold shadow-lg">Xóa ngay</button>
+                        <a asp-action="Index" class="btn btn-outline-light rounded-pill px-4">Hủy bỏ</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

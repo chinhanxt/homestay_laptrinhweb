@@ -1,0 +1,97 @@
+@model IEnumerable<WebHomestay.Models.RoomSlotTemplate>
+
+@{
+    ViewData["Title"] = "Quản lý Mẫu khung giờ";
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Cấu hình thời gian</span>
+                <h1>Quản lý Mẫu khung giờ</h1>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="CreateTemplate" class="btn-premium">
+                    <i class="fas fa-plus"></i>
+                    <span>Thêm mẫu mới</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="admin-card">
+            <div class="admin-table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Tên mẫu</th>
+                            <th>Mã định danh</th>
+                            <th>Thời lượng</th>
+                            <th>Thời gian dọn dẹp</th>
+                            <th>Bắt đầu dự kiến</th>
+                            <th>Trạng thái</th>
+                            <th class="text-end">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-primary">@item.Name</div>
+                                </td>
+                                <td>
+                                    <code class="px-2 py-1 bg-light rounded text-danger small">@item.Code</code>
+                                </td>
+                                <td>
+                                    <div class="small fw-600">@item.DurationMinutes phút</div>
+                                </td>
+                                <td>
+                                    <div class="small text-muted">@item.CleanupMinutes phút</div>
+                                </td>
+                                <td>
+                                    <div class="small"><i class="fas fa-clock me-2 text-muted"></i>@(item.SeedStartTime?.ToString("HH:mm") ?? "00:00")</div>
+                                </td>
+                                <td>
+                                    @if (item.IsActive)
+                                    {
+                                        <span class="badge-premium badge-success-soft">Đang kích hoạt</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-premium badge-secondary-soft">Tạm ngưng</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <div class="admin-actions">
+                                        <a asp-action="EditTemplate" asp-route-id="@item.Id" class="admin-btn-icon" title="Chỉnh sửa">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form asp-action="DeleteTemplate" asp-route-id="@item.Id" method="post" class="d-inline" onsubmit="return confirm('Xóa mẫu này sẽ xóa tất cả các ô lịch TRỐNG liên quan trong tương lai. Bạn chắc chắn chứ?')">
+                                            <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent" title="Xóa">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-5">
+                                    <div class="text-muted">
+                                        <i class="fas fa-history fa-3x mb-3 opacity-20"></i>
+                                        <p>Chưa có mẫu khung giờ nào được định nghĩa.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

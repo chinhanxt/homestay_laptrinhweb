@@ -1,0 +1,81 @@
+@model WebHomestay.Models.Room
+
+@{
+    ViewData["Title"] = "Chi tiết Phòng";
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Hồ sơ cơ sở</span>
+                <h1>Chi tiết Phòng: @Model.Name</h1>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn-premium me-2">
+                    <i class="fas fa-edit"></i>
+                    <span>Chỉnh sửa</span>
+                </a>
+                <a asp-action="Index" class="btn-premium-outline">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Quay lại</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="row g-4">
+            <div class="col-md-5">
+                <div class="admin-card overflow-hidden">
+                    <img src="@(string.IsNullOrEmpty(Model.ImageUrl) ? "https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=800" : Model.ImageUrl)" class="w-100" style="height: 350px; object-fit: cover;" />
+                    <div class="p-4">
+                        <label class="admin-form-label">Phân khúc chi nhánh</label>
+                        <h5 class="fw-bold text-primary">@Model.Branch?.Name</h5>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-7">
+                <div class="admin-card p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-4">
+                        <div>
+                            <label class="admin-form-label">Mô tả tiện ích</label>
+                            <p class="fs-5 text-muted">@Model.Description</p>
+                        </div>
+                        <span class="badge-premium @(Model.Status == "Available" ? "badge-success-soft" : "badge-warning-soft")">@Model.Status</span>
+                    </div>
+
+                    <div class="row g-4 mt-2">
+                        <div class="col-6 col-md-4">
+                            <div class="p-3 bg-light rounded">
+                                <label class="admin-form-label mb-1">Giá theo ngày</label>
+                                <div class="fw-bold text-primary fs-5">@Model.PricePerDay.ToString("N0")đ</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <div class="p-3 bg-light rounded">
+                                <label class="admin-form-label mb-1">Giá theo giờ</label>
+                                <div class="fw-bold text-primary fs-5">@Model.PricePerHour.ToString("N0")đ</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <div class="p-3 bg-light rounded">
+                                <label class="admin-form-label mb-1">Sức chứa</label>
+                                <div class="fw-bold fs-5">@Model.Capacity - @Model.MaxGuests khách</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-5">
+                        <label class="admin-form-label">Thông tin vận hành</label>
+                        <ul class="list-unstyled small">
+                            <li class="mb-2"><i class="fas fa-check-circle me-2 text-ready"></i>Tự động làm trống sau 5 phút nếu khách không thanh toán.</li>
+                            <li class="mb-2"><i class="fas fa-check-circle me-2 text-ready"></i>Cho phép đặt qua Ma trận vận hành.</li>
+                            <li><i class="fas fa-check-circle me-2 text-ready"></i>Tích hợp hệ thống Smart Lock.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,78 @@
+@model WebHomestay.Models.Branch
+
+@{
+    ViewData["Title"] = "Chỉnh sửa Chi nhánh";
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Cập nhật thông tin</span>
+                <h1>Chi nhánh: @Model.Name</h1>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Index" class="btn-premium-outline">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Quay lại</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="admin-form-card">
+            <form asp-action="Edit">
+                <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+                <input type="hidden" asp-for="Id" />
+                
+                <div class="row g-4">
+                    <div class="col-md-7">
+                        <div class="admin-form-group">
+                            <label asp-for="Name" class="admin-form-label">Tên chi nhánh</label>
+                            <input asp-for="Name" class="admin-form-input" />
+                            <span asp-validation-for="Name" class="text-danger small"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="admin-form-group">
+                            <label asp-for="Hotline" class="admin-form-label">Hotline liên hệ</label>
+                            <input asp-for="Hotline" class="admin-form-input" />
+                            <span asp-validation-for="Hotline" class="text-danger small"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-form-group">
+                    <label asp-for="Address" class="admin-form-label">Địa chỉ chi tiết</label>
+                    <input asp-for="Address" class="admin-form-input" />
+                    <span asp-validation-for="Address" class="text-danger small"></span>
+                </div>
+
+                <div class="admin-form-group">
+                    <label asp-for="Description" class="admin-form-label">Mô tả & Giới thiệu</label>
+                    <textarea asp-for="Description" class="admin-form-input" rows="4"></textarea>
+                    <span asp-validation-for="Description" class="text-danger small"></span>
+                </div>
+
+                <div class="admin-form-group">
+                    <label asp-for="MapUrl" class="admin-form-label">Google Maps URL</label>
+                    <input asp-for="MapUrl" class="admin-form-input" />
+                    <span asp-validation-for="MapUrl" class="text-danger small"></span>
+                </div>
+
+                <div class="mt-5 pt-3 border-top d-flex gap-2">
+                    <button type="submit" class="btn-premium px-5">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Cập nhật chi nhánh</span>
+                    </button>
+                    <a asp-action="Index" class="btn-premium-outline">Hủy bỏ</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

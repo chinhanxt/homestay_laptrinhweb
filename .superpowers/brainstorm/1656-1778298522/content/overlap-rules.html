@@ -1,0 +1,78 @@
+<h2>Quy tắc chặn slot khi thời gian bị giao nhau</h2>
+<p class="subtitle">Ví dụ: phòng đã có khách đặt ô <strong>Theo ngày 09:30-19:30</strong> vào ngày 09-05-2026</p>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">Tình huống mẫu</div>
+    <div class="mockup-body">
+      <div style="display:grid;grid-template-columns:140px repeat(5, 1fr);gap:10px;align-items:center;">
+        <div style="font-weight:700;">09-05-2026</div>
+        <div style="border:1px solid #888;border-radius:10px;padding:14px 8px;text-align:center;">09:30-12:30</div>
+        <div style="border:1px solid #888;border-radius:10px;padding:14px 8px;text-align:center;">13:00-16:00</div>
+        <div style="border:1px solid #888;border-radius:10px;padding:14px 8px;text-align:center;">16:30-19:30</div>
+        <div style="border:1px solid #888;border-radius:10px;padding:14px 8px;text-align:center;">Qua đêm<br>20:00-08:30</div>
+        <div style="background:#39e532;color:#081408;border-radius:10px;padding:14px 8px;text-align:center;font-weight:800;">Theo ngày<br>09:30-19:30</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <div class="label">Option A</div>
+      <h3>Chặn theo giờ thật</h3>
+      <p>`Theo ngày` sẽ khóa 3 ô ban ngày vì bị đụng giờ, nhưng vẫn cho đặt `Qua đêm` vì 20:00-08:30 không nằm trong khung 09:30-19:30.</p>
+      <div style="margin-top:12px;display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+        <div style="background:#ff6b6b22;border:1px solid #ff6b6b;border-radius:8px;padding:10px;text-align:center;">Khóa</div>
+        <div style="background:#ff6b6b22;border:1px solid #ff6b6b;border-radius:8px;padding:10px;text-align:center;">Khóa</div>
+        <div style="background:#ff6b6b22;border:1px solid #ff6b6b;border-radius:8px;padding:10px;text-align:center;">Khóa</div>
+        <div style="background:#2fd36b22;border:1px solid #2fd36b;border-radius:8px;padding:10px;text-align:center;">Còn trống</div>
+        <div style="background:#39e532;color:#081408;border-radius:8px;padding:10px;text-align:center;font-weight:700;">Đã đặt</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <div class="label">Option B</div>
+      <h3>Đặt ngày là khóa cả ngày</h3>
+      <p>Hễ có `Theo ngày` thì toàn bộ các ô khác trong cùng dòng ngày đó đều bị khóa để admin nhìn bảng cực đơn giản, không cần suy luận giao giờ.</p>
+      <div style="margin-top:12px;display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+        <div style="background:#ff6b6b22;border:1px solid #ff6b6b;border-radius:8px;padding:10px;text-align:center;">Khóa</div>
+        <div style="background:#ff6b6b22;border:1px solid #ff6b6b;border-radius:8px;padding:10px;text-align:center;">Khóa</div>
+        <div style="background:#ff6b6b22;border:1px solid #ff6b6b;border-radius:8px;padding:10px;text-align:center;">Khóa</div>
+        <div style="background:#ff6b6b22;border:1px solid #ff6b6b;border-radius:8px;padding:10px;text-align:center;">Khóa</div>
+        <div style="background:#39e532;color:#081408;border-radius:8px;padding:10px;text-align:center;font-weight:700;">Đã đặt</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <div class="label">Option C</div>
+      <h3>Có cấp độ ưu tiên</h3>
+      <p>`Theo ngày` và `Qua đêm` là slot mạnh. Khi chọn chúng, hệ thống khóa các slot nhỏ. Cách này linh hoạt hơn nhưng logic admin sẽ phức tạp hơn.</p>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros">
+          <h4>Ưu</h4>
+          <ul>
+            <li>Linh hoạt cho nhiều kiểu kinh doanh</li>
+            <li>Dễ mở rộng combo đặc biệt</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Nhược</h4>
+          <ul>
+            <li>Luật khó nhớ hơn</li>
+            <li>Dễ sinh tranh cãi khi sửa lịch tay</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <p><strong>Câu cần chốt:</strong> Nếu đã có khách đặt <strong>Theo ngày 09:30-19:30</strong>, anh muốn ô <strong>Qua đêm 20:00-08:30</strong> trong cùng ngày đó còn được đặt hay bị khóa luôn?</p>
+</div>

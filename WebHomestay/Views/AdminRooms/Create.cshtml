@@ -1,0 +1,119 @@
+@model WebHomestay.Models.Room
+
+@{
+    ViewData["Title"] = "Thêm Phòng";
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Quản lý cơ sở</span>
+                <h1>Thiết lập Phòng mới</h1>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Index" class="btn-premium-outline">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Quay lại</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="admin-form-card" style="max-width: 900px;">
+            <form asp-action="Create">
+                <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+                
+                <div class="row g-4">
+                    <div class="col-md-8">
+                        <div class="admin-form-group">
+                            <label asp-for="Name" class="admin-form-label">Tên phòng / Mã phòng</label>
+                            <input asp-for="Name" class="admin-form-input" placeholder="VD: Phòng 101 - Gác mái" />
+                            <span asp-validation-for="Name" class="text-danger small"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="admin-form-group">
+                            <label asp-for="BranchId" class="admin-form-label">Chi nhánh</label>
+                            <select asp-for="BranchId" class="admin-form-input" asp-items="ViewBag.BranchId"></select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4 mt-1">
+                    <div class="col-md-4">
+                        <div class="admin-form-group">
+                            <label asp-for="PricePerDay" class="admin-form-label">Giá theo ngày (VNĐ)</label>
+                            <input asp-for="PricePerDay" class="admin-form-input" type="number" />
+                            <span asp-validation-for="PricePerDay" class="text-danger small"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="admin-form-group">
+                            <label asp-for="PricePerHour" class="admin-form-label">Giá theo giờ (VNĐ)</label>
+                            <input asp-for="PricePerHour" class="admin-form-input" type="number" />
+                            <span asp-validation-for="PricePerHour" class="text-danger small"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="admin-form-group">
+                            <label asp-for="ExtraGuestFee" class="admin-form-label">Phí khách thêm (VNĐ)</label>
+                            <input asp-for="ExtraGuestFee" class="admin-form-input" type="number" />
+                            <span asp-validation-for="ExtraGuestFee" class="text-danger small"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4 mt-1">
+                    <div class="col-md-4">
+                        <div class="admin-form-group">
+                            <label asp-for="Capacity" class="admin-form-label">Sức chứa tiêu chuẩn</label>
+                            <input asp-for="Capacity" class="admin-form-input" type="number" />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="admin-form-group">
+                            <label asp-for="MaxGuests" class="admin-form-label">Số khách tối đa</label>
+                            <input asp-for="MaxGuests" class="admin-form-input" type="number" />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="admin-form-group">
+                            <label asp-for="Status" class="admin-form-label">Trạng thái vận hành</label>
+                            <select asp-for="Status" class="admin-form-input">
+                                <option value="Available">Available (Sẵn sàng)</option>
+                                <option value="Occupied">Occupied (Đang có khách)</option>
+                                <option value="Maintenance">Maintenance (Bảo trì)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-form-group mt-3">
+                    <label asp-for="Description" class="admin-form-label">Mô tả tiện ích phòng</label>
+                    <textarea asp-for="Description" class="admin-form-input" rows="4" placeholder="TV, Wifi, Điều hòa, View núi..."></textarea>
+                    <span asp-validation-for="Description" class="text-danger small"></span>
+                </div>
+
+                <div class="admin-form-group">
+                    <label asp-for="ImageUrl" class="admin-form-label">Link ảnh đại diện (URL)</label>
+                    <input asp-for="ImageUrl" class="admin-form-input" placeholder="https://..." />
+                    <span asp-validation-for="ImageUrl" class="text-danger small"></span>
+                </div>
+
+                <div class="mt-5 pt-3 border-top d-flex gap-2">
+                    <button type="submit" class="btn-premium px-5">
+                        <i class="fas fa-save"></i>
+                        <span>Lưu phòng</span>
+                    </button>
+                    <a asp-action="Index" class="btn-premium-outline">Hủy bỏ</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

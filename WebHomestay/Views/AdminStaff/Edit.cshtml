@@ -1,0 +1,70 @@
+@model WebHomestay.Models.AdminUser
+@{
+    ViewData["Title"] = "Chỉnh sửa nhân sự";
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Quản trị nhân lực</span>
+                <h1>Cập nhật hồ sơ: @Model.FullName</h1>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Index" class="btn-premium-outline">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Quay lại</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="admin-form-card" style="max-width: 600px;">
+            <form asp-action="Edit" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+                <input type="hidden" asp-for="Id" />
+                
+                <div class="admin-form-group">
+                    <label class="admin-form-label">Tên đăng nhập (Username)</label>
+                    <input asp-for="Username" class="admin-form-input" required />
+                    <span asp-validation-for="Username" class="text-danger small"></span>
+                </div>
+
+                <div class="admin-form-group">
+                    <label class="admin-form-label">Mật khẩu mới (Để trống nếu không đổi)</label>
+                    <input name="newPassword" type="password" class="admin-form-input" placeholder="••••••••" />
+                </div>
+
+                <div class="admin-form-group">
+                    <label class="admin-form-label">Họ và tên</label>
+                    <input asp-for="FullName" class="admin-form-input" required />
+                </div>
+
+                <div class="admin-form-group">
+                    <label class="admin-form-label">Vai trò (Role)</label>
+                    <select asp-for="Role" class="admin-form-input">
+                        <option value="Staff">Nhân viên (Staff)</option>
+                        <option value="Manager">Quản lý chi nhánh (Manager)</option>
+                        <option value="SuperAdmin">Quản trị tối cao (SuperAdmin)</option>
+                    </select>
+                </div>
+
+                <div class="admin-form-group mb-4">
+                    <label class="admin-form-label">Chi nhánh quản lý</label>
+                    <select asp-for="BranchId" class="admin-form-input" asp-items="ViewBag.Branches">
+                        <option value="">-- Tất cả chi nhánh (Global) --</option>
+                    </select>
+                </div>
+
+                <div class="mt-5 d-grid gap-2">
+                    <button type="submit" class="btn-premium py-2 justify-content-center">
+                        <i class="fas fa-check-circle"></i>
+                        <span>CẬP NHẬT TÀI KHOẢN</span>
+                    </button>
+                    <a asp-action="Index" class="btn-premium-outline justify-content-center">Hủy bỏ</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

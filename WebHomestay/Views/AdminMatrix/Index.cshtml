@@ -1,0 +1,1557 @@
+@using System.Text.Json
+@model IEnumerable<WebHomestay.Models.Branch>
+
+@{
+    ViewData["Title"] = "Ma trận vận hành phòng";
+
+    DateTime startDate = ViewBag.StartDate is DateTime start ? start.Date : DateTime.Today;
+    DateTime endDate = ViewBag.EndDate is DateTime end ? end.Date : startDate.AddDays(10);
+    var branches = Model?.Where(branch => branch.Rooms != null && branch.Rooms.Any())
+        .OrderBy(branch => branch.Name)
+        .ToList() ?? new List<WebHomestay.Models.Branch>();
+    var bookings = (ViewBag.Bookings as List<WebHomestay.Models.Booking> ?? new List<WebHomestay.Models.Booking>())
+        .OrderBy(booking => booking.StartTime)
+        .ToList();
+
+    var days = Enumerable.Range(0, (endDate - startDate).Days)
+        .Select(offset => startDate.AddDays(offset))
+        .ToList();
+
+    var rooms = branches
+        .SelectMany(branch => branch.Rooms.OrderBy(room => room.Name))
+        .ToList();
+
+    var today = DateTime.Today;
+    var tomorrow = today.AddDays(1);
+    var rangeOccupiedRooms = bookings
+        .Select(booking => booking.RoomId)
+        .Distinct()
+        .Count();
+    var occupiedTodayCount = bookings
+        .Where(booking => booking.StartTime < tomorrow && booking.EndTime > today)
+        .Select(booking => booking.RoomId)
+        .Distinct()
+        .Count();
+    var arrivalsTodayCount = bookings.Count(booking => booking.StartTime >= today && booking.StartTime < tomorrow);
+    var departuresTodayCount = bookings.Count(booking => booking.EndTime > today && booking.EndTime <= tomorrow);
+    var attentionCount = bookings.Count(booking =>
+        booking.Status is "AwaitingApproval" or "AwaitingPayment" or "PendingPayment");
+
+    Func<int, DateTime, string> cellKey = (roomId, date) => $"{roomId}:{date:yyyy-MM-dd}";
+    Func<string, string> bookingTone = status => status switch
+    {
+        "Confirmed" => "tone-confirmed",
+        "AwaitingApproval" => "tone-attention",
+        "AwaitingPayment" => "tone-pending",
+        "PendingPayment" => "tone-pending",
+        "CheckedIn" => "tone-inhouse",
+        "CheckedOut" => "tone-neutral",
+        _ => "tone-neutral"
+    };
+
+    var bookingsByRoomDate = new Dictionary<string, List<WebHomestay.Models.Booking>>();
+    foreach (var booking in bookings)
+    {
+        if (booking.BookingMode == WebHomestay.Models.BookingMode.Daily)
+        {
+            var visibleStart = booking.StartTime.Date < startDate ? startDate : booking.StartTime.Date;
+            var visibleEndExclusive = booking.EndTime.Date > endDate ? endDate : booking.EndTime.Date;
+
+            for (var date = visibleStart; date < visibleEndExclusive; date = date.AddDays(1))
+            {
+                var key = cellKey(booking.RoomId, date);
+                if (!bookingsByRoomDate.TryGetValue(key, out var bucket))
+                {
+                    bucket = new List<WebHomestay.Models.Booking>();
+                    bookingsByRoomDate[key] = bucket;
+                }
+
+                bucket.Add(booking);
+            }
+        }
+        else
+        {
+            var slotDate = booking.StartTime.Date;
+            if (slotDate >= startDate && slotDate < endDate)
+            {
+                var key = cellKey(booking.RoomId, slotDate);
+                if (!bookingsByRoomDate.TryGetValue(key, out var bucket))
+                {
+                    bucket = new List<WebHomestay.Models.Booking>();
+                    bookingsByRoomDate[key] = bucket;
+                }
+
+                bucket.Add(booking);
+            }
+        }
+    }
+
+    var roomBookingLookup = bookings
+        .GroupBy(booking => booking.RoomId)
+        .ToDictionary(group => group.Key, group => group.OrderBy(booking => booking.StartTime).ToList());
+
+    var matrixPayload = rooms.Select(room =>
+    {
+        var roomBookings = roomBookingLookup.TryGetValue(room.Id, out var value)
+            ? value
+            : new List<WebHomestay.Models.Booking>();
+
+        return new
+        {
+            roomId = room.Id,
+            roomName = room.Name,
+            branchName = room.Branch?.Name ?? string.Empty,
+            capacity = room.Capacity,
+            maxGuests = room.MaxGuests,
+            roomStatus = room.Status,
+            bookings = roomBookings.Select(booking => new
+            {
+                id = booking.Id,
+                customerName = booking.CustomerName,
+                customerPhone = booking.CustomerPhone,
+                customerEmail = booking.CustomerEmail ?? string.Empty,
+                guestCount = booking.GuestCount,
+                status = booking.Status,
+                bookingMode = booking.BookingMode.ToString(),
+                slotLabel = booking.SlotLabel ?? string.Empty,
+                startTime = booking.StartTime.ToString("yyyy-MM-ddTHH:mm:ss"),
+                endTime = booking.EndTime.ToString("yyyy-MM-ddTHH:mm:ss"),
+                totalPrice = booking.TotalPrice,
+                note = booking.CustomerNote ?? string.Empty
+            }).ToList()
+        };
+    }).ToList();
+
+    var matrixPayloadJson = JsonSerializer.Serialize(matrixPayload);
+    var bookingDetailsTemplate = Url.Action("Details", "AdminBookings", new { id = "__id__" }) ?? "/admin/bookings/details/__id__";
+    var bookingIndexUrl = Url.Action("Index", "AdminBookings") ?? "/admin/bookings";
+}
+
+<div class="admin-matrix-page" data-density="standard">
+    <div class="admin-matrix-shell">
+        <header class="admin-matrix-hero">
+            <div class="admin-matrix-hero-copy">
+                <h1>Ma trận vận hành</h1>
+            </div>
+
+            <div class="admin-matrix-nav-group">
+                <a href="?startDate=@startDate.AddDays(-10).ToString("yyyy-MM-dd")" class="admin-matrix-nav-btn" title="10 ngày trước">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+                <a href="?startDate=@DateTime.Today.ToString("yyyy-MM-dd")" class="admin-matrix-nav-btn is-range" title="Về hôm nay">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>@startDate.ToString("dd/MM") - @endDate.AddDays(-1).ToString("dd/MM/yyyy")</span>
+                </a>
+                <a href="?startDate=@startDate.AddDays(10).ToString("yyyy-MM-dd")" class="admin-matrix-nav-btn" title="10 ngày sau">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            </div>
+        </header>
+
+
+        <section class="admin-matrix-toolbar" aria-label="Công cụ lọc ma trận">
+            <div class="admin-matrix-toolbar-group">
+                <label class="admin-field">
+                    <span class="admin-field-label">Tìm phòng</span>
+                    <span class="admin-field-box">
+                        <i class="fas fa-search"></i>
+                        <input id="matrix-search" type="search" name="matrixSearch" autocomplete="off" placeholder="Nhập tên phòng hoặc chi nhánh..." />
+                    </span>
+                </label>
+
+                <label class="admin-field">
+                    <span class="admin-field-label">Lọc nhanh</span>
+                    <span class="admin-field-box is-select">
+                        <i class="fas fa-sliders-h"></i>
+                        <select id="matrix-filter" name="matrixFilter" autocomplete="off">
+                            <option value="all">Tất cả phòng</option>
+                            <option value="occupied">Đang có lịch</option>
+                            <option value="attention">Cần chú ý</option>
+                            <option value="vacant">Trống toàn kỳ</option>
+                        </select>
+                    </span>
+                </label>
+            </div>
+
+            <div class="admin-matrix-toolbar-group is-compact">
+                <div class="admin-matrix-legend">
+                    <span class="legend-pill tone-confirmed">Đã xác nhận</span>
+                    <span class="legend-pill tone-attention">Chờ duyệt</span>
+                    <span class="legend-pill tone-pending">Chờ thanh toán</span>
+                    <span class="legend-pill tone-inhouse">Đang lưu trú</span>
+                </div>
+            </div>
+        </section>
+
+        @if (rooms.Any())
+        {
+            <section class="admin-matrix-board">
+                <div id="matrix-empty-state" class="admin-matrix-empty-search d-none">
+                    <i class="fas fa-grid-2"></i>
+                    <strong>Không có phòng phù hợp bộ lọc hiện tại</strong>
+                    <span>Thử đổi từ khóa tìm kiếm hoặc chuyển lại bộ lọc để xem đầy đủ ma trận.</span>
+                </div>
+
+                <div class="table-responsive admin-matrix-table-wrap">
+                    <table class="table admin-matrix-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th class="sticky-col room-col">
+                                    <span class="table-head-label">Chi nhánh / Phòng</span>
+                                </th>
+                                @foreach (var day in days)
+                                {
+                                    var isToday = day.Date == today;
+                                    <th class="date-col @(isToday ? "is-today" : string.Empty)">
+                                        <span class="date-weekday">@day.ToString("ddd")</span>
+                                        <strong>@day.ToString("dd")</strong>
+                                        <span class="date-month">@day.ToString("MM")</span>
+                                    </th>
+                                }
+                            </tr>
+                        </thead>
+
+                        @foreach (var branch in branches)
+                        {
+                            var branchRooms = branch.Rooms.OrderBy(room => room.Name).ToList();
+                            if (!branchRooms.Any())
+                            {
+                                continue;
+                            }
+
+                            <tbody class="admin-matrix-branch" data-branch-block>
+                                <tr class="branch-divider">
+                                    <td colspan="@(days.Count + 1)">
+                                        <div class="branch-divider-inner">
+                                            <div>
+                                                <strong>@branch.Name</strong>
+                                                <span>@branchRooms.Count phòng trong khu vực này</span>
+                                            </div>
+                                            <span class="branch-divider-count">
+                                                @branchRooms.Count(room => roomBookingLookup.ContainsKey(room.Id)) phòng có lịch
+                                            </span>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                @foreach (var room in branchRooms)
+                                {
+                                    var roomBookings = roomBookingLookup.TryGetValue(room.Id, out var value)
+                                        ? value
+                                        : new List<WebHomestay.Models.Booking>();
+                                    var hasAnyBooking = roomBookings.Any();
+                                    var hasAttention = roomBookings.Any(booking =>
+                                        booking.Status is "AwaitingApproval" or "AwaitingPayment" or "PendingPayment");
+                                    var occupiedInRange = roomBookings.Select(booking => booking.Id).Any();
+                                    var statusChip = room.Status switch
+                                    {
+                                        "Maintenance" => "chip-maintenance",
+                                        "Occupied" => "chip-busy",
+                                        _ => "chip-ready"
+                                    };
+
+                                    <tr data-room-row
+                                        data-search="@($"{room.Name} {branch.Name}".ToLowerInvariant())"
+                                        data-occupied="@(occupiedInRange.ToString().ToLowerInvariant())"
+                                        data-attention="@(hasAttention.ToString().ToLowerInvariant())"
+                                        data-vacant="@((!occupiedInRange).ToString().ToLowerInvariant())">
+                                        <td class="sticky-col room-col">
+                                            <button type="button" class="room-summary-trigger" data-room-trigger data-room-id="@room.Id">
+                                                <span class="room-summary-main">
+                                                    <strong>@room.Name</strong>
+                                                    <span>@room.Capacity khách tiêu chuẩn · tối đa @room.MaxGuests khách</span>
+                                                </span>
+                                                <span class="room-summary-meta">
+                                                    <span class="room-status-chip @statusChip">@room.Status</span>
+                                                    @if (hasAttention)
+                                                    {
+                                                        <span class="room-attention-chip">Có việc cần xem</span>
+                                                    }
+                                                </span>
+                                            </button>
+                                        </td>
+
+                                        @foreach (var day in days)
+                                        {
+                                            bookingsByRoomDate.TryGetValue(cellKey(room.Id, day), out var dayBookings);
+                                            dayBookings ??= new List<WebHomestay.Models.Booking>();
+
+                                            <td class="matrix-cell-col">
+                                                <button type="button"
+                                                        class="admin-matrix-cell @(dayBookings.Any() ? "has-bookings" : "is-empty")"
+                                                        data-room-cell
+                                                        data-room-id="@room.Id"
+                                                        data-date="@day.ToString("yyyy-MM-dd")"
+                                                        data-date-label="@day.ToString("dddd, dd/MM/yyyy")"
+                                                        aria-label="Phòng @room.Name, ngày @day.ToString("dd/MM/yyyy"), @(dayBookings.Count == 0 ? "trống" : $"{dayBookings.Count} lịch")">
+                                                    @if (dayBookings.Any())
+                                                    {
+                                                        foreach (var booking in dayBookings.Take(2))
+                                                        {
+                                                            var toneClass = bookingTone(booking.Status);
+                                                            var isDaily = booking.BookingMode == WebHomestay.Models.BookingMode.Daily;
+                                                            var isStartSegment = isDaily && day.Date == booking.StartTime.Date;
+                                                            var isEndSegment = isDaily && day.Date == booking.EndTime.Date.AddDays(-1);
+                                                            var bookingTitle = isDaily
+                                                                ? (isStartSegment ? "Nhận phòng" : "Đang lưu trú")
+                                                                : (!string.IsNullOrWhiteSpace(booking.SlotLabel) ? booking.SlotLabel : "Theo giờ");
+                                                            var bookingSubtitle = isStartSegment || !isDaily
+                                                                ? booking.CustomerName
+                                                                : $"Đến {booking.EndTime:dd/MM}";
+
+                                                            <span class="matrix-booking @toneClass @(isDaily ? "is-daily" : "is-hourly") @(isStartSegment ? "is-start" : string.Empty) @(isEndSegment ? "is-end" : string.Empty)">
+                                                                <span class="matrix-booking-title">@bookingTitle</span>
+                                                                <span class="matrix-booking-subtitle">@bookingSubtitle</span>
+                                                            </span>
+                                                        }
+
+                                                        @if (dayBookings.Count > 2)
+                                                        {
+                                                            <span class="matrix-booking-overflow">+@(dayBookings.Count - 2) lịch</span>
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="matrix-cell-vacancy"></span>
+                                                    }
+                                                </button>
+                                            </td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        }
+                    </table>
+                </div>
+            </section>
+        }
+        else
+        {
+            <section class="admin-matrix-empty">
+                <i class="fas fa-hotel"></i>
+                <strong>Chưa có dữ liệu phòng để hiển thị ma trận</strong>
+                <span>Thêm phòng hoặc gán phòng vào chi nhánh để bắt đầu theo dõi vận hành tại màn này.</span>
+            </section>
+        }
+    </div>
+
+    <div id="matrix-scrim" class="admin-matrix-scrim"></div>
+    <aside id="matrix-drawer" class="admin-matrix-drawer" aria-hidden="true">
+        <div class="drawer-head">
+            <div>
+                <span class="drawer-kicker">Chi tiết phòng / ô lịch</span>
+                <h2 id="drawer-room-name">Chọn một ô hoặc một phòng</h2>
+                <p id="drawer-room-meta">Thông tin chi tiết sẽ hiện tại đây.</p>
+            </div>
+            <button type="button" class="drawer-close" id="drawer-close" aria-label="Đóng chi tiết">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="drawer-body">
+            <section class="drawer-stat-grid" id="drawer-stats">
+                <article class="drawer-stat-card">
+                    <span>Trạng thái</span>
+                    <strong>-</strong>
+                </article>
+                <article class="drawer-stat-card">
+                    <span>Số booking trong kỳ</span>
+                    <strong>-</strong>
+                </article>
+                <article class="drawer-stat-card">
+                    <span>Sức chứa</span>
+                    <strong>-</strong>
+                </article>
+            </section>
+
+            <section class="drawer-section">
+                <div class="drawer-section-head">
+                    <h3 id="drawer-timeline-title">Timeline theo phòng</h3>
+                    <span id="drawer-timeline-badge" class="drawer-section-badge">-</span>
+                </div>
+                <div id="drawer-bookings" class="drawer-booking-list">
+                    <div class="drawer-empty-state">
+                        <i class="fas fa-calendar-check"></i>
+                        <strong>Chưa có lịch nào được chọn</strong>
+                        <span>Bấm vào một phòng hoặc một ô trên ma trận để mở timeline chi tiết.</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </aside>
+</div>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap');
+
+    .admin-matrix-page {
+        --matrix-bg: #f3f0ea;
+        --matrix-surface: rgba(255, 255, 255, 0.88);
+        --matrix-surface-strong: #ffffff;
+        --matrix-border: rgba(24, 40, 60, 0.12);
+        --matrix-border-strong: rgba(24, 40, 60, 0.18);
+        --matrix-text: #1f2d3d;
+        --matrix-text-soft: #617182;
+        --matrix-title: #142033;
+        --matrix-primary: #243b5a;
+        --matrix-primary-soft: #edf3fa;
+        --matrix-gold: #b38a3f;
+        --matrix-ready: #2e7d5a;
+        --matrix-ready-soft: #e6f4ec;
+        --matrix-pending: #ad7a18;
+        --matrix-pending-soft: #fbf2dd;
+        --matrix-attention: #975648;
+        --matrix-attention-soft: #f7e5df;
+        --matrix-inhouse: #426f9e;
+        --matrix-inhouse-soft: #e8f0f8;
+        --matrix-neutral-soft: #eef2f6;
+        --matrix-shadow: 0 24px 60px rgba(24, 40, 60, 0.08);
+        position: relative;
+        background:
+            radial-gradient(circle at top left, rgba(179, 138, 63, 0.10), transparent 28%),
+            linear-gradient(180deg, #fbfaf8 0%, var(--matrix-bg) 100%);
+        color: var(--matrix-text);
+        font-family: 'Source Sans 3', sans-serif;
+        min-height: calc(100vh - 70px);
+        padding: 16px 20px 32px;
+        text-wrap: pretty;
+    }
+
+    .admin-matrix-shell {
+        max-width: 1600px;
+        margin: 0 auto;
+        display: grid;
+        gap: 8px;
+    }
+
+    .admin-matrix-hero,
+    .admin-matrix-summary-strip,
+    .admin-matrix-toolbar,
+    .admin-matrix-board,
+    .admin-matrix-empty,
+    .admin-matrix-drawer {
+        border: 1px solid var(--matrix-border);
+        background: var(--matrix-surface);
+        backdrop-filter: blur(14px);
+        box-shadow: var(--matrix-shadow);
+    }
+
+    .admin-matrix-hero {
+        border-radius: 12px;
+        padding: 10px 16px;
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: center;
+    }
+
+    .admin-matrix-kicker,
+    .drawer-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: var(--matrix-gold);
+        margin-bottom: 4px;
+    }
+
+    .admin-matrix-hero h1 {
+        font-size: 1.4rem;
+        line-height: 1.1;
+        display: inline-block;
+        margin-right: 12px;
+        margin-bottom: 0;
+    }
+
+    .admin-matrix-range-inline {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 10px;
+        background: var(--matrix-primary-soft);
+        color: var(--matrix-primary);
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        vertical-align: middle;
+    }
+
+    .admin-matrix-nav-group {
+        display: flex;
+        gap: 4px;
+        background: var(--matrix-surface-strong);
+        padding: 4px;
+        border-radius: 12px;
+        border: 1px solid var(--matrix-border);
+    }
+
+    .admin-matrix-nav-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        color: var(--matrix-text-soft);
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .admin-matrix-nav-btn:hover {
+        background: var(--matrix-primary-soft);
+        color: var(--matrix-primary);
+    }
+
+    .admin-matrix-nav-btn.is-range {
+        width: auto;
+        padding-inline: 14px;
+        font-weight: 700;
+        font-size: 0.88rem;
+        color: var(--matrix-primary);
+        background: var(--matrix-primary-soft);
+        gap: 8px;
+    }
+
+    .admin-matrix-hero-copy {
+        max-width: 760px;
+    }
+
+    .admin-matrix-hero-copy p,
+    .drawer-head p {
+        margin: 0;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        color: var(--matrix-text-soft);
+    }
+
+    .admin-matrix-range {
+        min-width: 280px;
+        border-radius: 18px;
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #fffefb, #f7f3ec);
+        border: 1px solid rgba(179, 138, 63, 0.20);
+        display: grid;
+        gap: 14px;
+    }
+
+    .admin-matrix-range-label,
+    .admin-field-label,
+    .summary-label,
+    .table-head-label,
+    .drawer-stat-card span {
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--matrix-text-soft);
+    }
+
+    .admin-matrix-range-value {
+        font-family: 'Lexend', sans-serif;
+        color: var(--matrix-title);
+        font-size: 1rem;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-matrix-range-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .admin-matrix-nav-button,
+    .density-button,
+    .drawer-close,
+    .room-summary-trigger,
+    .admin-matrix-cell {
+        transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, color 180ms ease, transform 180ms ease;
+        touch-action: manipulation;
+    }
+
+    .admin-matrix-nav-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--matrix-border);
+        background: var(--matrix-surface-strong);
+        color: var(--matrix-primary);
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .admin-matrix-nav-button:hover,
+    .admin-matrix-nav-button:focus-visible {
+        border-color: rgba(36, 59, 90, 0.28);
+        color: var(--matrix-title);
+        box-shadow: 0 10px 24px rgba(36, 59, 90, 0.10);
+    }
+
+    .admin-matrix-nav-button.is-quiet {
+        background: transparent;
+    }
+
+    .admin-matrix-summary-strip {
+        border-radius: 20px;
+        padding: 12px;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .admin-matrix-summary-card {
+        border-radius: 16px;
+        padding: 12px 14px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(24, 40, 60, 0.08);
+        display: grid;
+        gap: 8px;
+    }
+
+    .admin-matrix-summary-card strong,
+    .drawer-stat-card strong {
+        font-family: 'Lexend', sans-serif;
+        color: var(--matrix-title);
+        font-size: 1.4rem;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .summary-footnote {
+        color: var(--matrix-text-soft);
+        font-size: 0.85rem;
+        line-height: 1.3;
+    }
+
+    .admin-matrix-summary-card.is-warm {
+        background: linear-gradient(180deg, #fff9f2, #fdf3e2);
+        border-color: rgba(179, 138, 63, 0.20);
+    }
+
+    .admin-matrix-toolbar {
+        border-radius: 12px;
+        padding: 10px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .admin-matrix-toolbar-group {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+
+    .admin-matrix-toolbar-group.is-compact {
+        justify-content: flex-end;
+    }
+
+    .admin-field {
+        display: grid;
+        gap: 8px;
+        min-width: 240px;
+    }
+
+    .admin-field-box {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 40px;
+        padding: 0 12px;
+        background: var(--matrix-surface-strong);
+        border-radius: 16px;
+        border: 1px solid var(--matrix-border);
+        color: var(--matrix-text-soft);
+    }
+
+    .admin-field-box:focus-within {
+        border-color: rgba(36, 59, 90, 0.30);
+        box-shadow: 0 0 0 4px rgba(36, 59, 90, 0.08);
+    }
+
+    .admin-field-box input,
+    .admin-field-box select {
+        width: 100%;
+        border: none;
+        background: transparent;
+        color: var(--matrix-title);
+        font-size: 0.92rem;
+        outline: none;
+    }
+
+    .admin-field-box select {
+        cursor: pointer;
+        appearance: none;
+    }
+
+    .density-switch {
+        display: inline-flex;
+        padding: 4px;
+        background: var(--matrix-primary-soft);
+        border-radius: 999px;
+        border: 1px solid rgba(36, 59, 90, 0.10);
+        gap: 4px;
+    }
+
+    .density-button {
+        border: none;
+        background: transparent;
+        color: var(--matrix-text-soft);
+        font-weight: 700;
+        padding: 9px 14px;
+        border-radius: 999px;
+    }
+
+    .density-button.is-active,
+    .density-button:hover,
+    .density-button:focus-visible {
+        background: var(--matrix-surface-strong);
+        color: var(--matrix-primary);
+        box-shadow: 0 6px 18px rgba(36, 59, 90, 0.12);
+    }
+
+    .admin-matrix-legend {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .legend-pill,
+    .room-status-chip,
+    .room-attention-chip,
+    .branch-divider-count,
+    .drawer-section-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        padding: 6px 10px;
+    }
+
+    .tone-confirmed {
+        color: var(--matrix-ready);
+        background: var(--matrix-ready-soft);
+    }
+
+    .tone-attention {
+        color: var(--matrix-attention);
+        background: var(--matrix-attention-soft);
+    }
+
+    .tone-pending {
+        color: var(--matrix-pending);
+        background: var(--matrix-pending-soft);
+    }
+
+    .tone-inhouse {
+        color: var(--matrix-inhouse);
+        background: var(--matrix-inhouse-soft);
+    }
+
+    .tone-neutral {
+        color: var(--matrix-primary);
+        background: var(--matrix-neutral-soft);
+    }
+
+    .admin-matrix-board {
+        border-radius: 28px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .admin-matrix-empty-search,
+    .admin-matrix-empty,
+    .drawer-empty-state {
+        display: grid;
+        place-items: center;
+        text-align: center;
+        gap: 8px;
+        padding: 42px 18px;
+        color: var(--matrix-text-soft);
+    }
+
+    .admin-matrix-empty-search i,
+    .admin-matrix-empty i,
+    .drawer-empty-state i {
+        font-size: 1.8rem;
+        color: var(--matrix-gold);
+    }
+
+    .admin-matrix-table-wrap {
+        max-height: calc(100vh - 160px);
+    }
+
+    .admin-matrix-table {
+        --room-col-width: 280px;
+        margin: 0;
+        color: var(--matrix-text);
+        border-collapse: separate;
+        border-spacing: 0;
+        background: transparent;
+    }
+
+    .admin-matrix-table > :not(caption) > * > * {
+        padding: 0;
+        background: transparent;
+        border-bottom: 1px solid rgba(24, 40, 60, 0.06);
+    }
+
+    .admin-matrix-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 15;
+        background: rgba(251, 249, 245, 0.94);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--matrix-border-strong);
+    }
+
+    .admin-matrix-table .room-col {
+        width: var(--room-col-width);
+        min-width: var(--room-col-width);
+    }
+
+    .sticky-col {
+        position: sticky;
+        left: 0;
+        z-index: 12;
+        background: rgba(251, 249, 245, 0.98);
+        border-right: 1px solid rgba(24, 40, 60, 0.08);
+    }
+
+    .date-col {
+        min-width: 90px;
+        text-align: center;
+        padding: 10px 6px 8px !important;
+    }
+
+    .date-col strong {
+        display: block;
+        color: var(--matrix-title);
+        font-family: 'Lexend', sans-serif;
+        font-size: 0.95rem;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .date-weekday,
+    .date-month {
+        display: block;
+        color: var(--matrix-text-soft);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .date-col.is-today {
+        background: linear-gradient(180deg, rgba(36, 59, 90, 0.10), rgba(36, 59, 90, 0.03));
+    }
+
+    .branch-divider td {
+        background: linear-gradient(90deg, rgba(36, 59, 90, 0.08), rgba(36, 59, 90, 0.02));
+        border-bottom-color: rgba(24, 40, 60, 0.08) !important;
+    }
+
+    .branch-divider-inner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 8px 18px;
+    }
+
+    .branch-divider-inner strong {
+        display: block;
+        font-family: 'Lexend', sans-serif;
+        font-size: 1rem;
+        color: var(--matrix-title);
+    }
+
+    .branch-divider-inner span {
+        color: var(--matrix-text-soft);
+        font-size: 0.85rem;
+    }
+
+    .branch-divider-count {
+        background: rgba(255, 255, 255, 0.76);
+        color: var(--matrix-primary);
+        border: 1px solid rgba(36, 59, 90, 0.10);
+    }
+
+    .room-summary-trigger {
+        width: 100%;
+        border: none;
+        background: transparent;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 16px;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .room-summary-trigger:hover,
+    .room-summary-trigger:focus-visible {
+        background: rgba(36, 59, 90, 0.03);
+        outline: none;
+    }
+
+    .room-summary-main {
+        display: grid;
+        gap: 4px;
+    }
+
+    .room-summary-main strong {
+        color: var(--matrix-title);
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .room-summary-main span,
+    .room-summary-meta {
+        color: var(--matrix-text-soft);
+        font-size: 0.85rem;
+    }
+
+    .room-summary-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+
+    .room-status-chip.chip-ready {
+        color: var(--matrix-ready);
+        background: var(--matrix-ready-soft);
+    }
+
+    .room-status-chip.chip-maintenance {
+        color: var(--matrix-attention);
+        background: var(--matrix-attention-soft);
+    }
+
+    .room-status-chip.chip-busy {
+        color: var(--matrix-inhouse);
+        background: var(--matrix-inhouse-soft);
+    }
+
+    .room-attention-chip {
+        color: var(--matrix-pending);
+        background: var(--matrix-pending-soft);
+    }
+
+    .matrix-cell-col {
+        padding: 0 !important;
+    }
+
+    .admin-matrix-cell {
+        width: 100%;
+        min-height: 84px;
+        border: none;
+        background: transparent;
+        padding: 8px 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        align-items: stretch;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .admin-matrix-cell:hover,
+    .admin-matrix-cell:focus-visible {
+        background: rgba(36, 59, 90, 0.04);
+        outline: none;
+    }
+
+    .matrix-booking {
+        position: relative;
+        display: grid;
+        gap: 3px;
+        padding: 8px 10px;
+        border-radius: 14px;
+        border: 1px solid transparent;
+        min-height: 34px;
+        overflow: hidden;
+    }
+
+    .matrix-booking::before {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 4px;
+        border-radius: 14px 0 0 14px;
+        background: currentColor;
+        opacity: 0.65;
+    }
+
+    .matrix-booking.is-daily {
+        padding-left: 12px;
+        border-radius: 0;
+        margin-inline: -8px;
+    }
+
+    .matrix-booking.is-daily.is-start {
+        border-top-left-radius: 14px;
+        border-bottom-left-radius: 14px;
+        margin-left: 0;
+    }
+
+    .matrix-booking.is-daily.is-end {
+        border-top-right-radius: 14px;
+        border-bottom-right-radius: 14px;
+        margin-right: 0;
+    }
+
+    .matrix-booking-title {
+        color: inherit;
+        font-size: 0.72rem;
+        line-height: 1;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .matrix-booking-subtitle,
+    .matrix-booking-overflow {
+        color: var(--matrix-title);
+        font-size: 0.86rem;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .matrix-booking-overflow {
+        padding-left: 2px;
+        color: var(--matrix-text-soft);
+        font-weight: 700;
+    }
+
+    .admin-matrix-cell.has-bookings .tone-confirmed,
+    .admin-matrix-cell.has-bookings .tone-pending,
+    .admin-matrix-cell.has-bookings .tone-attention,
+    .admin-matrix-cell.has-bookings .tone-inhouse,
+    .admin-matrix-cell.has-bookings .tone-neutral {
+        border-color: rgba(24, 40, 60, 0.06);
+    }
+
+    .matrix-cell-vacancy {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: rgba(36, 59, 90, 0.12);
+        display: inline-block;
+        margin: auto;
+    }
+
+    .admin-matrix-page[data-density="standard"] .admin-matrix-cell {
+        min-height: 84px;
+    }
+
+    .admin-matrix-scrim {
+        position: fixed;
+        inset: 0;
+        background: rgba(13, 23, 37, 0.22);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 180ms ease;
+        z-index: 1040;
+    }
+
+    .admin-matrix-scrim.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .admin-matrix-drawer {
+        position: fixed;
+        top: 82px;
+        right: 18px;
+        bottom: 18px;
+        width: min(440px, calc(100vw - 24px));
+        border-radius: 28px;
+        padding: 22px;
+        padding-bottom: max(22px, env(safe-area-inset-bottom));
+        z-index: 1050;
+        transform: translateX(calc(100% + 24px));
+        opacity: 0;
+        pointer-events: none;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 18px;
+        overscroll-behavior: contain;
+    }
+
+    .admin-matrix-drawer.is-open {
+        transform: translateX(0);
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .drawer-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+    }
+
+    .drawer-head h2 {
+        font-size: 1.5rem;
+    }
+
+    .drawer-close {
+        width: 42px;
+        height: 42px;
+        border-radius: 999px;
+        border: 1px solid var(--matrix-border);
+        background: var(--matrix-surface-strong);
+        color: var(--matrix-primary);
+    }
+
+    .drawer-close:hover,
+    .drawer-close:focus-visible {
+        background: var(--matrix-primary-soft);
+        outline: none;
+    }
+
+    .drawer-body {
+        min-height: 0;
+        overflow-y: auto;
+        display: grid;
+        gap: 18px;
+        padding-right: 2px;
+        overscroll-behavior: contain;
+    }
+
+    .drawer-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .drawer-stat-card {
+        border-radius: 20px;
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.76);
+        border: 1px solid rgba(24, 40, 60, 0.08);
+        display: grid;
+        gap: 8px;
+    }
+
+    .drawer-section {
+        border-radius: 24px;
+        border: 1px solid rgba(24, 40, 60, 0.08);
+        background: rgba(255, 255, 255, 0.76);
+        padding: 16px;
+        display: grid;
+        gap: 14px;
+    }
+
+    .drawer-section-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .drawer-section-head h3 {
+        font-family: 'Lexend', sans-serif;
+        font-size: 1rem;
+        color: var(--matrix-title);
+        margin: 0;
+    }
+
+    .drawer-section-badge {
+        color: var(--matrix-primary);
+        background: var(--matrix-primary-soft);
+    }
+
+    .drawer-booking-list {
+        display: grid;
+        gap: 12px;
+    }
+
+    .drawer-booking-card {
+        border-radius: 20px;
+        padding: 14px;
+        border: 1px solid rgba(24, 40, 60, 0.08);
+        background: var(--matrix-surface-strong);
+        display: grid;
+        gap: 10px;
+    }
+
+    .drawer-booking-top,
+    .drawer-booking-meta,
+    .drawer-booking-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .drawer-booking-name {
+        font-family: 'Lexend', sans-serif;
+        color: var(--matrix-title);
+        font-size: 0.98rem;
+    }
+
+    .drawer-booking-meta span,
+    .drawer-booking-note {
+        color: var(--matrix-text-soft);
+        font-size: 0.92rem;
+        line-height: 1.45;
+    }
+
+    .drawer-booking-actions a {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 999px;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.92rem;
+    }
+
+    .drawer-booking-actions a.primary {
+        background: var(--matrix-primary);
+        color: #fff;
+    }
+
+    .drawer-booking-actions a.secondary {
+        background: var(--matrix-primary-soft);
+        color: var(--matrix-primary);
+    }
+
+    .d-none {
+        display: none !important;
+    }
+
+    @@media (max-width: 1280px) {
+        .admin-matrix-summary-strip {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .admin-matrix-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+    }
+
+    @@media (max-width: 980px) {
+        .admin-matrix-page {
+            padding-inline: 14px;
+        }
+
+        .admin-matrix-hero {
+            flex-direction: column;
+        }
+
+        .admin-matrix-range {
+            min-width: 0;
+            width: 100%;
+        }
+
+        .admin-matrix-summary-strip {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .drawer-stat-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @@media (max-width: 720px) {
+        .admin-matrix-summary-strip {
+            grid-template-columns: 1fr;
+        }
+
+        .admin-matrix-drawer {
+            top: auto;
+            left: 12px;
+            right: 12px;
+            bottom: 12px;
+            width: auto;
+            max-height: calc(100vh - 96px);
+        }
+    }
+</style>
+
+@section Scripts {
+    <script>
+        (() => {
+            const roomPayload = @Html.Raw(matrixPayloadJson);
+            const rooms = new Map(roomPayload.map(room => [room.roomId, room]));
+            const searchInput = document.getElementById('matrix-search');
+            const filterSelect = document.getElementById('matrix-filter');
+            const page = document.querySelector('.admin-matrix-page');
+            const roomRows = Array.from(document.querySelectorAll('[data-room-row]'));
+            const branchBlocks = Array.from(document.querySelectorAll('[data-branch-block]'));
+            const emptyState = document.getElementById('matrix-empty-state');
+            const drawer = document.getElementById('matrix-drawer');
+            const scrim = document.getElementById('matrix-scrim');
+            const drawerClose = document.getElementById('drawer-close');
+            const drawerRoomName = document.getElementById('drawer-room-name');
+            const drawerRoomMeta = document.getElementById('drawer-room-meta');
+            const drawerStats = document.getElementById('drawer-stats');
+            const drawerTimelineTitle = document.getElementById('drawer-timeline-title');
+            const drawerTimelineBadge = document.getElementById('drawer-timeline-badge');
+            const drawerBookings = document.getElementById('drawer-bookings');
+            const bookingDetailsTemplate = '@bookingDetailsTemplate';
+            const bookingIndexUrl = '@bookingIndexUrl';
+            const escapeHtml = value => String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+
+            const statusToneClass = status => {
+                switch (status) {
+                    case 'Confirmed':
+                        return 'tone-confirmed';
+                    case 'AwaitingApproval':
+                        return 'tone-attention';
+                    case 'AwaitingPayment':
+                    case 'PendingPayment':
+                        return 'tone-pending';
+                    case 'CheckedIn':
+                        return 'tone-inhouse';
+                    default:
+                        return 'tone-neutral';
+                }
+            };
+
+            const formatMoney = value => new Intl.NumberFormat('vi-VN').format(value ?? 0) + 'đ';
+
+            const formatDateTime = value => new Intl.DateTimeFormat('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(new Date(value));
+
+            const formatDateOnly = value => new Intl.DateTimeFormat('vi-VN', {
+                weekday: 'long',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            }).format(new Date(value));
+
+            const roomStatusLabel = status => {
+                switch (status) {
+                    case 'Maintenance':
+                        return 'Bảo trì';
+                    case 'Occupied':
+                        return 'Đang có khách';
+                    default:
+                        return 'Sẵn sàng';
+                }
+            };
+
+            const getBookingsForDate = (room, dateKey) => {
+                return room.bookings
+                    .filter(booking => {
+                        const startDate = booking.startTime.slice(0, 10);
+                        const endDate = booking.endTime.slice(0, 10);
+
+                        if (booking.bookingMode === 'Hourly') {
+                            return startDate === dateKey;
+                        }
+
+                        return dateKey >= startDate && dateKey < endDate;
+                    })
+                    .sort((left, right) => left.startTime.localeCompare(right.startTime));
+            };
+
+            const firstFutureBooking = bookings => {
+                const now = new Date();
+                return bookings.find(booking => new Date(booking.startTime) >= now) ?? null;
+            };
+
+            const bookingCardHtml = booking => {
+                const tone = statusToneClass(booking.status);
+                const detailsUrl = bookingDetailsTemplate.replace('__id__', booking.id);
+                const modeText = booking.bookingMode === 'Hourly'
+                    ? (booking.slotLabel || 'Theo giờ')
+                    : 'Theo ngày';
+                const noteHtml = booking.note
+                    ? `<div class="drawer-booking-note">${escapeHtml(booking.note)}</div>`
+                    : '';
+
+                return `
+                    <article class="drawer-booking-card">
+                        <div class="drawer-booking-top">
+                            <div>
+                                <div class="drawer-booking-name">${escapeHtml(booking.customerName)}</div>
+                                <div class="drawer-booking-meta">
+                                    <span>${escapeHtml(modeText)}</span>
+                                    <span>${booking.guestCount} khách</span>
+                                </div>
+                            </div>
+                            <span class="legend-pill ${tone}">${escapeHtml(booking.status)}</span>
+                        </div>
+                        <div class="drawer-booking-meta">
+                            <span>${formatDateTime(booking.startTime)}</span>
+                            <span>${formatDateTime(booking.endTime)}</span>
+                        </div>
+                        <div class="drawer-booking-meta">
+                            <span>${escapeHtml(booking.customerPhone)}</span>
+                            <span>${escapeHtml(booking.customerEmail || 'Chưa có email')}</span>
+                        </div>
+                        ${noteHtml}
+                        <div class="drawer-booking-actions">
+                            <a class="primary" href="${detailsUrl}">
+                                <i class="fas fa-arrow-right"></i>
+                                <span>Xem booking</span>
+                            </a>
+                            <a class="secondary" href="${bookingIndexUrl}">
+                                <i class="fas fa-list"></i>
+                                <span>Tới danh sách đơn</span>
+                            </a>
+                        </div>
+                        <div class="drawer-booking-meta">
+                            <span>Tạm tính</span>
+                            <span>${formatMoney(booking.totalPrice)}</span>
+                        </div>
+                    </article>
+                `;
+            };
+
+            const setDrawerStats = room => {
+                const nextBooking = firstFutureBooking(room.bookings);
+                drawerStats.innerHTML = `
+                    <article class="drawer-stat-card">
+                        <span>Trạng thái phòng</span>
+                        <strong>${roomStatusLabel(room.roomStatus)}</strong>
+                    </article>
+                    <article class="drawer-stat-card">
+                        <span>Số booking trong kỳ</span>
+                        <strong>${room.bookings.length}</strong>
+                    </article>
+                    <article class="drawer-stat-card">
+                        <span>Sức chứa</span>
+                        <strong>${room.capacity}/${room.maxGuests}</strong>
+                    </article>
+                `;
+
+                if (nextBooking) {
+                    drawerRoomMeta.textContent = `${room.branchName} · Lịch tới gần nhất: ${formatDateTime(nextBooking.startTime)}`;
+                } else {
+                    drawerRoomMeta.textContent = `${room.branchName} · Chưa có lịch tiếp theo trong khoảng đang xem`;
+                }
+            };
+
+            const openDrawer = (roomId, dateKey = null, dateLabel = null) => {
+                const room = rooms.get(roomId);
+                if (!room) {
+                    return;
+                }
+
+                const bookings = dateKey ? getBookingsForDate(room, dateKey) : room.bookings;
+                drawerRoomName.textContent = room.roomName;
+                setDrawerStats(room);
+
+                drawerTimelineTitle.textContent = dateKey
+                    ? `Timeline của ${dateLabel ?? dateKey}`
+                    : 'Timeline theo phòng trong khoảng đang xem';
+                drawerTimelineBadge.textContent = `${bookings.length} lịch`;
+
+                if (bookings.length === 0) {
+                    drawerBookings.innerHTML = `
+                        <div class="drawer-empty-state">
+                            <i class="fas fa-moon"></i>
+                            <strong>Ô này đang trống</strong>
+                            <span>${dateKey ? `Không có booking nào phủ ngày ${dateLabel ?? dateKey}.` : 'Phòng này chưa có booking nào trong khoảng ngày hiện tại.'}</span>
+                        </div>
+                    `;
+                } else {
+                    drawerBookings.innerHTML = bookings.map(bookingCardHtml).join('');
+                }
+
+                drawer.setAttribute('aria-hidden', 'false');
+                drawer.classList.add('is-open');
+                scrim.classList.add('is-visible');
+            };
+
+            const closeDrawer = () => {
+                drawer.setAttribute('aria-hidden', 'true');
+                drawer.classList.remove('is-open');
+                scrim.classList.remove('is-visible');
+            };
+
+            const applyFilters = () => {
+                const searchValue = (searchInput?.value || '').trim().toLowerCase();
+                const filterValue = filterSelect?.value || 'all';
+                let visibleRoomCount = 0;
+
+                roomRows.forEach(row => {
+                    const search = row.dataset.search || '';
+                    const matchesSearch = !searchValue || search.includes(searchValue);
+
+                    let matchesFilter = true;
+                    if (filterValue === 'occupied') {
+                        matchesFilter = row.dataset.occupied === 'true';
+                    } else if (filterValue === 'attention') {
+                        matchesFilter = row.dataset.attention === 'true';
+                    } else if (filterValue === 'vacant') {
+                        matchesFilter = row.dataset.vacant === 'true';
+                    }
+
+                    const visible = matchesSearch && matchesFilter;
+                    row.classList.toggle('d-none', !visible);
+                    if (visible) {
+                        visibleRoomCount += 1;
+                    }
+                });
+
+                branchBlocks.forEach(block => {
+                    const visibleRows = block.querySelectorAll('[data-room-row]:not(.d-none)');
+                    block.classList.toggle('d-none', visibleRows.length === 0);
+                });
+
+                emptyState.classList.toggle('d-none', visibleRoomCount !== 0);
+            };
+
+            document.querySelectorAll('[data-room-cell]').forEach(button => {
+                button.addEventListener('click', () => {
+                    openDrawer(
+                        Number(button.dataset.roomId),
+                        button.dataset.date,
+                        button.dataset.dateLabel
+                    );
+                });
+            });
+
+            document.querySelectorAll('[data-room-trigger]').forEach(button => {
+                button.addEventListener('click', () => {
+                    openDrawer(Number(button.dataset.roomId));
+                });
+            });
+
+
+            searchInput?.addEventListener('input', applyFilters);
+            filterSelect?.addEventListener('change', applyFilters);
+            drawerClose?.addEventListener('click', closeDrawer);
+            scrim?.addEventListener('click', closeDrawer);
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape') {
+                    closeDrawer();
+                }
+            });
+
+            applyFilters();
+        })();
+    </script>
+}

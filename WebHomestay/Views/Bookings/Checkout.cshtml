@@ -1,0 +1,187 @@
+@model WebHomestay.Models.ViewModels.BookingCheckoutViewModel
+@{
+    ViewData["Title"] = "Thanh toán & Xác nhận";
+}
+
+<div class="container py-5 mt-5">
+    <div class="mb-4 reveal-up">
+        <a href="javascript:history.back()" class="text-decoration-none text-muted small fw-bold text-uppercase" style="letter-spacing: 0.1em;">
+            <i class="fas fa-chevron-left me-1"></i> Quay lại chi tiết phòng
+        </a>
+    </div>
+
+    <div class="row g-5">
+        <div class="col-lg-8 reveal-up">
+            <div class="mb-5">
+                <span class="luxury-kicker">Xác nhận đặt phòng</span>
+                <h1 class="display-5 fw-bold" style="font-family: var(--luxury-font-heading);">Hoàn tất thông tin</h1>
+            </div>
+
+            <form asp-action="Checkout" method="post" enctype="multipart/form-data" id="checkoutForm">
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-4"></div>
+                <input type="hidden" name="RoomId" value="@Model.Room.Id" />
+                <input type="hidden" name="BookingMode" value="@Model.BookingMode" />
+                <input type="hidden" name="SlotInventoryId" value="@Model.SlotInventoryId" />
+                <input type="hidden" name="CheckInDate" value="@Model.CheckInDate?.ToString("yyyy-MM-dd")" />
+                <input type="hidden" name="CheckOutDate" value="@Model.CheckOutDate?.ToString("yyyy-MM-dd")" />
+
+                <!-- Customer Details -->
+                <div class="row g-4 mb-5">
+                    <div class="col-md-6">
+                        <div class="lux-form-group">
+                            <label class="lux-label">Họ và tên khách hàng</label>
+                            <input name="CustomerName" class="lux-input" placeholder="Ví dụ: Nguyễn Văn A" required />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="lux-form-group">
+                            <label class="lux-label">Số Zalo liên hệ</label>
+                            <input name="CustomerPhone" class="lux-input" placeholder="090x xxx xxx" required />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="lux-form-group">
+                            <label class="lux-label">Địa chỉ Email</label>
+                            <input name="CustomerEmail" class="lux-input" type="email" placeholder="email@example.com" required />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="lux-form-group">
+                            <label class="lux-label">Số lượng khách</label>
+                            <input name="GuestCount" class="lux-input" type="number" min="1" max="@Model.Room.MaxGuests" value="1" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Identity Verification -->
+                <div class="mb-5 pt-4 border-top">
+                    <div class="mb-4">
+                        <h5 class="fw-bold text-uppercase mb-2" style="font-size: 0.8rem; letter-spacing: 0.1em;">Xác thực danh tính (CCCD)</h5>
+                        <p class="text-muted small">Vui lòng tải lên ảnh CCCD để chúng tôi đăng ký tạm trú cho bạn.</p>
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="lux-file-upload" id="upload-front">
+                                <i class="fas fa-id-card-alt mb-2 text-muted icon-status"></i>
+                                <p class="small m-0 text-status">Mặt trước CCCD</p>
+                                <input type="file" name="idCardFront" class="lux-file-input" accept="image/*" onchange="previewFile(this, 'front')" />
+                                <div class="lux-file-preview-container" id="preview-front">
+                                    <img src="" alt="Preview Front" />
+                                </div>
+                                <div class="lux-file-info" id="info-front"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="lux-file-upload" id="upload-back">
+                                <i class="fas fa-id-card-alt mb-2 text-muted icon-status"></i>
+                                <p class="small m-0 text-status">Mặt sau CCCD</p>
+                                <input type="file" name="idCardBack" class="lux-file-input" accept="image/*" onchange="previewFile(this, 'back')" />
+                                <div class="lux-file-preview-container" id="preview-back">
+                                    <img src="" alt="Preview Back" />
+                                </div>
+                                <div class="lux-file-info" id="info-back"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="lux-label">Ghi chú thêm</label>
+                    <textarea name="CustomerNote" class="lux-input" rows="1" placeholder="Yêu cầu đặc biệt nếu có..."></textarea>
+                </div>
+
+                <div class="mt-5">
+                    <button type="submit" class="btn-auth-gold w-100 py-3 fs-5">
+                        TIẾP TỤC ĐẾN THANH TOÁN
+                    </button>
+                    <p class="text-center small text-muted mt-3">
+                        <i class="fas fa-lock me-1"></i> Thông tin của bạn được bảo mật tuyệt đối theo tiêu chuẩn quốc tế.
+                    </p>
+                </div>
+            </form>
+        </div>
+
+        <!-- Order Summary Sidebar -->
+        <div class="col-lg-4">
+            <div class="luxury-booking-card sticky-top reveal-up" style="top: 100px; animation-delay: 0.2s;">
+                <div class="p-4 border-bottom">
+                    <h6 class="fw-bold mb-0 text-uppercase" style="letter-spacing: 0.1em; font-size: 0.75rem;">Chi tiết đặt phòng</h6>
+                </div>
+                <div class="p-4">
+                    <div class="d-flex gap-3 mb-4">
+                        <img src="@(string.IsNullOrEmpty(Model.Room.ImageUrl) ? "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80" : Model.Room.ImageUrl)" 
+                             class="rounded-0" style="width: 100px; height: 75px; object-fit: cover;" />
+                        <div>
+                            <div class="fw-bold" style="font-family: var(--luxury-font-heading);">@Model.Room.Name</div>
+                            <div class="small text-muted">@Model.Room.Branch?.Name</div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="d-flex justify-content-between py-2 border-bottom border-light">
+                            <span class="small text-muted">Loại hình:</span>
+                            <span class="small fw-bold text-uppercase">@(Model.BookingMode == WebHomestay.Models.BookingMode.Hourly ? "Theo giờ" : "Theo ngày")</span>
+                        </div>
+
+                        @if (Model.BookingMode == WebHomestay.Models.BookingMode.Hourly)
+                        {
+                            <div class="d-flex justify-content-between py-2 border-bottom border-light">
+                                <span class="small text-muted">Khung giờ:</span>
+                                <span class="small fw-bold">@Model.SlotLabel</span>
+                            </div>
+                            <div class="d-flex justify-content-between py-2 border-bottom border-light">
+                                <span class="small text-muted">Ngày:</span>
+                                <span class="small fw-bold">@Model.StartTime.ToString("dd/MM/yyyy")</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="d-flex justify-content-between py-2 border-bottom border-light">
+                                <span class="small text-muted">Nhận phòng:</span>
+                                <span class="small fw-bold">@Model.StartTime.ToString("dd/MM/yyyy HH:mm")</span>
+                            </div>
+                            <div class="d-flex justify-content-between py-2 border-bottom border-light">
+                                <span class="small text-muted">Trả phòng:</span>
+                                <span class="small fw-bold">@Model.EndTime.ToString("dd/MM/yyyy HH:mm")</span>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="mt-5 pt-4 border-top">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.1em;">Tổng cộng</span>
+                            <span class="fs-4 fw-bold" style="color: var(--luxury-accent);">@Model.TotalPrice.ToString("N0")đ</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function previewFile(input, side) {
+            const container = document.getElementById('upload-' + side);
+            const previewContainer = document.getElementById('preview-' + side);
+            const previewImg = previewContainer.querySelector('img');
+            const info = document.getElementById('info-' + side);
+            const textStatus = container.querySelector('.text-status');
+            const iconStatus = container.querySelector('.icon-status');
+
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    previewContainer.style.display = 'block';
+                    container.classList.add('selected');
+                    info.innerHTML = '<i class="fas fa-check-circle me-1"></i> Đã chọn: ' + input.files[0].name;
+                    textStatus.style.display = 'none';
+                    iconStatus.className = 'fas fa-check-circle mb-2 text-accent';
+                    iconStatus.style.color = 'var(--luxury-accent)';
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
+}
