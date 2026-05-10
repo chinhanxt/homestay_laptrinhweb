@@ -10,11 +10,13 @@ public class BookingCreationService : IBookingCreationService
 {
     private readonly ApplicationDbContext _context;
     private readonly IAvailabilityService _availabilityService;
+    private readonly PricingService _pricingService;
 
-    public BookingCreationService(ApplicationDbContext context, IAvailabilityService availabilityService)
+    public BookingCreationService(ApplicationDbContext context, IAvailabilityService availabilityService, PricingService pricingService)
     {
         _context = context;
         _availabilityService = availabilityService;
+        _pricingService = pricingService;
     }
 
     public async Task<Booking> CreateHourlyBookingAsync(CreateBookingRequest request)
@@ -39,7 +41,7 @@ public class BookingCreationService : IBookingCreationService
             SlotLabel = inventory.SlotLabel,
             StartTime = inventory.StartTime,
             EndTime = inventory.EndTime,
-            TotalPrice = inventory.Room.PricePerHour + (Math.Max(0, request.GuestCount - inventory.Room.Capacity) * inventory.Room.ExtraGuestFee),
+            TotalPrice = await _pricingService.CalculateStayPriceAsync(request.RoomId, inventory.StartTime, inventory.EndTime, true) + (Math.Max(0, request.GuestCount - inventory.Room.Capacity) * inventory.Room.ExtraGuestFee),
             Status = "AwaitingPayment",
             PaymentStatus = "Unpaid"
         };
@@ -74,7 +76,7 @@ public class BookingCreationService : IBookingCreationService
             BookingMode = BookingMode.Daily,
             StartTime = interval.Start,
             EndTime = interval.End,
-            TotalPrice = (room.PricePerDay * nights) + (Math.Max(0, request.GuestCount - room.Capacity) * room.ExtraGuestFee),
+            TotalPrice = await _pricingService.CalculateStayPriceAsync(request.RoomId, interval.Start, interval.End, false) + (Math.Max(0, request.GuestCount - room.Capacity) * room.ExtraGuestFee),
             Status = "AwaitingPayment",
             PaymentStatus = "Unpaid"
         };

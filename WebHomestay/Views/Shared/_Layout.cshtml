@@ -55,6 +55,10 @@
                                     @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "bookings.view"))
                                     {
                                         <li><a class="dropdown-item py-2" asp-controller="AdminBookings" asp-action="Index">Đơn đặt phòng</a></li>
+                                        @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.view"))
+                                        {
+                                            <li><a class="dropdown-item py-2" asp-controller="AdminImages" asp-action="Index"><i class="fas fa-images me-2 text-muted"></i>Kho ảnh Đơn hàng</a></li>
+                                        }
                                         <li><a class="dropdown-item py-2" asp-controller="Statistics" asp-action="Index">Thống kê doanh thu</a></li>
                                     }
                                     @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.view"))

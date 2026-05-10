@@ -28,4 +28,6 @@ public class CalendarDayViewModel
 {
     public DateOnly Date { get; set; }
     public string Status { get; set; } = string.Empty;
+    public decimal PriceDay { get; set; }
+    public decimal PriceHour { get; set; }
 }

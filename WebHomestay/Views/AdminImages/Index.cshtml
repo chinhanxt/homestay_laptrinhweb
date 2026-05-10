@@ -1,0 +1,225 @@
+@model IEnumerable<WebHomestay.Models.Booking>
+@{
+    ViewData["Title"] = "Quản lý Hình ảnh tập trung";
+    Layout = "_Layout"; 
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<style>
+    .split-container {
+        display: flex;
+        height: calc(100vh - 70px); /* Adjust based on navbar height */
+        background: #f8fafc;
+        overflow: hidden;
+    }
+
+    .list-side {
+        width: 380px;
+        background: white;
+        border-right: 1px solid #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 4px 0 15px rgba(0,0,0,0.02);
+        z-index: 5;
+    }
+
+    .viewer-side {
+        flex: 1;
+        overflow-y: auto;
+        padding: 30px;
+        background: #f1f5f9;
+    }
+
+    .search-box-container {
+        padding: 24px;
+        background: white;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .booking-list-container {
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .booking-item {
+        padding: 18px 24px;
+        border-bottom: 1px solid #f8fafc;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+    }
+
+    .booking-item:hover {
+        background: #f8fafc;
+        padding-left: 30px;
+    }
+
+    .booking-item.active {
+        background: #eff6ff;
+    }
+
+    .booking-item.active::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: #3b82f6;
+        box-shadow: 2px 0 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .status-pill {
+        font-size: 0.65rem;
+        padding: 3px 8px;
+        border-radius: 20px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+    }
+
+    .image-placeholder {
+        background: white;
+        border: 2px dashed #cbd5e1;
+        border-radius: 24px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #94a3b8;
+        padding: 40px;
+        text-align: center;
+    }
+
+    .id-card-img {
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+        transition: transform 0.3s;
+    }
+    
+    .id-card-img:hover {
+        transform: scale(1.02);
+    }
+
+    /* Custom Scrollbar */
+    .booking-list-container::-webkit-scrollbar, .viewer-side::-webkit-scrollbar {
+        width: 6px;
+    }
+    .booking-list-container::-webkit-scrollbar-thumb, .viewer-side::-webkit-scrollbar-thumb {
+        background: #e2e8f0;
+        border-radius: 10px;
+    }
+</style>
+
+<div class="split-container" style="margin: 0; position: fixed; top: 70px; left: 0; right: 0; bottom: 0;">
+    <!-- Danh sách bên trái -->
+    <div class="list-side">
+        <div class="search-box-container">
+            <h5 class="fw-bold mb-3 d-flex align-items-center">
+                <span class="p-2 bg-primary bg-opacity-10 rounded-3 me-2">
+                    <i class="fas fa-images text-primary" style="font-size: 1rem;"></i>
+                </span>
+                Kho ảnh Đơn hàng
+            </h5>
+            <form method="get" id="searchForm">
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-0"><i class="fas fa-search text-muted"></i></span>
+                    <input type="text" name="search" class="form-control bg-light border-0 shadow-none" 
+                           placeholder="Tên, SĐT, mã đơn..." value="@Context.Request.Query["search"]" style="font-size: 0.9rem;">
+                </div>
+            </form>
+        </div>
+        
+        <div class="booking-list-container">
+            @if (!Model.Any())
+            {
+                <div class="p-5 text-center text-muted">
+                    <div class="mb-3"><i class="fas fa-search-minus fs-1 opacity-25"></i></div>
+                    <p class="small">Không có đơn hàng nào có ảnh.</p>
+                </div>
+            }
+            @foreach (var item in Model)
+            {
+                <div class="booking-item" onclick="loadDetails(@item.Id, this)">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="fw-bold text-primary" style="font-size: 0.8rem; letter-spacing: 0.05em;">#@item.Id.ToString().PadLeft(5, '0')</span>
+                        @{
+                            string statusViet = item.Status switch {
+                                "AwaitingApproval" => "Chờ duyệt",
+                                "Confirmed" => "Đã xác nhận",
+                                "CheckedOut" => "Đã trả phòng",
+                                "Cancelled" => "Đã hủy",
+                                "Pending" => "Chờ thanh toán",
+                                _ => item.Status
+                            };
+                            string statusClass = item.Status switch {
+                                "AwaitingApproval" => "bg-warning bg-opacity-10 text-warning",
+                                "Confirmed" => "bg-success bg-opacity-10 text-success",
+                                "CheckedOut" => "bg-info bg-opacity-10 text-info",
+                                "Cancelled" => "bg-danger bg-opacity-10 text-danger",
+                                _ => "bg-light text-dark"
+                            };
+                        }
+                        <span class="status-pill @statusClass">@statusViet</span>
+                    </div>
+                    <div class="fw-bold text-dark mb-1" style="font-size: 1rem;">@item.CustomerName</div>
+                    <div class="d-flex align-items-center text-muted small mb-2">
+                        <i class="far fa-clock me-1"></i> @item.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                    </div>
+                    <div class="d-flex gap-2">
+                        @if (item.PaymentProofUrl != null) { 
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-10 px-2 py-1" style="font-size: 0.6rem;">
+                                <i class="fas fa-file-invoice-dollar me-1"></i>HÓA ĐƠN
+                            </span> 
+                        }
+                        @if (item.IdCardFrontPath != null) { 
+                            <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-10 px-2 py-1" style="font-size: 0.6rem;">
+                                <i class="fas fa-id-card me-1"></i>CCCD
+                            </span> 
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Vùng hiển thị bên phải -->
+    <div class="viewer-side" id="detailsContainer">
+        <div class="image-placeholder">
+            <div class="p-4 bg-primary bg-opacity-10 rounded-circle mb-4">
+                <i class="fas fa-hand-pointer fs-1 text-primary"></i>
+            </div>
+            <h4 class="text-dark fw-bold">Chọn một đơn hàng</h4>
+            <p class="text-muted">Vui lòng chọn đơn hàng bên trái để xem minh chứng thanh toán và hồ sơ định danh.</p>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function loadDetails(id, element) {
+            // Active state
+            document.querySelectorAll('.booking-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+
+            // Loading state
+            $('#detailsContainer').html('<div class="d-flex justify-content-center align-items-center h-100"><div class="spinner-border text-primary" role="status"></div></div>');
+
+            // Ajax load
+            $.get('/admin/images/get-details/' + id, function(data) {
+                $('#detailsContainer').html(data);
+            }).fail(function() {
+                $('#detailsContainer').html('<div class="alert alert-danger">Lỗi khi tải thông tin ảnh.</div>');
+            });
+        }
+
+        // Auto load first item if exists
+        $(document).ready(function() {
+            const firstItem = document.querySelector('.booking-item');
+            if (firstItem) firstItem.click();
+        });
+    </script>
+}

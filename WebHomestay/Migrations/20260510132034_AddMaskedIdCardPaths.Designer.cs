@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WebHomestay.Data;
@@ -11,9 +12,11 @@ using WebHomestay.Data;
 namespace WebHomestay.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260510132034_AddMaskedIdCardPaths")]
+    partial class AddMaskedIdCardPaths
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -373,13 +376,9 @@ namespace WebHomestay.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<decimal>("PriceHolidayPerDay")
+                    b.Property<decimal>("PriceHoliday")
                         .HasColumnType("decimal(10, 2)")
-                        .HasColumnName("price_holiday_per_day");
-
-                    b.Property<decimal>("PriceHolidayPerHour")
-                        .HasColumnType("decimal(10, 2)")
-                        .HasColumnName("price_holiday_per_hour");
+                        .HasColumnName("price_holiday");
 
                     b.Property<decimal>("PricePerDay")
                         .HasColumnType("decimal(10, 2)")
@@ -389,13 +388,9 @@ namespace WebHomestay.Migrations
                         .HasColumnType("decimal(10, 2)")
                         .HasColumnName("price_per_hour");
 
-                    b.Property<decimal>("PriceWeekendPerDay")
+                    b.Property<decimal>("PriceWeekend")
                         .HasColumnType("decimal(10, 2)")
-                        .HasColumnName("price_weekend_per_day");
-
-                    b.Property<decimal>("PriceWeekendPerHour")
-                        .HasColumnType("decimal(10, 2)")
-                        .HasColumnName("price_weekend_per_hour");
+                        .HasColumnName("price_weekend");
 
                     b.Property<string>("Status")
                         .IsRequired()

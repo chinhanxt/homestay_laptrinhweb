@@ -1,1 +1,5 @@
-{"type":"click","text":"B\n    \n      Tự động theo SL khách\n      Khi tích vào, nếu khách tự nhập \"Số lượng khách\" > \"Sức chứa tiêu chuẩn\", hệ thống sẽ tự tính phí nhân với số người dư ra. Ô tích chỉ dùng để \"Xác nhận\" trả phí.","choice":"per_extra","id":null,"timestamp":1778347400325}
+{"type":"click","text":"1\n      \n        Thêm vào Ma trận phân quyền\n        Thêm module \"Quản lý Ảnh\" vào bảng phân quyền Admin hiện có.","choice":"perm-matrix-new","id":null,"timestamp":1778417949359}
+{"type":"click","text":"1\n      \n        Thêm vào Ma trận phân quyền\n        Thêm module \"Quản lý Ảnh\" vào bảng phân quyền Admin hiện có.","choice":"perm-matrix-new","id":null,"timestamp":1778417949810}
+{"type":"click","text":"1\n      \n        Thêm vào Ma trận phân quyền\n        Thêm module \"Quản lý Ảnh\" vào bảng phân quyền Admin hiện có.","choice":"perm-matrix-new","id":null,"timestamp":1778417950467}
+{"type":"click","text":"3\n      \n        Bản gốc dành cho SuperAdmin\n        Chỉ tài khoản cấp cao nhất mới có thể nhấn nút \"Xem ảnh gốc\" trong chi tiết đơn.","choice":"original-for-super","id":null,"timestamp":1778417959435}
+{"type":"click","text":"2\n      \n        Mặc định xem bản Masked\n        Nhân viên khi xem Chi tiết đơn hàng (để duyệt) sẽ chỉ thấy ảnh CCCD đã che mờ.","choice":"masked-by-default","id":null,"timestamp":1778417960952}

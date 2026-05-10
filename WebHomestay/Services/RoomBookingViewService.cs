@@ -11,12 +11,14 @@ public class RoomBookingViewService : IRoomBookingViewService
     private readonly ApplicationDbContext _context;
     private readonly IAvailabilityService _availabilityService;
     private readonly ISettingService _settingService;
+    private readonly PricingService _pricingService;
 
-    public RoomBookingViewService(ApplicationDbContext context, IAvailabilityService availabilityService, ISettingService settingService)
+    public RoomBookingViewService(ApplicationDbContext context, IAvailabilityService availabilityService, ISettingService settingService, PricingService pricingService)
     {
         _context = context;
         _availabilityService = availabilityService;
         _settingService = settingService;
+        _pricingService = pricingService;
     }
 
     public async Task<RoomDetailsViewModel> BuildAsync(Room room, DateOnly selectedHourlyDate)
@@ -75,22 +77,26 @@ public class RoomBookingViewService : IRoomBookingViewService
 
         var blockedDates = await _availabilityService.GetBlockedDatesAsync(room.Id, DateOnly.FromDateTime(DateTime.Today), 30);
 
+        var calendar = new List<CalendarDayViewModel>();
+        for (int i = 0; i < 30; i++)
+        {
+            var date = DateOnly.FromDateTime(DateTime.Today).AddDays(i);
+            var dt = date.ToDateTime(TimeOnly.MinValue);
+            calendar.Add(new CalendarDayViewModel
+            {
+                Date = date,
+                Status = blockedDates.Contains(date) ? "Blocked" : "Available",
+                PriceDay = await _pricingService.GetRoomPriceForDate(room.Id, dt, false),
+                PriceHour = await _pricingService.GetRoomPriceForDate(room.Id, dt, true)
+            });
+        }
+
         return new RoomDetailsViewModel
         {
             Room = room,
             SelectedHourlyDate = selectedHourlyDate,
             HourlyGroups = BuildHourlyGroupsSync(hourlySlots),
-            DailyCalendar = Enumerable.Range(0, 30)
-                .Select(offset =>
-                {
-                    var date = DateOnly.FromDateTime(DateTime.Today).AddDays(offset);
-                    return new CalendarDayViewModel
-                    {
-                        Date = date,
-                        Status = blockedDates.Contains(date) ? "Blocked" : "Available"
-                    };
-                })
-                .ToList()
+            DailyCalendar = calendar
         };
     }
 
@@ -127,7 +133,7 @@ public class RoomBookingViewService : IRoomBookingViewService
             SlotLabel = slot.SlotLabel,
             StartTime = slot.StartTime,
             EndTime = slot.EndTime,
-            TotalPrice = slot.Room.PricePerHour, // Assuming simple pricing for now
+            TotalPrice = await _pricingService.CalculateStayPriceAsync(roomId, slot.StartTime, slot.EndTime, true),
             Capacity = slot.Room.Capacity,
             MaxGuests = slot.Room.MaxGuests,
             ExtraGuestFee = slot.Room.ExtraGuestFee
@@ -150,7 +156,7 @@ public class RoomBookingViewService : IRoomBookingViewService
             CheckOutDate = checkOutDate,
             StartTime = interval.Start,
             EndTime = interval.End,
-            TotalPrice = room.PricePerDay * Math.Max(1, days),
+            TotalPrice = await _pricingService.CalculateStayPriceAsync(roomId, interval.Start, interval.End, false),
             Capacity = room.Capacity,
             MaxGuests = room.MaxGuests,
             ExtraGuestFee = room.ExtraGuestFee

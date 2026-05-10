@@ -13,19 +13,22 @@ namespace WebHomestay.Controllers
         private readonly IRoomBookingViewService _roomBookingViewService;
         private readonly IBookingCreationService _bookingCreationService;
         private readonly IWebHostEnvironment _environment;
+        private readonly IImageMaskingService _maskingService;
 
         public BookingsController(
             ApplicationDbContext context, 
             IAvailabilityService availabilityService, 
             IRoomBookingViewService roomBookingViewService,
             IBookingCreationService bookingCreationService,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            IImageMaskingService maskingService)
         {
             _context = context;
             _availabilityService = availabilityService;
             _roomBookingViewService = roomBookingViewService;
             _bookingCreationService = bookingCreationService;
             _environment = environment;
+            _maskingService = maskingService;
         }
 
         [HttpGet]
@@ -80,8 +83,18 @@ namespace WebHomestay.Controllers
                 // Handle ID Card uploads if provided
                 if (idCardFront != null || idCardBack != null)
                 {
-                    booking.IdCardFrontPath = await SaveSecureFile(idCardFront);
-                    booking.IdCardBackPath = await SaveSecureFile(idCardBack);
+                    if (idCardFront != null)
+                    {
+                        booking.IdCardFrontPath = await SaveSecureFile(idCardFront);
+                        booking.IdCardFrontMaskedPath = await _maskingService.MaskIdCardAsync(booking.IdCardFrontPath!, true);
+                    }
+                    
+                    if (idCardBack != null)
+                    {
+                        booking.IdCardBackPath = await SaveSecureFile(idCardBack);
+                        booking.IdCardBackMaskedPath = await _maskingService.MaskIdCardAsync(booking.IdCardBackPath!, false);
+                    }
+                    
                     await _context.SaveChangesAsync();
                 }
 

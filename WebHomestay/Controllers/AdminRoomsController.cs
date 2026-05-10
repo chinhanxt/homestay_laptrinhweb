@@ -72,7 +72,7 @@ namespace WebHomestay.Controllers
         [AdminAuthorize(Permission = "rooms.create")]
         [HttpPost("create")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,Name,Description,PricePerHour,PricePerDay,PriceWeekend,PriceHoliday,ExtraGuestFee,Capacity,MaxGuests,Status,BranchId")] Room room, IFormFile? mainImageFile, List<IFormFile> illustrationFiles)
+        public async Task<IActionResult> Create([Bind("Id,Name,Description,PricePerHour,PricePerDay,PriceWeekendPerHour,PriceWeekendPerDay,PriceHolidayPerHour,PriceHolidayPerDay,ExtraGuestFee,Capacity,MaxGuests,Status,BranchId")] Room room, IFormFile? mainImageFile, List<IFormFile> illustrationFiles)
         {
             if (ModelState.IsValid)
             {
@@ -115,7 +115,7 @@ namespace WebHomestay.Controllers
         [AdminAuthorize(Permission = "rooms.edit")]
         [HttpPost("edit/{id}")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Description,PricePerHour,PricePerDay,PriceWeekend,PriceHoliday,ExtraGuestFee,Capacity,MaxGuests,Status,BranchId")] Room room, IFormFile? mainImageFile, List<IFormFile> illustrationFiles)
+        public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Description,PricePerHour,PricePerDay,PriceWeekendPerHour,PriceWeekendPerDay,PriceHolidayPerHour,PriceHolidayPerDay,ExtraGuestFee,Capacity,MaxGuests,Status,BranchId")] Room room, IFormFile? mainImageFile, List<IFormFile> illustrationFiles)
         {
             if (id != room.Id) return NotFound();
 

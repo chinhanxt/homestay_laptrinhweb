@@ -33,6 +33,8 @@ namespace WebHomestay.Models
 
         public string? IdCardFrontPath { get; set; }
         public string? IdCardBackPath { get; set; }
+        public string? IdCardFrontMaskedPath { get; set; }
+        public string? IdCardBackMaskedPath { get; set; }
 
         public string? CustomerNote { get; set; }
         public string? AdminNote { get; set; }

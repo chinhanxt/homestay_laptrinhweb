@@ -1,0 +1,139 @@
+<h2>Giao diện Quản lý Ảnh (v2)</h2>
+<p class="subtitle">Bản cập nhật: Loại bỏ nút duyệt, tập trung vào trải nghiệm xem ảnh tập trung</p>
+
+<div class="mockup">
+  <div class="mockup-header">Phân hệ Quản trị: Kho lưu trữ Hình ảnh (Bill & CCCD)</div>
+  <div class="mockup-body" style="background: #f8fafc; padding: 0; min-height: 550px;">
+    <!-- Split Layout -->
+    <div style="display: flex; height: 100%; border-top: 1px solid #e2e8f0;">
+      <!-- Left: Booking List -->
+      <div style="width: 320px; background: white; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column;">
+        <div style="padding: 15px; border-bottom: 1px solid #e2e8f0; background: #fdfdfd;">
+          <div style="font-size: 0.7rem; font-weight: bold; color: #94a3b8; margin-bottom: 8px;">BỘ LỌC ĐƠN HÀNG</div>
+          <input class="mock-input" placeholder="Tìm theo tên, SĐT, mã đơn..." style="margin:0; width: 100%; font-size: 0.85rem;">
+        </div>
+        <div style="flex: 1; overflow-y: auto;">
+          <!-- Item 1 (Selected) -->
+          <div style="padding: 15px; background: #f0f7ff; border-left: 4px solid #0066ff; border-bottom: 1px solid #f1f5f9; cursor: pointer;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+              <span style="font-size: 0.7rem; font-weight: bold; color: #0066ff;">#BK-9921</span>
+              <span style="font-size: 0.65rem; background: #e0f2fe; color: #0369a1; padding: 1px 6px; border-radius: 4px; font-weight: bold;">CÓ CCCD</span>
+            </div>
+            <div style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">Nguyễn Hoàng Nam</div>
+            <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">Deluxe Room • 12/05/2026</div>
+          </div>
+          <!-- Item 2 -->
+          <div style="padding: 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; opacity: 0.7;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+              <span style="font-size: 0.7rem; font-weight: bold; color: #94a3b8;">#BK-9920</span>
+              <span style="font-size: 0.65rem; background: #f1f5f9; color: #64748b; padding: 1px 6px; border-radius: 4px; font-weight: bold;">CHƯA CCCD</span>
+            </div>
+            <div style="font-weight: 600; color: #334155; font-size: 0.95rem;">Lê Minh Khôi</div>
+            <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">Standard Room • 12/05/2026</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Pure Viewer Area -->
+      <div style="flex: 1; background: #fff; display: flex; flex-direction: column;">
+        <div style="padding: 15px 25px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="margin:0; font-size: 1.1rem; color: #0f172a;">Hồ sơ ảnh: Nguyễn Hoàng Nam</h3>
+            <p style="margin:5px 0 0; font-size: 0.8rem; color: #64748b;">Mã đơn: #BK-9921 | Đã thanh toán: 1,200,000đ</p>
+          </div>
+          <div style="display: flex; gap: 10px;">
+             <button class="mock-button" style="padding: 8px 15px; font-size: 0.8rem; background: #f1f5f9; color: #475569;"><i class="fas fa-print"></i> In ảnh</button>
+             <button class="mock-button" style="padding: 8px 15px; font-size: 0.8rem; background: #f1f5f9; color: #475569;"><i class="fas fa-download"></i> Tải về (ZIP)</button>
+          </div>
+        </div>
+
+        <div style="flex: 1; padding: 25px; overflow-y: auto; background: #f8fafc;">
+          <!-- Images Grid -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            
+            <!-- Bill Card -->
+            <div class="card" style="grid-column: span 2;">
+              <div style="padding: 10px 15px; background: #fff; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                <span class="label" style="color: #64748b;"><i class="fas fa-receipt me-2"></i>BIÊN LAI THANH TOÁN</span>
+                <span style="font-size: 0.7rem; color: #22c55e; font-weight: bold;">HỢP LỆ</span>
+              </div>
+              <div class="placeholder" style="height: 350px; background: #fff; border: none; padding: 20px;">
+                <div style="width: 100%; height: 100%; background: #f1f5f9; border-radius: 8px; border: 1px solid #e2e8f0; position: relative;">
+                   <!-- Watermark simulation -->
+                   <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 2rem; color: rgba(0,0,0,0.05); font-weight: bold; white-space: nowrap; pointer-events: none;">STAYLUXE CONFIDENTIAL</div>
+                   <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #cbd5e1; font-size: 3rem;">
+                     <i class="fas fa-image"></i>
+                   </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CCCD Front -->
+            <div class="card">
+               <div style="padding: 10px 15px; background: #fff; border-bottom: 1px solid #f1f5f9;">
+                <span class="label" style="color: #64748b;">CCCD - MẶT TRƯỚC</span>
+              </div>
+              <div style="position: relative; background: #fff; padding: 15px;">
+                <div style="height: 200px; background: #f1f5f9; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; position: relative;">
+                   <!-- Simulating Masked Info -->
+                   <div style="padding: 15px;">
+                      <div style="width: 50px; height: 70px; background: #cbd5e1; border-radius: 4px; margin-bottom: 10px;"></div>
+                      <div style="height: 10px; width: 120px; background: #475569; margin-bottom: 10px;"></div>
+                      <div style="height: 14px; width: 140px; background: #e2e8f0; border: 1px dashed #cbd5e1; border-radius: 2px;"></div>
+                   </div>
+                   <!-- Mask Overlay -->
+                   <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6); color: white; padding: 5px; text-align: center; font-size: 0.65rem; font-weight: bold;">
+                      <i class="fas fa-shield-alt"></i> ĐÃ MASK DỮ LIỆU NHẠY CẢM
+                   </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CCCD Back -->
+            <div class="card">
+               <div style="padding: 10px 15px; background: #fff; border-bottom: 1px solid #f1f5f9;">
+                <span class="label" style="color: #64748b;">CCCD - MẶT SAU</span>
+              </div>
+              <div style="position: relative; background: #fff; padding: 15px;">
+                <div style="height: 200px; background: #f1f5f9; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; position: relative;">
+                   <div style="width: 60px; height: 60px; border: 2px dashed #cbd5e1; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.6rem;">MASKED QR</div>
+                   <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6); color: white; padding: 5px; text-align: center; font-size: 0.65rem; font-weight: bold;">
+                      <i class="fas fa-shield-alt"></i> ĐÃ MASK DỮ LIỆU NHẠY CẢM
+                   </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Xác nhận Quy trình Phân quyền</h3>
+  <div class="options" data-multiselect>
+    <div class="option" data-choice="perm-matrix-new" onclick="toggleSelect(this)">
+      <div class="letter">1</div>
+      <div class="content">
+        <h3>Thêm vào Ma trận phân quyền</h3>
+        <p>Thêm module "Quản lý Ảnh" vào bảng phân quyền Admin hiện có.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="masked-by-default" onclick="toggleSelect(this)">
+      <div class="letter">2</div>
+      <div class="content">
+        <h3>Mặc định xem bản Masked</h3>
+        <p>Nhân viên khi xem Chi tiết đơn hàng (để duyệt) sẽ chỉ thấy ảnh CCCD đã che mờ.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="original-for-super" onclick="toggleSelect(this)">
+      <div class="letter">3</div>
+      <div class="content">
+        <h3>Bản gốc dành cho SuperAdmin</h3>
+        <p>Chỉ tài khoản cấp cao nhất mới có thể nhấn nút "Xem ảnh gốc" trong chi tiết đơn.</p>
+      </div>
+    </div>
+  </div>
+</div>

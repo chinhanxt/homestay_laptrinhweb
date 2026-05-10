@@ -71,7 +71,10 @@
                     <section class="booking-mode-panel p-3" data-panel="hourly">
                         <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
                             <h6 class="fw-bold mb-0 text-uppercase" style="letter-spacing: 0.1em; font-size: 0.75rem;">Ngày & Khung giờ</h6>
-                            <div class="fw-bold" style="color: var(--luxury-accent);">@Model.Room.PricePerHour.ToString("N0")đ/h</div>
+                            <div class="text-end">
+                                <div class="fw-bold" style="color: var(--luxury-accent);" id="hourly-price-display">@Model.Room.PricePerHour.ToString("N0")đ/h</div>
+                                <div id="hourly-price-note" class="small text-muted" style="font-size: 0.6rem;">Giá ngày thường</div>
+                            </div>
                         </div>
 
                         <div class="hourly-date-selection-container mb-4">
@@ -105,7 +108,9 @@
                                     @foreach (var day in Model.DailyCalendar.Take(14))
                                     {
                                         <div class="luxury-date-chip @(day.Date == Model.SelectedHourlyDate ? "active" : "")"
-                                             data-date="@day.Date.ToString("yyyy-MM-dd")">
+                                             data-date="@day.Date.ToString("yyyy-MM-dd")"
+                                             data-price-hour="@day.PriceHour"
+                                             data-price-day="@day.PriceDay">
                                             <div class="chip-day-name label" style="font-size: 0.65rem; margin-bottom: 5px;">@day.Date.ToString("ddd").ToUpper()</div>
                                             <strong class="chip-day-num" style="font-size: 1.2rem;">@day.Date.Day</strong>
                                             @if (day.Date == DateOnly.FromDateTime(DateTime.Today))
@@ -127,8 +132,9 @@
                     <section class="booking-mode-panel p-3 d-none" data-panel="daily">
                         <div class="mb-4 pb-3 border-bottom d-flex justify-content-between align-items-end">
                             <div>
-                                <span class="fs-4 fw-bold">@Model.Room.PricePerDay.ToString("N0")đ</span>
+                                <span class="fs-4 fw-bold" id="daily-price-display">@Model.Room.PricePerDay.ToString("N0")đ</span>
                                 <span class="text-muted small"> / ngày</span>
+                                <div id="daily-price-note" class="small text-muted" style="font-size: 0.6rem;">Giá ngày thường</div>
                             </div>
                             <button type="button" class="btn btn-link btn-sm p-0 text-muted small text-decoration-none d-none" id="clear-selection-btn">Bỏ chọn</button>
                         </div>
@@ -164,7 +170,9 @@
                                     {
                                         <div class="lux-cal-day @(day.Status == "Blocked" ? "blocked" : "available")" 
                                              data-date="@day.Date.ToString("yyyy-MM-dd")"
-                                             data-display="@day.Date.ToString("dd/MM")">
+                                             data-display="@day.Date.ToString("dd/MM")"
+                                             data-price-day="@day.PriceDay"
+                                             data-price-hour="@day.PriceHour">
                                             @if (day.Status == "Blocked")
                                             {
                                                 <span class="booked-label">Đã đặt</span>
@@ -189,6 +197,21 @@
                                     <span class="small text-muted">Trả:</span>
                                     <span class="small fw-bold" id="display-checkout">-</span>
                                 </div>
+
+                                <!-- Price Breakdown -->
+                                <div id="price-breakdown-container" class="mt-3 pt-3 border-top border-dashed d-none">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="small text-muted uppercase fw-bold" style="font-size: 0.6rem; letter-spacing: 0.05em;">Chi tiết giá theo đêm</span>
+                                        <span id="total-nights-count" class="badge bg-light text-dark fw-bold" style="font-size: 0.65rem;">0 đêm</span>
+                                    </div>
+                                    <div id="price-breakdown-list" class="small space-y-1">
+                                        <!-- JS will populate this -->
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                                        <span class="small fw-bold text-uppercase" style="font-size: 0.65rem;">Tổng dự tính</span>
+                                        <span id="range-total-price" class="fw-bold text-primary" style="font-size: 1.1rem;">0đ</span>
+                                    </div>
+                                </div>
                             </div>
 
                             <button type="submit" class="btn-auth-gold w-100 py-3" id="daily-submit-btn" disabled>
@@ -207,5 +230,12 @@
 </div>
 
 @section Scripts {
+    <script>
+        window.RoomPricingData = @Html.Raw(Json.Serialize(Model.DailyCalendar.ToDictionary(d => d.Date.ToString("yyyy-MM-dd"), d => new { d.PriceDay, d.PriceHour })));
+        window.BasePrices = {
+            day: @Model.Room.PricePerDay.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            hour: @Model.Room.PricePerHour.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        };
+    </script>
     <script src="~/js/room-booking.js"></script>
 }

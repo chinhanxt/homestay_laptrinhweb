@@ -221,8 +221,10 @@ namespace WebHomestay.Data
 
             // Update Room mapping for new fields
             modelBuilder.Entity<Room>(entity => {
-                entity.Property(e => e.PriceWeekend).HasColumnName("price_weekend");
-                entity.Property(e => e.PriceHoliday).HasColumnName("price_holiday");
+                entity.Property(e => e.PriceWeekendPerHour).HasColumnName("price_weekend_per_hour");
+                entity.Property(e => e.PriceWeekendPerDay).HasColumnName("price_weekend_per_day");
+                entity.Property(e => e.PriceHolidayPerHour).HasColumnName("price_holiday_per_hour");
+                entity.Property(e => e.PriceHolidayPerDay).HasColumnName("price_holiday_per_day");
                 entity.Property(e => e.AdditionalImages).HasColumnName("additional_images");
             });
         }

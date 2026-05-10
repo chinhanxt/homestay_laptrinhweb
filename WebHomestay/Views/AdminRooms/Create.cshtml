@@ -98,47 +98,79 @@
                         <i class="fas fa-tags"></i> Cấu hình giá & Quy định
                     </h3>
 
-                    <div class="admin-form-group">
-                        <label asp-for="PricePerDay" class="admin-form-label">Giá theo ngày thường (VNĐ)</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-money-bill-wave"></i></span>
-                            <input asp-for="PricePerDay" class="admin-form-input border-start-0" type="number" placeholder="Vd: 950000" />
-                        </div>
-                        <span asp-validation-for="PricePerDay" class="text-danger small"></span>
-                    </div>
-
-                    <div class="row g-3">
+                    <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <div class="admin-form-group">
-                                <label asp-for="PriceWeekend" class="admin-form-label text-primary">Giá Thứ 7 & Chủ Nhật (VNĐ)</label>
-                                <input asp-for="PriceWeekend" class="admin-form-input border-primary" type="number" placeholder="Vd: 1200000" />
-                                <span asp-validation-for="PriceWeekend" class="text-danger small"></span>
+                                <label asp-for="PricePerDay" class="admin-form-label">Giá Ngày thường (Ngày)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-sun"></i></span>
+                                    <input asp-for="PricePerDay" class="admin-form-input border-start-0" type="number" placeholder="Vd: 950000" />
+                                </div>
+                                <span asp-validation-for="PricePerDay" class="text-danger small"></span>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="admin-form-group">
-                                <label asp-for="PriceHoliday" class="admin-form-label text-danger">Giá ngày Lễ (VNĐ)</label>
-                                <input asp-for="PriceHoliday" class="admin-form-input border-danger" type="number" placeholder="Vd: 1500000" />
-                                <span asp-validation-for="PriceHoliday" class="text-danger small"></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <div class="admin-form-group">
-                                <label asp-for="PricePerHour" class="admin-form-label">Giá theo giờ (VNĐ)</label>
-                                <input asp-for="PricePerHour" class="admin-form-input" type="number" placeholder="Vd: 150000" />
+                                <label asp-for="PricePerHour" class="admin-form-label">Giá Ngày thường (Giờ)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-clock"></i></span>
+                                    <input asp-for="PricePerHour" class="admin-form-input border-start-0" type="number" placeholder="Vd: 150000" />
+                                </div>
                                 <span asp-validation-for="PricePerHour" class="text-danger small"></span>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <div class="admin-form-group">
-                                <label asp-for="ExtraGuestFee" class="admin-form-label">Phí khách thêm (VNĐ)</label>
-                                <input asp-for="ExtraGuestFee" class="admin-form-input" type="number" placeholder="Vd: 100000" />
-                                <span asp-validation-for="ExtraGuestFee" class="text-danger small"></span>
+                                <label asp-for="PriceWeekendPerDay" class="admin-form-label text-primary">Giá Thứ 7 & CN (Ngày)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-end-0 text-primary border-primary"><i class="fas fa-calendar-check"></i></span>
+                                    <input asp-for="PriceWeekendPerDay" class="admin-form-input border-start-0 border-primary" type="number" placeholder="Vd: 1200000" />
+                                </div>
+                                <span asp-validation-for="PriceWeekendPerDay" class="text-danger small"></span>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="admin-form-group">
+                                <label asp-for="PriceWeekendPerHour" class="admin-form-label text-primary">Giá Thứ 7 & CN (Giờ)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-end-0 text-primary border-primary"><i class="fas fa-clock"></i></span>
+                                    <input asp-for="PriceWeekendPerHour" class="admin-form-input border-start-0 border-primary" type="number" placeholder="Vd: 180000" />
+                                </div>
+                                <span asp-validation-for="PriceWeekendPerHour" class="text-danger small"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="admin-form-group">
+                                <label asp-for="PriceHolidayPerDay" class="admin-form-label text-danger">Giá Ngày Lễ (Ngày)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-end-0 text-danger border-danger"><i class="fas fa-star"></i></span>
+                                    <input asp-for="PriceHolidayPerDay" class="admin-form-input border-start-0 border-danger" type="number" placeholder="Vd: 1500000" />
+                                </div>
+                                <span asp-validation-for="PriceHolidayPerDay" class="text-danger small"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="admin-form-group">
+                                <label asp-for="PriceHolidayPerHour" class="admin-form-label text-danger">Giá Ngày Lễ (Giờ)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-end-0 text-danger border-danger"><i class="fas fa-clock"></i></span>
+                                    <input asp-for="PriceHolidayPerHour" class="admin-form-input border-start-0 border-danger" type="number" placeholder="Vd: 200000" />
+                                </div>
+                                <span asp-validation-for="PriceHolidayPerHour" class="text-danger small"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-form-group">
+                        <label asp-for="ExtraGuestFee" class="admin-form-label">Phí khách thêm (VNĐ)</label>
+                        <input asp-for="ExtraGuestFee" class="admin-form-input" type="number" placeholder="Vd: 100000" />
+                        <span asp-validation-for="ExtraGuestFee" class="text-danger small"></span>
                     </div>
 
                     <div class="row g-3 mt-1">

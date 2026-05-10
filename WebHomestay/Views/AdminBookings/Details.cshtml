@@ -77,14 +77,27 @@
 
                 <!-- ID Cards Card -->
                 <div class="admin-card p-4">
-                    <h5 class="fw-bold text-primary mb-4"><i class="fas fa-id-card me-2"></i>Hồ sơ định danh (CCCD)</h5>
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="fw-bold text-primary mb-0"><i class="fas fa-id-card me-2"></i>Hồ sơ định danh (CCCD)</h5>
+                        @if (Context.Session.GetString("AdminRole") != "SuperAdmin")
+                        {
+                            <span class="badge bg-warning-soft text-warning small"><i class="fas fa-shield-alt me-1"></i>Bản đã che thông tin</span>
+                        }
+                    </div>
                     <div class="row g-4">
                         <div class="col-md-6">
                             <label class="admin-form-label">Mặt trước</label>
                             <div class="rounded overflow-hidden border shadow-sm bg-light d-flex align-items-center justify-content-center" style="min-height: 200px;">
                                 @if (!string.IsNullOrEmpty(Model.IdCardFrontPath))
                                 {
-                                    <img src="@Url.Action("ViewIDCard", new { fileName = Model.IdCardFrontPath })" class="w-100" />
+                                    if (Context.Session.GetString("AdminRole") == "SuperAdmin")
+                                    {
+                                        <img src="/SecureImage/GetOriginal?fileName=@Model.IdCardFrontPath" class="w-100" style="cursor: zoom-in;" onclick="window.open(this.src)" />
+                                    }
+                                    else
+                                    {
+                                        <img src="@Model.IdCardFrontMaskedPath" class="w-100" />
+                                    }
                                 }
                                 else
                                 {
@@ -97,7 +110,14 @@
                             <div class="rounded overflow-hidden border shadow-sm bg-light d-flex align-items-center justify-content-center" style="min-height: 200px;">
                                 @if (!string.IsNullOrEmpty(Model.IdCardBackPath))
                                 {
-                                    <img src="@Url.Action("ViewIDCard", new { fileName = Model.IdCardBackPath })" class="w-100" />
+                                    if (Context.Session.GetString("AdminRole") == "SuperAdmin")
+                                    {
+                                        <img src="/SecureImage/GetOriginal?fileName=@Model.IdCardBackPath" class="w-100" style="cursor: zoom-in;" onclick="window.open(this.src)" />
+                                    }
+                                    else
+                                    {
+                                        <img src="@Model.IdCardBackMaskedPath" class="w-100" />
+                                    }
                                 }
                                 else
                                 {

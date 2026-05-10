@@ -1,0 +1,124 @@
+<h2>Giao diện Quản lý Ảnh Bill & CCCD</h2>
+<p class="subtitle">Đề xuất bố cục split-view giúp nhân viên đối soát nhanh chóng</p>
+
+<div class="mockup">
+  <div class="mockup-header">Admin Panel: Quản lý Hình ảnh</div>
+  <div class="mockup-body" style="background: #f8fafc; padding: 0; min-height: 500px;">
+    <!-- Split Layout -->
+    <div style="display: flex; height: 100%; border-top: 1px solid #e2e8f0;">
+      <!-- Left: Booking List -->
+      <div style="width: 350px; background: white; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column;">
+        <div style="padding: 15px; border-bottom: 1px solid #e2e8f0; background: #fff;">
+          <input class="mock-input" placeholder="Tìm tên khách, SĐT..." style="margin:0; width: 100%;">
+        </div>
+        <div style="flex: 1; overflow-y: auto;">
+          <!-- Item 1 (Selected) -->
+          <div style="padding: 15px; background: #eff6ff; border-left: 4px solid #3b82f6; border-bottom: 1px solid #e2e8f0; cursor: pointer;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+              <span class="label" style="color: #3b82f6;">#BK12345</span>
+              <span class="label" style="background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px;">PAID</span>
+            </div>
+            <div style="font-weight: 600; color: #1e293b;">Nguyễn Văn A</div>
+            <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">Phòng: Deluxe - 10/05/2026</div>
+          </div>
+          <!-- Item 2 -->
+          <div style="padding: 15px; border-bottom: 1px solid #e2e8f0; cursor: pointer;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+              <span class="label">#BK12346</span>
+              <span class="label" style="background: #fef9c3; color: #854d0e; padding: 2px 6px; border-radius: 4px;">AWAITING</span>
+            </div>
+            <div style="font-weight: 600; color: #1e293b;">Trần Thị B</div>
+            <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">Phòng: Suite - 11/05/2026</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Image Preview Area -->
+      <div style="flex: 1; padding: 20px; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h3 style="margin:0;">Chi tiết Hình ảnh: #BK12345</h3>
+          <div>
+            <button class="mock-button" style="background: #3b82f6; color: white;">Duyệt & Gửi Vé</button>
+          </div>
+        </div>
+
+        <div class="cards">
+          <!-- Bill Image -->
+          <div class="card" style="width: 100%; margin-bottom: 20px;">
+            <div class="label" style="padding: 10px 15px; border-bottom: 1px solid #eee;">ẢNH BILL THANH TOÁN</div>
+            <div class="placeholder" style="height: 250px; display: flex; align-items: center; justify-content: center; background: #f1f5f9;">
+              <i class="fas fa-file-invoice-dollar" style="font-size: 3rem; color: #cbd5e1;"></i>
+              <span style="color: #94a3b8; margin-left: 10px;">Click để xem ảnh phóng to</span>
+            </div>
+          </div>
+
+          <!-- CCCD Images -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div class="card">
+              <div class="label" style="padding: 10px 15px; border-bottom: 1px solid #eee;">CCCD - MẶT TRƯỚC</div>
+              <div style="position: relative;">
+                <div class="placeholder" style="height: 200px; background: #fff;">
+                  <!-- Simulaled CCCD UI -->
+                  <div style="padding: 15px;">
+                    <div style="display: flex; gap: 15px;">
+                      <div style="width: 60px; height: 80px; background: #e2e8f0; border-radius: 4px;"></div>
+                      <div style="flex: 1;">
+                        <div style="height: 12px; width: 100px; background: #1e293b; margin-bottom: 10px; border-radius: 2px;"></div>
+                        <div style="height: 10px; width: 60px; background: #64748b; margin-bottom: 10px; border-radius: 2px;"></div>
+                        <!-- Masked area -->
+                        <div style="height: 15px; width: 120px; background: #f1f5f9; border: 1px dashed #cbd5e1; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #94a3b8;">MASKED ID</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Overlay badge for staff -->
+                <div style="position: absolute; top: 10px; right: 10px; background: #fbbf24; color: #78350f; font-size: 0.65rem; padding: 2px 8px; border-radius: 99px; font-weight: bold;">
+                  BẢN ĐÃ CHE (MASKED)
+                </div>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="label" style="padding: 10px 15px; border-bottom: 1px solid #eee;">CCCD - MẶT SAU</div>
+              <div style="position: relative;">
+                <div class="placeholder" style="height: 200px; background: #fff; display: flex; align-items: center; justify-content: center;">
+                  <div style="width: 60px; height: 60px; background: #f1f5f9; border: 1px dashed #cbd5e1; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #94a3b8;">MASKED QR</div>
+                </div>
+                <div style="position: absolute; top: 10px; right: 10px; background: #fbbf24; color: #78350f; font-size: 0.65rem; padding: 2px 8px; border-radius: 99px; font-weight: bold;">
+                  BẢN ĐÃ CHE (MASKED)
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Các lựa chọn xử lý ảnh CCCD</h3>
+  <div class="options" data-multiselect>
+    <div class="option" data-choice="auto-mask" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>Tự động che (Auto-mask)</h3>
+        <p>Hệ thống tự động phát hiện và che các vùng thông tin nhạy cảm khi khách upload.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="admin-view-full" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>Admin xem bản gốc</h3>
+        <p>Chỉ SuperAdmin hoặc User có quyền đặc biệt mới được xem ảnh gốc (unmasked).</p>
+      </div>
+    </div>
+    <div class="option" data-choice="watermark" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>Watermark bảo mật</h3>
+        <p>Đóng dấu mờ "CHỈ DÙNG CHO BOOKING" lên toàn bộ ảnh để tránh bị lợi dụng.</p>
+      </div>
+    </div>
+  </div>
+</div>

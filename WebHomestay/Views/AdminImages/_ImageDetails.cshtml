@@ -1,0 +1,117 @@
+@model WebHomestay.Models.Booking
+@{
+    var role = Context.Session.GetString("AdminRole");
+    bool isSuperAdmin = role == "SuperAdmin";
+}
+
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+    <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
+        <div>
+            <div class="d-flex align-items-center mb-1">
+                <h3 class="mb-0 fw-bold text-dark me-3">@Model.CustomerName</h3>
+                <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2" style="font-size: 0.7rem;">
+                    <i class="fas fa-check-circle me-1"></i> Hồ sơ hợp lệ
+                </span>
+            </div>
+            <p class="mb-0 text-muted small d-flex align-items-center">
+                <span class="me-3"><i class="fas fa-hashtag me-1"></i>Đơn hàng: <strong class="text-dark">#@Model.Id.ToString().PadLeft(5, '0')</strong></span>
+                <span class="me-3"><i class="fas fa-door-open me-1"></i>Phòng: <strong class="text-dark">@Model.Room?.Name</strong></span>
+                <span><i class="fas fa-wallet me-1"></i>Tổng tiền: <strong class="text-success">@Model.TotalPrice.ToString("N0")đ</strong></span>
+            </p>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <!-- Thông tin liên hệ -->
+            <div class="d-flex align-items-center bg-light rounded-pill px-3 py-2 border">
+                <i class="fab fa-whatsapp text-primary fs-5 me-2"></i>
+                <span class="fw-bold text-dark me-3" style="font-size: 0.9rem;">@Model.CustomerPhone</span>
+                <a href="https://zalo.me/@Model.CustomerPhone" target="_blank" class="btn btn-primary btn-sm rounded-pill px-3 py-1 fw-bold" style="font-size: 0.75rem;">
+                    Chat Zalo
+                </a>
+            </div>
+            
+            <!-- Nút Chi tiết đơn - Simplified -->
+            <a href="/admin/bookings/details/@Model.Id" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-2 fw-bold d-flex align-items-center">
+                <i class="fas fa-external-link-alt me-2"></i>Chi tiết đơn
+            </a>
+        </div>
+    </div>
+    
+    <div class="card-body p-4">
+        <!-- 1. Hóa đơn thanh toán -->
+        <div class="mb-5">
+            <div class="d-flex align-items-center mb-4">
+                <div class="p-2 bg-success bg-opacity-10 rounded-3 me-3 text-success">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </div>
+                <h5 class="fw-bold text-dark mb-0">Hóa đơn thanh toán</h5>
+            </div>
+            
+            @if (!string.IsNullOrEmpty(Model.PaymentProofUrl))
+            {
+                <div class="bg-light p-3 rounded-4 border border-dashed text-center position-relative group">
+                    <img src="@Model.PaymentProofUrl" class="img-fluid rounded-3 shadow-sm" style="max-height: 600px; cursor: zoom-in;" onclick="window.open(this.src)" />
+                    <div class="mt-3 text-muted small italic">
+                        <i class="fas fa-search-plus me-1"></i> Nhấn vào ảnh để xem kích thước đầy đủ
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="p-5 text-center bg-light rounded-4 border border-dashed">
+                    <i class="fas fa-file-invoice-dollar fs-1 text-muted opacity-25 mb-3"></i>
+                    <p class="text-muted mb-0">Khách hàng chưa cung cấp hóa đơn thanh toán.</p>
+                </div>
+            }
+        </div>
+
+        <!-- 2. Hồ sơ định danh (CCCD) -->
+        <div>
+            <div class="d-flex align-items-center mb-4">
+                <div class="p-2 bg-info bg-opacity-10 rounded-3 me-3 text-info">
+                    <i class="fas fa-id-card"></i>
+                </div>
+                <h5 class="fw-bold text-dark mb-0">Hồ sơ định danh (CCCD gốc)</h5>
+            </div>
+
+            <div class="row g-4">
+                <!-- Mặt trước -->
+                <div class="col-md-6">
+                    <div class="p-4 bg-white rounded-4 border shadow-sm h-100 position-relative">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="text-muted fw-bold small">MẶT TRƯỚC</span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(Model.IdCardFrontPath))
+                        {
+                            <div class="position-relative overflow-hidden rounded-3 shadow-sm border bg-light">
+                                <img src="/SecureImage/GetOriginal?fileName=@Model.IdCardFrontPath" class="id-card-img" style="cursor: zoom-in;" onclick="window.open(this.src)" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="py-5 text-center text-muted bg-light rounded-3 border-dashed">Chưa cung cấp mặt trước</div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Mặt sau -->
+                <div class="col-md-6">
+                    <div class="p-4 bg-white rounded-4 border shadow-sm h-100 position-relative">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="text-muted fw-bold small">MẶT SAU</span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(Model.IdCardBackPath))
+                        {
+                            <div class="position-relative overflow-hidden rounded-3 shadow-sm border bg-light">
+                                <img src="/SecureImage/GetOriginal?fileName=@Model.IdCardBackPath" class="id-card-img" style="cursor: zoom-in;" onclick="window.open(this.src)" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="py-5 text-center text-muted bg-light rounded-3 border-dashed">Chưa cung cấp mặt sau</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

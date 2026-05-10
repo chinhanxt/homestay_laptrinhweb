@@ -23,10 +23,16 @@ namespace WebHomestay.Models
         public decimal ExtraGuestFee { get; set; } = 0;
 
         [Column(TypeName = "decimal(10, 2)")]
-        public decimal PriceWeekend { get; set; }
+        public decimal PriceWeekendPerHour { get; set; }
 
         [Column(TypeName = "decimal(10, 2)")]
-        public decimal PriceHoliday { get; set; }
+        public decimal PriceWeekendPerDay { get; set; }
+
+        [Column(TypeName = "decimal(10, 2)")]
+        public decimal PriceHolidayPerHour { get; set; }
+
+        [Column(TypeName = "decimal(10, 2)")]
+        public decimal PriceHolidayPerDay { get; set; }
 
         public int Capacity { get; set; } = 2;
         public int MaxGuests { get; set; } = 4;

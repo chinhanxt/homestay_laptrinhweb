@@ -80,6 +80,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const displayCheckout = document.getElementById('display-checkout');
     const submitBtn = document.getElementById('daily-submit-btn');
     const clearBtn = document.getElementById('clear-selection-btn');
+    const hourlyPriceDisplay = document.getElementById('hourly-price-display');
+    const dailyPriceDisplay = document.getElementById('daily-price-display');
 
     const manualCheckIn = document.getElementById('manual-checkin');
     const manualCheckOut = document.getElementById('manual-checkout');
@@ -138,6 +140,7 @@ document.addEventListener('DOMContentLoaded', function () {
             BookingState.currentHourlyDate = date;
             renderHourlyDateBar(date);
             loadHourlySlots(date);
+            updatePriceLabelsByDate(date, 'hourly');
         });
     }
 
@@ -154,6 +157,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 scrollToChip(this, true);
                 loadHourlySlots(date);
+                updatePriceLabels(this, 'hourly');
             });
         });
         
@@ -245,6 +249,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 
                 scrollToChip(this, true);
                 loadHourlySlots(dateIso);
+                updatePriceLabelsByDate(dateIso, 'hourly');
             });
             
             hourlyBar.appendChild(chip);
@@ -325,6 +330,42 @@ document.addEventListener('DOMContentLoaded', function () {
             if (dailySummary) {
                 dailySummary.classList.remove('d-none');
                 dailySummary.style.display = 'block';
+
+                // Render Price Breakdown
+                const dates = getDatesInRange(BookingState.checkIn, BookingState.checkOut);
+                const container = document.getElementById('price-breakdown-container');
+                const list = document.getElementById('price-breakdown-list');
+                const totalCountEl = document.getElementById('total-nights-count');
+                const totalValEl = document.getElementById('range-total-price');
+
+                if (container && list) {
+                    container.classList.remove('d-none');
+                    let total = 0;
+                    let html = '';
+
+                    dates.forEach((dateStr, index) => {
+                        const pricing = window.RoomPricingData ? window.RoomPricingData[dateStr] : null;
+                        const basePrice = window.BasePrices ? window.BasePrices.day : 0;
+                        const price = pricing ? (pricing.priceDay || pricing.PriceDay || basePrice) : basePrice;
+
+                        const dateObj = parseDate(dateStr);
+                        const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+                        const label = isWeekend ? "Cuối tuần" : "Ngày thường";
+                        const colorStyle = isWeekend ? "color: #e29b61; font-weight: 500;" : "color: #6c757d;";
+
+                        html += `
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span style="${colorStyle}">Đêm ${index + 1}: ${dateStr.split('-').reverse().join('/')} (${label})</span>
+                                <span class="fw-bold">${new Number(price).toLocaleString('vi-VN')}đ</span>
+                            </div>
+                        `;
+                        total += price;
+                    });
+
+                    list.innerHTML = html;
+                    if (totalCountEl) totalCountEl.innerText = `${dates.length} đêm`;
+                    if (totalValEl) totalValEl.innerText = new Number(total).toLocaleString('vi-VN') + 'đ';
+                }
             }
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -335,6 +376,9 @@ document.addEventListener('DOMContentLoaded', function () {
             if (dailySummary) {
                 dailySummary.classList.add('d-none');
                 dailySummary.style.display = 'none';
+                
+                const container = document.getElementById('price-breakdown-container');
+                if (container) container.classList.add('d-none');
             }
             if (submitBtn) {
                 submitBtn.disabled = true;
@@ -431,6 +475,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
         updateUI();
+        updatePriceLabels(document.querySelector(`.lux-cal-day[data-date="${dateStr}"]`), 'daily');
     }
 
     function isRangeBlocked(start, end) {
@@ -438,9 +483,75 @@ document.addEventListener('DOMContentLoaded', function () {
         return BookingState.blockedDates.some(date => date >= start && date <= end);
     }
 
+    function getDatesInRange(startDate, endDate) {
+        const dates = [];
+        let currentDate = parseDate(startDate);
+        const stopDate = parseDate(endDate);
+        
+        while (currentDate < stopDate) {
+            const y = currentDate.getFullYear();
+            const m = String(currentDate.getMonth() + 1).padStart(2, '0');
+            const d = String(currentDate.getDate()).padStart(2, '0');
+            dates.push(`${y}-${m}-${d}`);
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+        return dates;
+    }
+
+    function parseDate(str) {
+        if (!str) return new Date();
+        const parts = str.split('-');
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+
     function formatDate(isoStr) {
         const parts = isoStr.split('-');
         return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+
+    function updatePriceLabelsByDate(dateStr, mode) {
+        const pricing = window.RoomPricingData ? window.RoomPricingData[dateStr] : null;
+        const basePrices = window.BasePrices || { day: 0, hour: 0 };
+        
+        // Support both camelCase (priceHour) and PascalCase (PriceHour)
+        let priceHour = basePrices.hour;
+        let priceDay = basePrices.day;
+
+        if (pricing) {
+            priceHour = pricing.priceHour !== undefined ? pricing.priceHour : (pricing.PriceHour !== undefined ? pricing.PriceHour : basePrices.hour);
+            priceDay = pricing.priceDay !== undefined ? pricing.priceDay : (pricing.PriceDay !== undefined ? pricing.PriceDay : basePrices.day);
+        }
+        
+        const noteEl = mode === 'hourly' ? document.getElementById('hourly-price-note') : document.getElementById('daily-price-note');
+        const displayEl = mode === 'hourly' ? document.getElementById('hourly-price-display') : document.getElementById('daily-price-display');
+        
+        if (displayEl) {
+            const finalPrice = mode === 'hourly' ? priceHour : priceDay;
+            displayEl.innerText = new Number(finalPrice).toLocaleString('vi-VN') + (mode === 'hourly' ? 'đ/h' : 'đ');
+        }
+
+        if (noteEl) {
+            const date = new Date(dateStr);
+            const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+            const currentPrice = mode === 'hourly' ? priceHour : priceDay;
+            const basePrice = mode === 'hourly' ? basePrices.hour : basePrices.day;
+            
+            if (currentPrice > basePrice) {
+                noteEl.innerText = isWeekend ? "Giá cuối tuần" : "Giá ngày lễ";
+                noteEl.style.color = "#e29b61";
+                noteEl.style.fontWeight = "bold";
+            } else {
+                noteEl.innerText = "Giá ngày thường";
+                noteEl.style.color = "";
+                noteEl.style.fontWeight = "normal";
+            }
+        }
+    }
+
+    function updatePriceLabels(element, mode) {
+        if (!element) return;
+        const dateStr = element.getAttribute('data-date');
+        if (dateStr) updatePriceLabelsByDate(dateStr, mode);
     }
 
     // Global scroll function for hourly bar
