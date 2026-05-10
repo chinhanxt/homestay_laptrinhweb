@@ -7,114 +7,209 @@
 <link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
 
 <div class="premium-admin-body">
-    <div class="admin-shell">
+    <div class="admin-shell" style="max-width: 1200px;">
         <header class="admin-hero">
             <div class="admin-hero-title">
-                <span class="admin-kicker">Cập nhật thông tin</span>
-                <h1>Phòng: @Model.Name</h1>
+                <span class="admin-kicker">Cấu hình chi tiết</span>
+                <h1>Chỉnh sửa: @Model.Name</h1>
             </div>
             <div class="admin-hero-actions">
                 <a asp-action="Index" class="btn-premium-outline">
                     <i class="fas fa-arrow-left"></i>
-                    <span>Quay lại</span>
+                    <span>Quay lại danh sách</span>
                 </a>
             </div>
         </header>
 
-        <div class="admin-form-card" style="max-width: 900px;">
-            <form asp-action="Edit">
-                <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
-                <input type="hidden" asp-for="Id" />
-                
-                <div class="row g-4">
-                    <div class="col-md-8">
-                        <div class="admin-form-group">
-                            <label asp-for="Name" class="admin-form-label">Tên phòng / Mã phòng</label>
-                            <input asp-for="Name" class="admin-form-input" />
-                            <span asp-validation-for="Name" class="text-danger small"></span>
+        <form asp-action="Edit" enctype="multipart/form-data">
+            <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+            <input type="hidden" asp-for="Id" />
+
+            <div class="room-form-grid">
+                <!-- Bảng 1: Thông tin cơ bản & Hình ảnh -->
+                <div class="panel-card">
+                    <h3 class="panel-title text-primary">
+                        <i class="fas fa-info-circle"></i> Thông tin cơ bản
+                    </h3>
+
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <div class="admin-form-group">
+                                <label asp-for="Name" class="admin-form-label">Tên phòng / Mã phòng</label>
+                                <input asp-for="Name" class="admin-form-input" placeholder="Vd: Phòng Gác Mái Rừng Thông" />
+                                <span asp-validation-for="Name" class="text-danger small"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="admin-form-group">
+                                <label asp-for="BranchId" class="admin-form-label">Chi nhánh</label>
+                                <select asp-for="BranchId" class="admin-form-input" asp-items="ViewBag.BranchId"></select>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <div class="admin-form-group">
-                            <label asp-for="BranchId" class="admin-form-label">Chi nhánh</label>
-                            <select asp-for="BranchId" class="admin-form-input" asp-items="ViewBag.BranchId"></select>
+
+                    <div class="admin-form-group">
+                        <label asp-for="Status" class="admin-form-label">Trạng thái vận hành</label>
+                        <select asp-for="Status" class="admin-form-input">
+                            <option value="Available">Available (Sẵn sàng)</option>
+                            <option value="Maintenance">Maintenance (Bảo trì)</option>
+                        </select>
+                    </div>
+
+                    <div class="admin-form-group">
+                        <label asp-for="Description" class="admin-form-label">Mô tả tiện ích phòng</label>
+                        <textarea asp-for="Description" class="admin-form-input" rows="4" placeholder="Mô tả các tiện ích, đặc điểm nổi bật của phòng..."></textarea>
+                        <span asp-validation-for="Description" class="text-danger small"></span>
+                    </div>
+
+                    <div class="admin-form-group">
+                        <label class="admin-form-label">Ảnh đại diện (Chính)</label>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="position-relative" style="width: 120px; height: 80px; border-radius: 8px; overflow: hidden; background: #eee; border: 1px solid #ddd;">
+                                @if (!string.IsNullOrEmpty(Model.ImageUrl))
+                                {
+                                    <img src="@Model.ImageUrl" id="mainImagePreview" style="width: 100%; height: 100%; object-fit: cover;" />
+                                }
+                                else
+                                {
+                                    <img id="mainImagePreview" style="width: 100%; height: 100%; object-fit: cover; display: none;" />
+                                    <div id="mainImagePlaceholder" class="h-100 d-flex align-items-center justify-content-center text-muted small">No Image</div>
+                                }
+                            </div>
+                            <div class="flex-grow-1">
+                                <input type="file" name="mainImageFile" id="mainImageInput" class="form-control form-control-sm" accept="image/*" onchange="previewImage(this, 'mainImagePreview', 'mainImagePlaceholder')" />
+                                <p class="small text-muted mb-0 mt-1">Tải lên file ảnh từ máy tính (JPG, PNG, WEBP)</p>
+                            </div>
                         </div>
+                    </div>
+
+                    <div class="admin-form-group mt-4">
+                        <label class="admin-form-label">Ảnh minh họa thêm (Bắt buộc 5 tấm)</label>
+                        <div class="image-upload-grid">
+                            @for (int i = 1; i <= 5; i++)
+                            {
+                                <div class="image-upload-slot" onclick="document.getElementById('illustration_@i').click()">
+                                    <i class="fas fa-camera"></i>
+                                    <span>Ảnh @i</span>
+                                    <img id="preview_@i" class="image-preview" style="display: none;" />
+                                    <input type="file" name="illustrationFiles" id="illustration_@i" class="file-input-hidden" accept="image/*" onchange="previewSlot(this, @i)" />
+                                </div>
+                            }
+                        </div>
+                        <p class="small text-danger mt-2 mb-0"><i class="fas fa-exclamation-triangle me-1"></i>Vui lòng chọn đủ 5 ảnh để đảm bảo giao diện hiển thị tốt nhất.</p>
                     </div>
                 </div>
 
-                <div class="row g-4 mt-1">
-                    <div class="col-md-4">
-                        <div class="admin-form-group">
-                            <label asp-for="PricePerDay" class="admin-form-label">Giá theo ngày (VNĐ)</label>
-                            <input asp-for="PricePerDay" class="admin-form-input" type="number" />
-                            <span asp-validation-for="PricePerDay" class="text-danger small"></span>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="admin-form-group">
-                            <label asp-for="PricePerHour" class="admin-form-label">Giá theo giờ (VNĐ)</label>
-                            <input asp-for="PricePerHour" class="admin-form-input" type="number" />
-                            <span asp-validation-for="PricePerHour" class="text-danger small"></span>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="admin-form-group">
-                            <label asp-for="ExtraGuestFee" class="admin-form-label">Phí khách thêm (VNĐ)</label>
-                            <input asp-for="ExtraGuestFee" class="admin-form-input" type="number" />
-                            <span asp-validation-for="ExtraGuestFee" class="text-danger small"></span>
-                        </div>
-                    </div>
-                </div>
+                <!-- Bảng 2: Cấu hình giá & Quy định -->
+                <div class="panel-card">
+                    <h3 class="panel-title text-ready">
+                        <i class="fas fa-tags"></i> Cấu hình giá & Quy định
+                    </h3>
 
-                <div class="row g-4 mt-1">
-                    <div class="col-md-4">
-                        <div class="admin-form-group">
-                            <label asp-for="Capacity" class="admin-form-label">Sức chứa tiêu chuẩn</label>
-                            <input asp-for="Capacity" class="admin-form-input" type="number" />
+                    <div class="admin-form-group">
+                        <label asp-for="PricePerDay" class="admin-form-label">Giá theo ngày thường (VNĐ)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-money-bill-wave"></i></span>
+                            <input asp-for="PricePerDay" class="admin-form-input border-start-0" type="number" placeholder="Vd: 950000" />
+                        </div>
+                        <span asp-validation-for="PricePerDay" class="text-danger small"></span>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="admin-form-group">
+                                <label asp-for="PriceWeekend" class="admin-form-label text-primary">Giá Thứ 7 & Chủ Nhật (VNĐ)</label>
+                                <input asp-for="PriceWeekend" class="admin-form-input border-primary" type="number" placeholder="Vd: 1200000" />
+                                <span asp-validation-for="PriceWeekend" class="text-danger small"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="admin-form-group">
+                                <label asp-for="PriceHoliday" class="admin-form-label text-danger">Giá ngày Lễ (VNĐ)</label>
+                                <input asp-for="PriceHoliday" class="admin-form-input border-danger" type="number" placeholder="Vd: 1500000" />
+                                <span asp-validation-for="PriceHoliday" class="text-danger small"></span>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <div class="admin-form-group">
-                            <label asp-for="MaxGuests" class="admin-form-label">Số khách tối đa</label>
-                            <input asp-for="MaxGuests" class="admin-form-input" type="number" />
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="admin-form-group">
+                                <label asp-for="PricePerHour" class="admin-form-label">Giá theo giờ (VNĐ)</label>
+                                <input asp-for="PricePerHour" class="admin-form-input" type="number" placeholder="Vd: 150000" />
+                                <span asp-validation-for="PricePerHour" class="text-danger small"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="admin-form-group">
+                                <label asp-for="ExtraGuestFee" class="admin-form-label">Phí khách thêm (VNĐ)</label>
+                                <input asp-for="ExtraGuestFee" class="admin-form-input" type="number" placeholder="Vd: 100000" />
+                                <span asp-validation-for="ExtraGuestFee" class="text-danger small"></span>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <div class="admin-form-group">
-                            <label asp-for="Status" class="admin-form-label">Trạng thái vận hành</label>
-                            <select asp-for="Status" class="admin-form-input">
-                                <option value="Available">Available (Sẵn sàng)</option>
-                                <option value="Occupied">Occupied (Đang có khách)</option>
-                                <option value="Maintenance">Maintenance (Bảo trì)</option>
-                            </select>
+
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-6">
+                            <div class="admin-form-group">
+                                <label asp-for="Capacity" class="admin-form-label">Sức chứa tiêu chuẩn</label>
+                                <input asp-for="Capacity" class="admin-form-input" type="number" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="admin-form-group">
+                                <label asp-for="MaxGuests" class="admin-form-label">Số khách tối đa</label>
+                                <input asp-for="MaxGuests" class="admin-form-input" type="number" />
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="admin-form-group mt-3">
-                    <label asp-for="Description" class="admin-form-label">Mô tả tiện ích phòng</label>
-                    <textarea asp-for="Description" class="admin-form-input" rows="4"></textarea>
-                    <span asp-validation-for="Description" class="text-danger small"></span>
-                </div>
+                    <div class="mt-4 p-3 bg-light rounded-3">
+                        <h6 class="small font-weight-bold text-muted text-uppercase mb-2">Ghi chú logic giá:</h6>
+                        <ul class="small text-muted mb-0 ps-3">
+                            <li><strong>Ngày lễ:</strong> Ưu tiên cao nhất. Ngày lễ cấu hình trong cài đặt hệ thống.</li>
+                            <li><strong>Cuối tuần:</strong> Ưu tiên thứ hai (Thứ 7 & Chủ Nhật).</li>
+                            <li><strong>Ngày thường:</strong> Áp dụng nếu không trùng ngày lễ/cuối tuần.</li>
+                        </ul>
+                    </div>
 
-                <div class="admin-form-group">
-                    <label asp-for="ImageUrl" class="admin-form-label">Link ảnh đại diện (URL)</label>
-                    <input asp-for="ImageUrl" class="admin-form-input" />
-                    <span asp-validation-for="ImageUrl" class="text-danger small"></span>
+                    <div class="mt-5 d-flex gap-2">
+                        <button type="submit" class="btn-premium btn-ready w-100 py-3">
+                            <i class="fas fa-save fa-lg me-2"></i>
+                            <span class="fs-6">Lưu thay đổi phòng</span>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="mt-5 pt-3 border-top d-flex gap-2">
-                    <button type="submit" class="btn-premium px-5">
-                        <i class="fas fa-check-circle"></i>
-                        <span>Cập nhật phòng</span>
-                    </button>
-                    <a asp-action="Index" class="btn-premium-outline">Hủy bỏ</a>
-                </div>
-            </form>
-        </div>
+            </div>
+        </form>
     </div>
 </div>
 
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        function previewImage(input, previewId, placeholderId) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    document.getElementById(previewId).src = e.target.result;
+                    document.getElementById(previewId).style.display = 'block';
+                    if (placeholderId) document.getElementById(placeholderId).style.display = 'none';
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function previewSlot(input, index) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    var preview = document.getElementById('preview_' + index);
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
 }

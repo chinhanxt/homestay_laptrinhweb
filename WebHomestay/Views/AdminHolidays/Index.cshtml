@@ -1,0 +1,298 @@
+@model IEnumerable<WebHomestay.Models.Holiday>
+@{
+    ViewData["Title"] = "Ma trận cấu hình Ngày Lễ";
+    // Group holidays by description
+    var groupedHolidays = Model.GroupBy(h => h.Description).OrderByDescending(g => g.Max(x => x.Date));
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Cấu hình hệ thống</span>
+                <h1>Ma trận Ngày Lễ</h1>
+            </div>
+        </header>
+
+        <div class="row g-4">
+            <!-- Cột trái: Quản lý cụm ngày lễ -->
+            <div class="col-md-4 col-lg-4">
+                <div class="panel-card h-100">
+                    <h5 class="panel-title text-primary">
+                        <i class="fas fa-layer-group"></i> Ngày lễ đã cấu hình
+                    </h5>
+                    
+                    <div class="holiday-groups mt-3">
+                        @if (!groupedHolidays.Any())
+                        {
+                            <div class="text-center py-4 text-muted">
+                                <i class="fas fa-calendar-times fs-1 opacity-25 mb-2"></i>
+                                <p>Chưa có ngày lễ nào</p>
+                            </div>
+                        }
+                        @foreach (var group in groupedHolidays)
+                        {
+                            <div class="holiday-group-item mb-2 border rounded-3 overflow-hidden">
+                                <div class="group-header p-3 bg-light d-flex justify-content-between align-items-center cursor-pointer" onclick="toggleGroup(this)">
+                                    <div>
+                                        <div class="fw-bold small">@group.Key</div>
+                                        <div class="text-muted" style="font-size: 0.7rem;">@group.Count() ngày (@group.Min(x => x.Date).ToString("dd/MM") - @group.Max(x => x.Date).ToString("dd/MM"))</div>
+                                    </div>
+                                    <i class="fas fa-chevron-right group-arrow transition-all"></i>
+                                </div>
+                                <div class="group-details p-2 bg-white border-top" style="display: none;">
+                                    @foreach (var h in group.OrderBy(x => x.Date))
+                                    {
+                                        <div class="d-flex justify-content-between align-items-center p-2 border-bottom last-border-0">
+                                            <span class="small">@h.Date.ToString("dd/MM/yyyy")</span>
+                                            <form asp-action="Delete" asp-route-id="@h.Id" method="post" onsubmit="return confirm('Xóa ngày lễ này?')">
+                                                <button type="submit" class="btn text-danger btn-sm p-0"><i class="fas fa-times"></i></button>
+                                            </form>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cột phải: Lịch thông minh -->
+            <div class="col-md-8 col-lg-8">
+                <div class="panel-card">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h3 class="fw-bold mb-0 text-dark" style="font-size: 1.25rem;">
+                            <i class="fas fa-chevron-left me-3 cursor-pointer text-muted hover-primary" onclick="changeMonth(-1)"></i>
+                            <span id="currentMonthYear">THÁNG -- / ----</span>
+                            <i class="fas fa-chevron-right ms-3 cursor-pointer text-muted hover-primary" onclick="changeMonth(1)"></i>
+                        </h3>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-light btn-sm rounded-pill px-3" onclick="today()">Hôm nay</button>
+                            <button class="btn btn-soft-danger btn-sm rounded-pill px-3" onclick="clearSelection()">Bỏ chọn tất cả</button>
+                        </div>
+                    </div>
+
+                    <!-- Selection Status Bar -->
+                    <div id="selectionBar" class="alert alert-primary border-0 mb-4 py-2 px-3 d-flex justify-content-between align-items-center" style="display: none !important;">
+                        <div class="small fw-bold">
+                            <i class="fas fa-mouse-pointer me-2"></i>
+                            Đang chọn: <span id="selectionText">...</span>
+                        </div>
+                        <button class="btn btn-primary btn-sm px-4" data-bs-toggle="modal" data-bs-target="#saveHolidayModal">Cấu hình Lễ</button>
+                    </div>
+
+                    <div class="calendar-grid">
+                        <div class="calendar-header">T2</div>
+                        <div class="calendar-header">T3</div>
+                        <div class="calendar-header">T4</div>
+                        <div class="calendar-header">T5</div>
+                        <div class="calendar-header">T6</div>
+                        <div class="calendar-header text-warning">T7</div>
+                        <div class="calendar-header text-warning">CN</div>
+                        <div id="calendarDays" class="contents" style="display: contents;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal lưu cấu hình ngày lễ -->
+<div class="modal fade" id="saveHolidayModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Thiết lập Ngày Lễ</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="CreateRange" method="post">
+                <div class="modal-body py-4">
+                    <p class="text-muted small mb-4">Các ngày được chọn sẽ được áp dụng giá Lễ trong hệ thống.</p>
+                    <input type="hidden" name="startDate" id="modalStartDate" />
+                    <input type="hidden" name="endDate" id="modalEndDate" />
+                    
+                    <div class="admin-form-group">
+                        <label class="admin-form-label">Tên ngày lễ / Dịp lễ</label>
+                        <input type="text" name="description" class="admin-form-input" placeholder="Vd: Giải phóng & Quốc tế Lao động" required />
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn-premium rounded-pill px-4">Lưu cấu hình</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .cursor-pointer { cursor: pointer; }
+    .btn-soft-danger { background: #fee2e2; color: #dc2626; border: none; }
+    .btn-soft-danger:hover { background: #fecaca; }
+    .hover-primary:hover { color: var(--admin-primary) !important; }
+    .transition-all { transition: all 0.2s; }
+    
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+    .calendar-header { text-align: center; font-weight: 800; font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; padding-bottom: 12px; }
+    
+    .calendar-day {
+        aspect-ratio: 1/1;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 8px;
+        cursor: pointer;
+        transition: all 0.15s;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+    }
+    
+    .calendar-day:hover:not(.other-month) { border-color: #3b82f6; background: #eff6ff; }
+    
+    .calendar-day.is-holiday { background: #fee2e2; border-color: #fecaca; color: #b91c1c; font-weight: 700; }
+    .calendar-day.is-today { border-width: 2px; border-color: #3b82f6; }
+    .calendar-day.other-month { opacity: 0.1; pointer-events: none; }
+    
+    /* Range Selection Styles */
+    .calendar-day.selected { background: #3b82f6 !important; border-color: #2563eb !important; color: white !important; border-radius: 0; }
+    .calendar-day.selected-start { border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+    .calendar-day.selected-end { border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+    .calendar-day.selected-single { border-radius: 12px !important; }
+
+    .calendar-day-num { font-weight: 800; font-size: 1rem; }
+    .calendar-day-desc { font-size: 0.6rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .holiday-group-item .group-header:hover { background: #f1f5f9 !important; }
+    .last-border-0:last-child { border-bottom: 0 !important; }
+</style>
+
+@section Scripts {
+    <script>
+        const holidays = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Select(h => new { date = h.Date.ToString("yyyy-MM-dd"), desc = h.Description })));
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+        let selectedDates = []; // Array of date strings "YYYY-MM-DD"
+
+        function renderCalendar() {
+            const daysContainer = document.getElementById('calendarDays');
+            daysContainer.innerHTML = '';
+            
+            const firstDay = new Date(currentYear, currentMonth, 1);
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            
+            const monthNames = ["THÁNG 01", "THÁNG 02", "THÁNG 03", "THÁNG 04", "THÁNG 05", "THÁNG 06", "THÁNG 07", "THÁNG 08", "THÁNG 09", "THÁNG 10", "THÁNG 11", "THÁNG 12"];
+            document.getElementById('currentMonthYear').innerText = `${monthNames[currentMonth]} / ${currentYear}`;
+
+            let startDay = firstDay.getDay();
+            startDay = startDay === 0 ? 6 : startDay - 1;
+
+            for (let i = 0; i < startDay; i++) {
+                const dayEl = document.createElement('div');
+                dayEl.className = 'calendar-day other-month';
+                daysContainer.appendChild(dayEl);
+            }
+
+            const todayDate = new Date();
+            for (let d = 1; d <= lastDay.getDate(); d++) {
+                const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const holiday = holidays.find(h => h.date === dateStr);
+                const isSelected = selectedDates.includes(dateStr);
+                
+                const dayEl = document.createElement('div');
+                dayEl.className = `calendar-day ${holiday ? 'is-holiday' : ''} ${isSelected ? 'selected' : ''}`;
+                
+                if (isSelected) {
+                    const sorted = [...selectedDates].sort();
+                    if (sorted.length === 1) dayEl.classList.add('selected-single');
+                    else {
+                        if (dateStr === sorted[0]) dayEl.classList.add('selected-start');
+                        if (dateStr === sorted[sorted.length - 1]) dayEl.classList.add('selected-end');
+                    }
+                }
+
+                if (todayDate.getFullYear() === currentYear && todayDate.getMonth() === currentMonth && todayDate.getDate() === d) {
+                    dayEl.classList.add('is-today');
+                }
+
+                dayEl.onclick = () => handleDateClick(dateStr);
+                
+                dayEl.innerHTML = `
+                    <div class="calendar-day-num">${d}</div>
+                    ${holiday ? `<div class="calendar-day-desc text-danger">${holiday.desc}</div>` : ''}
+                `;
+                daysContainer.appendChild(dayEl);
+            }
+            updateSelectionBar();
+        }
+
+        function handleDateClick(dateStr) {
+            if (selectedDates.includes(dateStr)) {
+                // Deselect if clicked again
+                selectedDates = selectedDates.filter(d => d !== dateStr);
+            } else {
+                selectedDates.push(dateStr);
+                if (selectedDates.length >= 2) {
+                    // Range logic: find min and max, fill the gap
+                    const sorted = selectedDates.map(d => new Date(d)).sort((a, b) => a - b);
+                    const minDate = sorted[0];
+                    const maxDate = sorted[sorted.length - 1];
+                    
+                    const newSelection = [];
+                    for (let d = new Date(minDate); d <= maxDate; d.setDate(d.getDate() + 1)) {
+                        newSelection.push(d.toISOString().split('T')[0]);
+                    }
+                    selectedDates = newSelection;
+                }
+            }
+            renderCalendar();
+        }
+
+        function updateSelectionBar() {
+            const bar = document.getElementById('selectionBar');
+            if (selectedDates.length > 0) {
+                bar.style.setProperty('display', 'flex', 'important');
+                const sorted = [...selectedDates].sort();
+                const start = sorted[0].split('-').reverse().join('/');
+                const end = sorted[sorted.length - 1].split('-').reverse().join('/');
+                document.getElementById('selectionText').innerText = selectedDates.length === 1 ? start : `${start} đến ${end} (${selectedDates.length} ngày)`;
+                
+                document.getElementById('modalStartDate').value = sorted[0];
+                document.getElementById('modalEndDate').value = sorted[sorted.length - 1];
+            } else {
+                bar.style.setProperty('display', 'none', 'important');
+            }
+        }
+
+        function clearSelection() {
+            selectedDates = [];
+            renderCalendar();
+        }
+
+        function toggleGroup(header) {
+            const details = header.nextElementSibling;
+            const arrow = header.querySelector('.group-arrow');
+            const isVisible = details.style.display === 'block';
+            
+            details.style.display = isVisible ? 'none' : 'block';
+            arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
+        }
+
+        function changeMonth(delta) {
+            currentMonth += delta;
+            if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            renderCalendar();
+        }
+
+        function today() {
+            currentMonth = new Date().getMonth();
+            currentYear = new Date().getFullYear();
+            renderCalendar();
+        }
+
+        renderCalendar();
+    </script>
+}

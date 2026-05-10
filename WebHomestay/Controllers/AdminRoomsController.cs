@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
 using WebHomestay.Models;
 using WebHomestay.Filters;
+using System.IO;
+using System.Text.Json;
 
 namespace WebHomestay.Controllers
 {
@@ -12,10 +14,12 @@ namespace WebHomestay.Controllers
     public class AdminRoomsController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly IWebHostEnvironment _hostEnvironment;
 
-        public AdminRoomsController(ApplicationDbContext context)
+        public AdminRoomsController(ApplicationDbContext context, IWebHostEnvironment hostEnvironment)
         {
             _context = context;
+            _hostEnvironment = hostEnvironment;
         }
 
         [AdminAuthorize(Permission = "rooms.view")]
@@ -68,10 +72,27 @@ namespace WebHomestay.Controllers
         [AdminAuthorize(Permission = "rooms.create")]
         [HttpPost("create")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,Name,Description,PricePerHour,PricePerDay,ExtraGuestFee,Capacity,MaxGuests,Status,ImageUrl,BranchId")] Room room)
+        public async Task<IActionResult> Create([Bind("Id,Name,Description,PricePerHour,PricePerDay,PriceWeekend,PriceHoliday,ExtraGuestFee,Capacity,MaxGuests,Status,BranchId")] Room room, IFormFile? mainImageFile, List<IFormFile> illustrationFiles)
         {
             if (ModelState.IsValid)
             {
+                // Handle Main Image
+                if (mainImageFile != null)
+                {
+                    room.ImageUrl = await SaveFile(mainImageFile);
+                }
+
+                // Handle Illustration Images
+                if (illustrationFiles != null && illustrationFiles.Count > 0)
+                {
+                    var imagePaths = new List<string>();
+                    foreach (var file in illustrationFiles)
+                    {
+                        imagePaths.Add(await SaveFile(file));
+                    }
+                    room.AdditionalImages = System.Text.Json.JsonSerializer.Serialize(imagePaths);
+                }
+
                 _context.Add(room);
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
@@ -94,13 +115,40 @@ namespace WebHomestay.Controllers
         [AdminAuthorize(Permission = "rooms.edit")]
         [HttpPost("edit/{id}")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Description,PricePerHour,PricePerDay,ExtraGuestFee,Capacity,MaxGuests,Status,ImageUrl,BranchId")] Room room)
+        public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Description,PricePerHour,PricePerDay,PriceWeekend,PriceHoliday,ExtraGuestFee,Capacity,MaxGuests,Status,BranchId")] Room room, IFormFile? mainImageFile, List<IFormFile> illustrationFiles)
         {
             if (id != room.Id) return NotFound();
+
             if (ModelState.IsValid)
             {
                 try
                 {
+                    var existingRoom = await _context.Rooms.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
+                    if (existingRoom == null) return NotFound();
+
+                    // Keep existing images if no new files uploaded
+                    room.ImageUrl = existingRoom.ImageUrl;
+                    room.AdditionalImages = existingRoom.AdditionalImages;
+
+                    // Update Main Image if new file uploaded
+                    if (mainImageFile != null)
+                    {
+                        room.ImageUrl = await SaveFile(mainImageFile);
+                    }
+
+                    // Update Illustration Images if new files uploaded
+                    if (illustrationFiles != null && illustrationFiles.Count > 0)
+                    {
+                        var imagePaths = new List<string>();
+                        foreach (var file in illustrationFiles)
+                        {
+                            imagePaths.Add(await SaveFile(file));
+                        }
+                        room.AdditionalImages = System.Text.Json.JsonSerializer.Serialize(imagePaths);
+                    }
+
+                    room.CreatedAt = existingRoom.CreatedAt; // Preserve CreatedAt
+
                     _context.Update(room);
                     await _context.SaveChangesAsync();
                 }
@@ -113,6 +161,22 @@ namespace WebHomestay.Controllers
             }
             ViewData["BranchId"] = new SelectList(_context.Branches, "Id", "Name", room.BranchId);
             return View(room);
+        }
+
+        private async Task<string> SaveFile(IFormFile file)
+        {
+            string uploadsFolder = Path.Combine(_hostEnvironment.WebRootPath, "uploads", "rooms");
+            if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+
+            string uniqueFileName = Guid.NewGuid().ToString() + "_" + file.FileName;
+            string filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+            using (var fileStream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(fileStream);
+            }
+
+            return "/uploads/rooms/" + uniqueFileName;
         }
 
         [AdminAuthorize(Permission = "rooms.edit")]

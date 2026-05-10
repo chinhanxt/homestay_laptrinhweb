@@ -15,6 +15,23 @@
                 <div class="card-header bg-white border-0 py-3">
                     <h6 class="mb-0 fw-bold text-primary"><i class="fas fa-store me-2"></i>Chi nhánh</h6>
                 </div>
+                <div class="list-group list-group-flush border-bottom mb-3" role="tablist">
+                    <a class="list-group-item list-group-item-action border-0 py-3" href="/admin/holidays">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-warning bg-opacity-10 p-2 rounded-3 me-3 text-warning">
+                                <i class="fas fa-calendar-alt"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold small">Ma trận Ngày Lễ</div>
+                                <div class="text-muted" style="font-size: 0.7rem;">Cấu hình chung hệ thống</div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="card-header bg-white border-0 py-2">
+                    <h6 class="mb-0 fw-bold text-muted small text-uppercase">Cấu hình theo chi nhánh</h6>
+                </div>
                 <div class="list-group list-group-flush" id="branch-list" role="tablist">
                     @{ int i = 0; }
                     @foreach (var branch in branches)

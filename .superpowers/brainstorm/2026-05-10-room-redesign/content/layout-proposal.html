@@ -1,0 +1,87 @@
+<h2>Đề xuất bố cục Trang Quản lý Phòng</h2>
+<p class="subtitle">Thiết kế chia thành 2 bảng thông tin và giá như bạn yêu cầu</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Bảng 1: Thông tin cơ bản</div>
+    <div class="mockup-body">
+      <div class="section">
+        <div class="label">Tên phòng / Mã phòng</div>
+        <div class="mock-input">Phòng Gác Mái Rừng Thông</div>
+      </div>
+      <div class="section">
+        <div class="label">Chi nhánh</div>
+        <div class="mock-input">StayEasy Đà Lạt</div>
+      </div>
+      <div class="section">
+        <div class="label">Trạng thái vận hành</div>
+        <div class="mock-input">Available (Sẵn sàng) / Maintenance (Bảo trì)</div>
+        <p style="font-size: 0.8rem; color: #666;">* Đã bỏ trạng thái "Đang có khách"</p>
+      </div>
+      <div class="section">
+        <div class="label">Mô tả tiện ích</div>
+        <div class="mock-input" style="height: 60px;">Trải nghiệm ngủ giữa ngàn thông...</div>
+      </div>
+      <div class="section">
+        <div class="label">Ảnh đại diện</div>
+        <button class="mock-button">Chọn file từ máy...</button>
+      </div>
+      <div class="section">
+        <div class="label">Ảnh minh họa thêm (Nhiều ảnh)</div>
+        <button class="mock-button">+ Thêm ảnh</button>
+        <div style="display: flex; gap: 5px; margin-top: 10px;">
+          <div class="placeholder" style="width: 50px; height: 50px;"></div>
+          <div class="placeholder" style="width: 50px; height: 50px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">Bảng 2: Cấu hình giá</div>
+    <div class="mockup-body">
+      <div class="section">
+        <div class="label">Giá theo ngày (VNĐ)</div>
+        <input class="mock-input" value="950,000">
+      </div>
+      <div class="section">
+        <div class="label">Giá theo giờ (VNĐ)</div>
+        <input class="mock-input" value="150,000">
+      </div>
+      <div class="section">
+        <div class="label">Phí khách thêm (VNĐ)</div>
+        <input class="mock-input" value="100,000">
+      </div>
+      <div class="section" style="border-top: 1px dashed #ccc; pt: 15px;">
+        <div class="label" style="color: #e67e22;">Giá theo Thứ 7, CN, Lễ (VNĐ)</div>
+        <input class="mock-input" value="1,200,000" style="border-color: #e67e22;">
+        <p style="font-size: 0.8rem; color: #666;">* Tự động áp dụng khi book vào ngày nghỉ/lễ</p>
+      </div>
+      <div class="section">
+        <div class="label">Sức chứa tiêu chuẩn</div>
+        <input class="mock-input" value="2">
+      </div>
+      <div class="section">
+        <div class="label">Số khách tối đa</div>
+        <input class="mock-input" value="4">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="layout_ok" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>Bố cục này ổn rồi</h3>
+      <p>Tiến hành thiết kế chi tiết theo hướng này</p>
+    </div>
+  </div>
+  <div class="option" data-choice="need_change" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>Cần điều chỉnh thêm</h3>
+      <p>Tôi sẽ góp ý thêm ở phần chat</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,86 @@
+<h2>Cập nhật bố cục Trang Quản lý Phòng (v3)</h2>
+<p class="subtitle">Đơn giản hóa form: Chỉ giữ trường giá, ngày lễ cấu hình tập trung</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Bảng 1: Thông tin cơ bản</div>
+    <div class="mockup-body">
+      <div class="section">
+        <div class="label">Tên phòng / Mã phòng</div>
+        <div class="mock-input">Phòng Gác Mái Rừng Thông</div>
+      </div>
+      <div class="section">
+        <div class="label">Chi nhánh</div>
+        <div class="mock-input">StayEasy Đà Lạt</div>
+      </div>
+      <div class="section">
+        <div class="label">Trạng thái vận hành</div>
+        <div class="mock-input">Available (Sẵn sàng) / Maintenance (Bảo trì)</div>
+      </div>
+      <div class="section">
+        <div class="label">Mô tả tiện ích</div>
+        <div class="mock-input" style="height: 80px;">Trải nghiệm ngủ giữa ngàn thông...</div>
+      </div>
+      <div class="section">
+        <div class="label">Ảnh đại diện</div>
+        <button class="mock-button">Tải ảnh lên...</button>
+      </div>
+      <div class="section">
+        <div class="label">Ảnh minh họa (Bắt buộc 5 tấm)</div>
+        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 10px;">
+          <div class="placeholder" style="aspect-ratio: 1/1; border: 2px dashed #ccc;"></div>
+          <div class="placeholder" style="aspect-ratio: 1/1; border: 2px dashed #ccc;"></div>
+          <div class="placeholder" style="aspect-ratio: 1/1; border: 2px dashed #ccc;"></div>
+          <div class="placeholder" style="aspect-ratio: 1/1; border: 2px dashed #ccc;"></div>
+          <div class="placeholder" style="aspect-ratio: 1/1; border: 2px dashed #ccc;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">Bảng 2: Cấu hình giá & Quy định</div>
+    <div class="mockup-body">
+      <div class="section">
+        <div class="label">Giá theo ngày thường (VNĐ)</div>
+        <input class="mock-input" value="950,000">
+      </div>
+      <div class="section">
+        <div class="label">Giá Thứ 7 & Chủ Nhật (VNĐ)</div>
+        <input class="mock-input" value="1,200,000" style="border-color: #3498db;">
+      </div>
+      <div class="section">
+        <div class="label">Giá ngày Lễ (VNĐ)</div>
+        <input class="mock-input" value="1,500,000" style="border-color: #e74c3c;">
+        <p style="font-size: 0.8rem; color: #666; margin-top: 4px;">* Ngày lễ được lấy từ cấu hình hệ thống chung</p>
+      </div>
+      <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+      <div class="section">
+        <div class="label">Giá theo giờ (VNĐ)</div>
+        <input class="mock-input" value="150,000">
+      </div>
+      <div class="section">
+        <div class="label">Phí khách thêm (VNĐ)</div>
+        <input class="mock-input" value="100,000">
+      </div>
+      <div class="section">
+        <div class="label">Sức chứa tiêu chuẩn</div>
+        <input class="mock-input" value="2">
+      </div>
+      <div class="section">
+        <div class="label">Số khách tối đa</div>
+        <input class="mock-input" value="4">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="v3_final" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>Thiết kế này hoàn hảo rồi</h3>
+      <p>Bắt đầu viết tài liệu thiết kế và triển khai</p>
+    </div>
+  </div>
+</div>

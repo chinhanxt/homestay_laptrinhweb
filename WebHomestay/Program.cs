@@ -23,6 +23,8 @@ builder.Services.AddScoped<WebHomestay.Services.ISlotManagementService, WebHomes
 builder.Services.AddScoped<WebHomestay.Services.IMailService, WebHomestay.Services.MailService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<WebHomestay.Services.ISettingService, WebHomestay.Services.SettingService>();
+builder.Services.AddScoped<WebHomestay.Services.IStatisticsService, WebHomestay.Services.StatisticsService>();
+builder.Services.AddScoped<WebHomestay.Services.PricingService>();
 builder.Services.AddHostedService<WebHomestay.Services.BookingCleanupService>();
 
 // Add Session

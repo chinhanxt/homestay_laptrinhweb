@@ -22,6 +22,7 @@ namespace WebHomestay.Data
         public DbSet<RoomSlotInventory> RoomSlotInventories { get; set; }
         public DbSet<RoomSlotOverride> RoomSlotOverrides { get; set; }
         public DbSet<SystemSetting> SystemSettings { get; set; }
+        public DbSet<Holiday> Holidays { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -40,6 +41,7 @@ namespace WebHomestay.Data
             modelBuilder.Entity<RoomSlotInventory>().ToTable("room_slot_inventories");
             modelBuilder.Entity<SystemSetting>().ToTable("system_settings");
             modelBuilder.Entity<RoomSlotOverride>().ToTable("room_slot_overrides");
+            modelBuilder.Entity<Holiday>().ToTable("holidays");
 
             // AdminUser - Branch relationship
             modelBuilder.Entity<AdminUser>()
@@ -207,6 +209,21 @@ namespace WebHomestay.Data
                 entity.Property(e => e.Description).HasColumnName("description");
                 entity.Property(e => e.GroupName).HasColumnName("group_name");
                 entity.Property(e => e.LastUpdated).HasColumnName("last_updated");
+            });
+
+            modelBuilder.Entity<Holiday>(entity =>
+            {
+                entity.ToTable("holidays");
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.Date).HasColumnName("date");
+                entity.Property(e => e.Description).HasColumnName("description");
+            });
+
+            // Update Room mapping for new fields
+            modelBuilder.Entity<Room>(entity => {
+                entity.Property(e => e.PriceWeekend).HasColumnName("price_weekend");
+                entity.Property(e => e.PriceHoliday).HasColumnName("price_holiday");
+                entity.Property(e => e.AdditionalImages).HasColumnName("additional_images");
             });
         }
     }

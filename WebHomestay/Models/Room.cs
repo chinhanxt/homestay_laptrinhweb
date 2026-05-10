@@ -22,12 +22,19 @@ namespace WebHomestay.Models
         [Column(TypeName = "decimal(10, 2)")]
         public decimal ExtraGuestFee { get; set; } = 0;
 
+        [Column(TypeName = "decimal(10, 2)")]
+        public decimal PriceWeekend { get; set; }
+
+        [Column(TypeName = "decimal(10, 2)")]
+        public decimal PriceHoliday { get; set; }
+
         public int Capacity { get; set; } = 2;
         public int MaxGuests { get; set; } = 4;
 
-        public string Status { get; set; } = "Available"; // Available, Occupied, Maintenance
+        public string Status { get; set; } = "Available"; // Available, Maintenance
 
         public string? ImageUrl { get; set; }
+        public string? AdditionalImages { get; set; } // Store as JSON array of strings
 
         public int BranchId { get; set; }
         public virtual Branch? Branch { get; set; }
