@@ -95,6 +95,30 @@ namespace WebHomestay.Controllers
             return View(branch);
         }
 
+        [AdminAuthorize(Permission = "branches.delete")]
+        [HttpPost("delete/{id}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var branch = await _context.Branches
+                .Include(b => b.Rooms)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (branch == null) return NotFound();
+
+            // Kiểm tra xem chi nhánh có phòng nào không
+            if (branch.Rooms != null && branch.Rooms.Any())
+            {
+                TempData["ErrorMessage"] = $"Không thể xóa chi nhánh '{branch.Name}' vì vẫn còn phòng thuộc chi nhánh này. Hãy xóa hết phòng của chi nhánh trước khi thực hiện.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            _context.Branches.Remove(branch);
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Đã xóa chi nhánh '{branch.Name}' thành công.";
+            return RedirectToAction(nameof(Index));
+        }
+
         private bool BranchExists(int id)
         {
             return _context.Branches.Any(e => e.Id == id);

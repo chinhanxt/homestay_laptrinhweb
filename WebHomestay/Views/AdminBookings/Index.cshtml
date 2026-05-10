@@ -14,10 +14,13 @@
                 <h1>Quản lý Đơn đặt phòng</h1>
             </div>
             <div class="admin-hero-actions">
-                <a asp-action="Trash" class="btn-premium-outline">
-                    <i class="fas fa-trash-alt"></i>
-                    <span>Thùng rác</span>
-                </a>
+                @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "bookings.delete"))
+                {
+                    <a asp-action="Trash" class="btn-premium-outline">
+                        <i class="fas fa-trash-alt"></i>
+                        <span>Thùng rác</span>
+                    </a>
+                }
             </div>
         </header>
 
@@ -49,7 +52,7 @@
                             <tr>
                                 <td>
                                     <div class="fw-bold">#@item.Id</div>
-                                    <div class="small text-muted">@item.CreatedAt.ToString("dd/MM HH:mm")</div>
+                                    <div class="small text-muted">@item.CreatedAt.AddHours(7).ToString("dd/MM HH:mm")</div>
                                 </td>
                                 <td>
                                     <div class="fw-bold text-primary">@item.CustomerName</div>
@@ -103,18 +106,24 @@
                                         <span class="text-muted small italic">Chưa có bill</span>
                                     }
                                 </td>
-                                <td>
-                                    @if (item.Status == "AwaitingPayment" || item.Status == "PendingPayment")
+                                 <td>
+                                    @if (item.Status?.Equals("AwaitingPayment", StringComparison.OrdinalIgnoreCase) == true || 
+                                         item.Status?.Equals("PendingPayment", StringComparison.OrdinalIgnoreCase) == true ||
+                                         item.Status?.Equals("PENDING", StringComparison.OrdinalIgnoreCase) == true)
                                     {
                                         <span class="badge-premium badge-secondary-soft">Chờ thanh toán</span>
                                     }
-                                    else if (item.Status == "AwaitingApproval")
+                                    else if (item.Status?.Equals("AwaitingApproval", StringComparison.OrdinalIgnoreCase) == true)
                                     {
                                         <span class="badge-premium badge-warning-soft">Cần duyệt bill</span>
                                     }
-                                    else if (item.Status == "Confirmed")
+                                    else if (item.Status?.Equals("Confirmed", StringComparison.OrdinalIgnoreCase) == true)
                                     {
                                         <span class="badge-premium badge-success-soft">Đã xác nhận</span>
+                                    }
+                                    else if (item.Status?.Equals("CheckedOut", StringComparison.OrdinalIgnoreCase) == true)
+                                    {
+                                        <span class="badge-premium" style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Hoàn thành</span>
                                     }
                                     else
                                     {
@@ -132,12 +141,29 @@
                                         <a asp-action="Details" asp-route-id="@item.Id" class="admin-btn-icon" title="Chi tiết">
                                             <i class="fas fa-eye"></i>
                                         </a>
-                                        <form asp-action="SoftDelete" method="post" class="d-inline" onsubmit="return confirm('Bạn muốn xóa đơn hàng này?')">
-                                            <input type="hidden" name="id" value="@item.Id" />
-                                            <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </form>
+                                         @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "bookings.delete"))
+                                        {
+                                            var s = item.Status ?? "";
+                                            bool isRestricted = s.Equals("Confirmed", StringComparison.OrdinalIgnoreCase) || 
+                                                                s.Equals("AwaitingApproval", StringComparison.OrdinalIgnoreCase);
+                                            
+                                            if (isRestricted)
+                                            {
+                                                <button type="button" class="admin-btn-icon is-danger border-0 bg-transparent opacity-50" 
+                                                        onclick="showLuxToast('Không thể xóa đơn hàng đang vận hành!', 'error')" title="Xóa (Bị chặn)">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <form asp-action="SoftDelete" method="post" class="d-inline" onsubmit="return confirm('Bạn muốn xóa đơn hàng này?')">
+                                                    <input type="hidden" name="id" value="@item.Id" />
+                                                    <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            }
+                                        }
                                     </div>
 
                                     <!-- Approval Modal -->
@@ -196,3 +222,54 @@
         </div>
     </div>
 </div>
+
+@if (TempData["ErrorMessage"] != null || TempData["SuccessMessage"] != null)
+{
+    var isError = TempData["ErrorMessage"] != null;
+    var message = isError ? TempData["ErrorMessage"] : TempData["SuccessMessage"];
+
+    <div class="lux-toast-container" id="toast-notif">
+        <div class="lux-toast @(isError ? "is-danger" : "is-success")">
+            <div class="lux-toast-accent"></div>
+            <div class="lux-toast-content">
+                @message
+            </div>
+        </div>
+    </div>
+
+    @section Scripts {
+        <script>
+            function showLuxToast(message, type = 'success') {
+                let container = document.querySelector('.lux-toast-container');
+                if (!container) {
+                    container = document.createElement('div');
+                    container.className = 'lux-toast-container';
+                    document.body.appendChild(container);
+                }
+                
+                const toast = document.createElement('div');
+                toast.className = `lux-toast ${type === 'error' ? 'is-danger' : 'is-success'}`;
+                toast.innerHTML = `
+                    <div class="lux-toast-accent"></div>
+                    <div class="lux-toast-content">${message}</div>
+                `;
+                
+                container.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.classList.add('fade-out');
+                    setTimeout(() => toast.remove(), 500);
+                }, 4000);
+            }
+
+            // Xử lý toast từ TempData
+            setTimeout(function() {
+                const toast = document.getElementById('toast-notif');
+                if (toast) {
+                    toast.classList.add('fade-out');
+                    setTimeout(() => toast.remove(), 500);
+                }
+            }, 4000);
+        </script>
+    }
+}

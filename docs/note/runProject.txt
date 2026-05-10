@@ -1,0 +1,2 @@
+cd "C:\Users\admin\Documents\VS Tím\web_homestay\web_homestay\WebHomestay"; dotnet run
+dotnet build

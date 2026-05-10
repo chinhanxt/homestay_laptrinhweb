@@ -115,6 +115,54 @@ namespace WebHomestay.Controllers
             return View(room);
         }
 
+        [AdminAuthorize(Permission = "rooms.edit")]
+        [HttpPost("toggle-status/{id}")]
+        public async Task<IActionResult> ToggleStatus(int id)
+        {
+            var room = await _context.Rooms.Include(r => r.Bookings).FirstOrDefaultAsync(r => r.Id == id);
+            if (room == null) return NotFound();
+
+            string message = "";
+            bool success = true;
+
+            if (room.Status == "Maintenance")
+            {
+                room.Status = "Available";
+                message = $"Phòng {room.Name} đã hoạt động trở lại.";
+            }
+            else
+            {
+                // Kiểm tra đơn đặt phòng trong tương lai (Confirmed, AwaitingApproval, CheckedIn)
+                var activeBookings = room.Bookings.Any(b => 
+                    b.EndTime > DateTime.Now && 
+                    (b.Status == "Confirmed" || b.Status == "AwaitingApproval" || b.Status == "CheckedIn")
+                );
+
+                if (activeBookings)
+                {
+                    success = false;
+                    message = $"Không thể tắt hoạt động phòng {room.Name} vì đang có đơn đặt phòng hoặc khách đang ở.";
+                }
+                else
+                {
+                    room.Status = "Maintenance";
+                    message = $"Đã tạm ngưng hoạt động phòng {room.Name}.";
+                }
+            }
+
+            if (success) await _context.SaveChangesAsync();
+
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success, message, newStatus = room.Status });
+            }
+
+            if (success) TempData["SuccessMessage"] = message;
+            else TempData["ErrorMessage"] = message;
+
+            return RedirectToAction(nameof(Index));
+        }
+
         [AdminAuthorize(Permission = "rooms.delete")]
         [HttpPost("delete/{id}"), ActionName("Delete")]
         [ValidateAntiForgeryToken]

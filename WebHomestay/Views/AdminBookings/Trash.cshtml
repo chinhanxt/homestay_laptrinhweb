@@ -61,7 +61,7 @@
                                     </div>
                                 </td>
                                 <td>
-                                    <div class="small fw-bold">@item.DeletedAt?.ToString("dd/MM/yyyy HH:mm")</div>
+                                    <div class="small fw-bold">@item.DeletedAt?.AddHours(7).ToString("dd/MM/yyyy HH:mm")</div>
                                 </td>
                                 <td>
                                     @{

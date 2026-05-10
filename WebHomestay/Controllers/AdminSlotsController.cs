@@ -122,6 +122,27 @@ public class AdminSlotsController : Controller
     }
 
     [HttpPost]
+    public async Task<IActionResult> ToggleAssignment(int assignmentId)
+    {
+        var assignment = await _context.RoomSlotTemplateAssignments.FindAsync(assignmentId);
+        if (assignment == null) return NotFound();
+
+        int roomId = assignment.RoomId;
+        var result = await _slotManagementService.ToggleAssignmentAsync(assignmentId);
+
+        if (result.success)
+        {
+            TempData["SuccessMessage"] = result.message;
+        }
+        else
+        {
+            TempData["ErrorMessage"] = result.message;
+        }
+
+        return RedirectToAction(nameof(RoomSchedules), new { roomId });
+    }
+
+    [HttpPost]
     public async Task<IActionResult> RemoveAssignment(int assignmentId)
     {
         var assignment = await _context.RoomSlotTemplateAssignments.FindAsync(assignmentId);

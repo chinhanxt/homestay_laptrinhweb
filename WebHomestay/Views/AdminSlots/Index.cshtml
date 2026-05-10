@@ -14,10 +14,13 @@
                 <h1>Quản lý Mẫu khung giờ</h1>
             </div>
             <div class="admin-hero-actions">
-                <a asp-action="CreateTemplate" class="btn-premium">
-                    <i class="fas fa-plus"></i>
-                    <span>Thêm mẫu mới</span>
-                </a>
+                @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.create"))
+                {
+                    <a asp-action="CreateTemplate" class="btn-premium">
+                        <i class="fas fa-plus"></i>
+                        <span>Thêm mẫu mới</span>
+                    </a>
+                }
             </div>
         </header>
 
@@ -65,16 +68,22 @@
                                     }
                                 </td>
                                 <td class="text-end">
-                                    <div class="admin-actions">
-                                        <a asp-action="EditTemplate" asp-route-id="@item.Id" class="admin-btn-icon" title="Chỉnh sửa">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <form asp-action="DeleteTemplate" asp-route-id="@item.Id" method="post" class="d-inline" onsubmit="return confirm('Xóa mẫu này sẽ xóa tất cả các ô lịch TRỐNG liên quan trong tương lai. Bạn chắc chắn chứ?')">
-                                            <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent" title="Xóa">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </form>
-                                    </div>
+                                     <div class="admin-actions">
+                                        @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.edit"))
+                                        {
+                                            <a asp-action="EditTemplate" asp-route-id="@item.Id" class="admin-btn-icon" title="Chỉnh sửa">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        }
+                                        @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.delete"))
+                                        {
+                                            <form asp-action="DeleteTemplate" asp-route-id="@item.Id" method="post" class="d-inline" onsubmit="return confirm('Xóa mẫu này sẽ xóa tất cả các ô lịch TRỐNG liên quan trong tương lai. Bạn chắc chắn chứ?')">
+                                                <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent" title="Xóa">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        }
+                                     </div>
                                 </td>
                             </tr>
                         }

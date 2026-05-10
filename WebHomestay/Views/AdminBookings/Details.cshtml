@@ -27,7 +27,24 @@
                 <div class="admin-card mb-4 p-4">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h5 class="fw-bold text-primary mb-0"><i class="fas fa-user-circle me-2"></i>Thông tin khách hàng</h5>
-                        <span class="badge-premium @(Model.Status == "Confirmed" ? "badge-success-soft" : "badge-warning-soft")">@Model.Status</span>
+                        @{
+                            var statusDisplay = Model.Status switch {
+                                "AwaitingApproval" => "Cần duyệt bill",
+                                "Confirmed" => "Đã xác nhận",
+                                "CheckedIn" => "Đã nhận phòng",
+                                "CheckedOut" => "Hoàn thành",
+                                "Cancelled" => "Đã hủy",
+                                "AwaitingPayment" or "PendingPayment" or "PENDING" => "Chờ thanh toán",
+                                _ => Model.Status
+                            };
+                            var statusClass = Model.Status switch {
+                                "Confirmed" => "badge-success-soft",
+                                "AwaitingApproval" => "badge-warning-soft",
+                                "Cancelled" => "badge-danger-soft",
+                                _ => "badge-primary-soft"
+                            };
+                        }
+                        <span class="badge-premium @statusClass">@statusDisplay</span>
                     </div>
                     
                     <div class="row g-4">
@@ -138,10 +155,23 @@
                                 <i class="fas fa-check-double me-2"></i>DUYỆT & GỬI VÉ
                             </button>
                         }
-                        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn-premium-outline justify-content-center">
-                            <i class="fas fa-edit me-2"></i>Chỉnh sửa
-                        </a>
-                        <button class="btn btn-link text-danger text-decoration-none small">Hủy đơn hàng này</button>
+                        @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "bookings.delete"))
+                        {
+                            bool isRestricted = Model.Status == "Confirmed" || Model.Status == "AwaitingApproval";
+                            
+                            if (isRestricted)
+                            {
+                                <button type="button" class="btn btn-link text-danger text-decoration-none small opacity-50" 
+                                        onclick="showLuxToast('Không thể xóa đơn hàng đang vận hành!', 'error')">Hủy đơn hàng này</button>
+                            }
+                            else
+                            {
+                                <form asp-action="SoftDelete" method="post" class="d-grid" onsubmit="return confirm('Bạn muốn xóa đơn hàng này?')">
+                                    <input type="hidden" name="id" value="@Model.Id" />
+                                    <button type="submit" class="btn btn-link text-danger text-decoration-none small">Hủy đơn hàng này</button>
+                                </form>
+                            }
+                        }
                     </div>
                 </div>
             </div>
@@ -149,4 +179,30 @@
     </div>
 </div>
 
-<!-- Modal Duyệt (nếu cần) - Tương tự như trang Index -->
+
+@section Scripts {
+    <script>
+        function showLuxToast(message, type = 'success') {
+            let container = document.querySelector('.lux-toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'lux-toast-container';
+                document.body.appendChild(container);
+            }
+            
+            const toast = document.createElement('div');
+            toast.className = `lux-toast ${type === 'error' ? 'is-danger' : 'is-success'}`;
+            toast.innerHTML = `
+                <div class="lux-toast-accent"></div>
+                <div class="lux-toast-content">${message}</div>
+            `;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('fade-out');
+                setTimeout(() => toast.remove(), 500);
+            }, 4000);
+        }
+    </script>
+}

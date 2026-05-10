@@ -16,20 +16,10 @@
                     <h6 class="mb-0 fw-bold text-primary"><i class="fas fa-store me-2"></i>Chi nhánh</h6>
                 </div>
                 <div class="list-group list-group-flush" id="branch-list" role="tablist">
-                    <a class="list-group-item list-group-item-action active border-0 py-3" id="tab-global" data-bs-toggle="list" href="#global-settings" role="tab">
-                        <div class="d-flex align-items-center">
-                            <div class="bg-primary bg-opacity-10 p-2 rounded-3 me-3 text-primary">
-                                <i class="fas fa-globe"></i>
-                            </div>
-                            <div>
-                                <div class="fw-bold small">Toàn hệ thống</div>
-                                <div class="text-muted" style="font-size: 0.7rem;">Cấu hình mặc định</div>
-                            </div>
-                        </div>
-                    </a>
+                    @{ int i = 0; }
                     @foreach (var branch in branches)
                     {
-                        <a class="list-group-item list-group-item-action border-0 py-3" id="tab-branch-@branch.Id" data-bs-toggle="list" href="#branch-@branch.Id-settings" role="tab">
+                        <a class="list-group-item list-group-item-action border-0 py-3 @(i == 0 ? "active" : "")" id="tab-branch-@branch.Id" data-bs-toggle="list" href="#branch-@branch.Id-settings" role="tab">
                             <div class="d-flex align-items-center">
                                 <div class="bg-light p-2 rounded-3 me-3 text-muted">
                                     <i class="fas fa-map-marker-alt"></i>
@@ -40,6 +30,7 @@
                                 </div>
                             </div>
                         </a>
+                        i++;
                     }
                 </div>
             </div>
@@ -55,55 +46,11 @@
             }
 
             <div class="tab-content">
-                <!-- Cấu hình toàn hệ thống -->
-                <div class="tab-pane fade show active" id="global-settings" role="tabpanel">
-                    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
-                        <div class="card-header bg-white border-0 py-3">
-                            <h5 class="mb-0 fw-bold">Cấu hình mặc định toàn cầu</h5>
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead class="bg-light">
-                                        <tr>
-                                            <th class="ps-4 border-0 small fw-bold text-muted">Tham số</th>
-                                            <th class="border-0 small fw-bold text-muted">Giá trị</th>
-                                            <th class="pe-4 border-0 text-end small fw-bold text-muted">Hành động</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var setting in Model)
-                                        {
-                                            <tr>
-                                                <td class="ps-4">
-                                                    <div class="fw-bold text-dark">@setting.SettingKey</div>
-                                                    <div class="text-muted small">@setting.Description</div>
-                                                </td>
-                                                <td style="width: 150px;">
-                                                    <form asp-action="Update" method="post" id="form-global-@setting.Id">
-                                                        <input type="hidden" name="key" value="@setting.SettingKey" />
-                                                        <input type="text" name="value" value="@setting.SettingValue" class="form-control form-control-sm rounded-pill border-0 bg-light px-3" />
-                                                    </form>
-                                                </td>
-                                                <td class="pe-4 text-end">
-                                                    <button type="submit" form="form-global-@setting.Id" class="btn-luxury-save">
-                                                        <span>Lưu thay đổi</span>
-                                                        <i class="fas fa-chevron-right ms-2 small"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Cấu hình riêng cho từng chi nhánh -->
+                @{ int j = 0; }
                 @foreach (var branch in branches)
                 {
-                    <div class="tab-pane fade" id="branch-@branch.Id-settings" role="tabpanel">
+                    <div class="tab-pane fade @(j == 0 ? "show active" : "")" id="branch-@branch.Id-settings" role="tabpanel">
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-header bg-white border-0 py-3">
                                 <div class="d-flex align-items-center">
@@ -135,6 +82,7 @@
                             </div>
                         </div>
                     </div>
+                    j++;
                 }
             </div>
         </div>

@@ -8,4 +8,5 @@ public interface ISlotManagementService
     Task SyncTemplateChangesAsync(int templateId);
     Task DeleteTemplateAndCleanInventoryAsync(int templateId);
     Task RemoveAssignmentAndCleanInventoryAsync(int assignmentId);
+    Task<(bool success, string message)> ToggleAssignmentAsync(int assignmentId);
 }

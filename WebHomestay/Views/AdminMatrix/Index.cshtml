@@ -178,7 +178,6 @@
                     <span class="legend-pill tone-confirmed">Đã xác nhận</span>
                     <span class="legend-pill tone-attention">Chờ duyệt</span>
                     <span class="legend-pill tone-pending">Chờ thanh toán</span>
-                    <span class="legend-pill tone-inhouse">Đang lưu trú</span>
                 </div>
             </div>
         </section>
@@ -243,6 +242,12 @@
                                     var hasAttention = roomBookings.Any(booking =>
                                         booking.Status is "AwaitingApproval" or "AwaitingPayment" or "PendingPayment");
                                     var occupiedInRange = roomBookings.Select(booking => booking.Id).Any();
+                                    var statusLabel = room.Status switch
+                                    {
+                                        "Maintenance" => "Bảo trì",
+                                        "Occupied" => "Hết phòng",
+                                        _ => "Sẵn sàng"
+                                    };
                                     var statusChip = room.Status switch
                                     {
                                         "Maintenance" => "chip-maintenance",
@@ -259,13 +264,16 @@
                                             <button type="button" class="room-summary-trigger" data-room-trigger data-room-id="@room.Id">
                                                 <span class="room-summary-main">
                                                     <strong>@room.Name</strong>
-                                                    <span>@room.Capacity khách tiêu chuẩn · tối đa @room.MaxGuests khách</span>
                                                 </span>
                                                 <span class="room-summary-meta">
-                                                    <span class="room-status-chip @statusChip">@room.Status</span>
+                                                    <span class="room-status-chip @statusChip" title="@statusLabel">
+                                                        <i class="fas @(room.Status == "Maintenance" ? "fa-tools" : (room.Status == "Occupied" ? "fa-user-lock" : "fa-check-circle"))"></i>
+                                                    </span>
                                                     @if (hasAttention)
                                                     {
-                                                        <span class="room-attention-chip">Có việc cần xem</span>
+                                                        <span class="room-attention-chip" title="Cần chú ý">
+                                                            <i class="fas fa-circle-exclamation"></i>
+                                                        </span>
                                                     }
                                                 </span>
                                             </button>
@@ -286,28 +294,36 @@
                                                         aria-label="Phòng @room.Name, ngày @day.ToString("dd/MM/yyyy"), @(dayBookings.Count == 0 ? "trống" : $"{dayBookings.Count} lịch")">
                                                     @if (dayBookings.Any())
                                                     {
-                                                        foreach (var booking in dayBookings.Take(2))
+                                                        foreach (var booking in dayBookings.Take(3))
                                                         {
                                                             var toneClass = bookingTone(booking.Status);
                                                             var isDaily = booking.BookingMode == WebHomestay.Models.BookingMode.Daily;
                                                             var isStartSegment = isDaily && day.Date == booking.StartTime.Date;
                                                             var isEndSegment = isDaily && day.Date == booking.EndTime.Date.AddDays(-1);
-                                                            var bookingTitle = isDaily
-                                                                ? (isStartSegment ? "Nhận phòng" : "Đang lưu trú")
-                                                                : (!string.IsNullOrWhiteSpace(booking.SlotLabel) ? booking.SlotLabel : "Theo giờ");
-                                                            var bookingSubtitle = isStartSegment || !isDaily
-                                                                ? booking.CustomerName
-                                                                : $"Đến {booking.EndTime:dd/MM}";
+
+                                                            var displayStatus = booking.Status switch
+                                                            {
+                                                                "AwaitingApproval" => "CHỜ DUYỆT",
+                                                                "AwaitingPayment" or "PendingPayment" => "CHỜ THANH TOÁN",
+                                                                "Confirmed" => "ĐÃ XÁC NHẬN",
+                                                                "CheckedIn" => "ĐANG Ở",
+                                                                "CheckedOut" => "ĐÃ TRẢ",
+                                                                _ => "ĐẶT CHỖ"
+                                                            };
+
+                                                            string rangeText = isDaily 
+                                                                ? $"{booking.StartTime:dd/MM}-{booking.EndTime:dd/MM}"
+                                                                : $"{booking.StartTime:HH:mm}-{booking.EndTime:HH:mm}";
 
                                                             <span class="matrix-booking @toneClass @(isDaily ? "is-daily" : "is-hourly") @(isStartSegment ? "is-start" : string.Empty) @(isEndSegment ? "is-end" : string.Empty)">
-                                                                <span class="matrix-booking-title">@bookingTitle</span>
-                                                                <span class="matrix-booking-subtitle">@bookingSubtitle</span>
+                                                                <span class="matrix-booking-title">@displayStatus</span>
+                                                                <span class="matrix-booking-subtitle">@rangeText</span>
                                                             </span>
                                                         }
 
-                                                        @if (dayBookings.Count > 2)
+                                                        @if (dayBookings.Count > 3)
                                                         {
-                                                            <span class="matrix-booking-overflow">+@(dayBookings.Count - 2) lịch</span>
+                                                            <span class="matrix-booking-overflow">+@(dayBookings.Count - 3) lịch</span>
                                                         }
                                                     }
                                                     else
@@ -339,41 +355,30 @@
     <aside id="matrix-drawer" class="admin-matrix-drawer" aria-hidden="true">
         <div class="drawer-head">
             <div>
-                <span class="drawer-kicker">Chi tiết phòng / ô lịch</span>
-                <h2 id="drawer-room-name">Chọn một ô hoặc một phòng</h2>
-                <p id="drawer-room-meta">Thông tin chi tiết sẽ hiện tại đây.</p>
+                <span class="drawer-kicker">
+                    <i class="fas fa-info-circle"></i>
+                    Chi tiết vận hành
+                </span>
+                <h2 id="drawer-room-name">Chọn phòng / ô lịch</h2>
+                <p id="drawer-room-meta">Chọn một đối tượng trên ma trận để xem dữ liệu</p>
             </div>
-            <button type="button" class="drawer-close" id="drawer-close" aria-label="Đóng chi tiết">
+            <button type="button" class="drawer-close" id="drawer-close" title="Đóng (Esc)">
                 <i class="fas fa-times"></i>
             </button>
         </div>
 
         <div class="drawer-body">
-            <section class="drawer-stat-grid" id="drawer-stats">
-                <article class="drawer-stat-card">
-                    <span>Trạng thái</span>
-                    <strong>-</strong>
-                </article>
-                <article class="drawer-stat-card">
-                    <span>Số booking trong kỳ</span>
-                    <strong>-</strong>
-                </article>
-                <article class="drawer-stat-card">
-                    <span>Sức chứa</span>
-                    <strong>-</strong>
-                </article>
-            </section>
 
             <section class="drawer-section">
                 <div class="drawer-section-head">
-                    <h3 id="drawer-timeline-title">Timeline theo phòng</h3>
+                    <h3 id="drawer-timeline-title">Lịch trình chi tiết</h3>
                     <span id="drawer-timeline-badge" class="drawer-section-badge">-</span>
                 </div>
                 <div id="drawer-bookings" class="drawer-booking-list">
                     <div class="drawer-empty-state">
-                        <i class="fas fa-calendar-check"></i>
-                        <strong>Chưa có lịch nào được chọn</strong>
-                        <span>Bấm vào một phòng hoặc một ô trên ma trận để mở timeline chi tiết.</span>
+                        <i class="fas fa-inbox"></i>
+                        <strong>Chưa có dữ liệu</strong>
+                        <span>Bấm vào một phòng hoặc ô trên ma trận</span>
                     </div>
                 </div>
             </section>
@@ -385,35 +390,37 @@
     @@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap');
 
     .admin-matrix-page {
-        --matrix-bg: #f3f0ea;
-        --matrix-surface: rgba(255, 255, 255, 0.88);
+        --matrix-bg: #f5f2eb;
+        --matrix-surface: rgba(255, 255, 255, 0.92);
         --matrix-surface-strong: #ffffff;
-        --matrix-border: rgba(24, 40, 60, 0.12);
-        --matrix-border-strong: rgba(24, 40, 60, 0.18);
-        --matrix-text: #1f2d3d;
-        --matrix-text-soft: #617182;
-        --matrix-title: #142033;
-        --matrix-primary: #243b5a;
-        --matrix-primary-soft: #edf3fa;
-        --matrix-gold: #b38a3f;
-        --matrix-ready: #2e7d5a;
-        --matrix-ready-soft: #e6f4ec;
-        --matrix-pending: #ad7a18;
-        --matrix-pending-soft: #fbf2dd;
-        --matrix-attention: #975648;
-        --matrix-attention-soft: #f7e5df;
-        --matrix-inhouse: #426f9e;
-        --matrix-inhouse-soft: #e8f0f8;
-        --matrix-neutral-soft: #eef2f6;
-        --matrix-shadow: 0 24px 60px rgba(24, 40, 60, 0.08);
+        --matrix-border: rgba(24, 40, 60, 0.1);
+        --matrix-border-strong: rgba(24, 40, 60, 0.15);
+        --matrix-text: #1a2638;
+        --matrix-text-soft: #5c6b7a;
+        --matrix-title: #0f1a2a;
+        --matrix-primary: #1e3a5f;
+        --matrix-primary-soft: #f0f4f8;
+        --matrix-gold: #a67c37;
+        --matrix-ready: #2a7a58;
+        --matrix-ready-soft: #e8f5ed;
+        --matrix-pending: #a37516;
+        --matrix-pending-soft: #fdf5e6;
+        --matrix-attention: #8e4b3e;
+        --matrix-attention-soft: #f9ebe6;
+        --matrix-inhouse: #3a6b9a;
+        --matrix-inhouse-soft: #ebf2f8;
+        --matrix-neutral-soft: #f1f3f6;
+        --matrix-shadow: 0 30px 70px rgba(15, 26, 42, 0.1);
+        --matrix-shadow-sm: 0 4px 12px rgba(15, 26, 42, 0.04);
+        --matrix-radius: 24px;
         position: relative;
         background:
-            radial-gradient(circle at top left, rgba(179, 138, 63, 0.10), transparent 28%),
-            linear-gradient(180deg, #fbfaf8 0%, var(--matrix-bg) 100%);
+            radial-gradient(circle at 10% 10%, rgba(166, 124, 55, 0.08), transparent 40%),
+            linear-gradient(180deg, #fdfcf9 0%, var(--matrix-bg) 100%);
         color: var(--matrix-text);
         font-family: 'Source Sans 3', sans-serif;
         min-height: calc(100vh - 70px);
-        padding: 16px 20px 32px;
+        padding: 16px 24px 40px;
         text-wrap: pretty;
     }
 
@@ -733,7 +740,15 @@
         border-radius: 999px;
         font-size: 0.82rem;
         font-weight: 700;
-        padding: 6px 10px;
+        padding: 6px 12px;
+    }
+
+    .room-status-chip,
+    .room-attention-chip {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        font-size: 1.1rem;
     }
 
     .tone-confirmed {
@@ -915,12 +930,6 @@
         font-weight: 700;
     }
 
-    .room-summary-main span,
-    .room-summary-meta {
-        color: var(--matrix-text-soft);
-        font-size: 0.85rem;
-    }
-
     .room-summary-meta {
         display: flex;
         flex-wrap: wrap;
@@ -1013,18 +1022,21 @@
 
     .matrix-booking-title {
         color: inherit;
-        font-size: 0.72rem;
+        font-size: 0.62rem;
         line-height: 1;
-        font-weight: 700;
+        font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.05em;
+        opacity: 0.8;
     }
 
     .matrix-booking-subtitle,
     .matrix-booking-overflow {
         color: var(--matrix-title);
-        font-size: 0.86rem;
-        line-height: 1.2;
+        font-family: 'Lexend', sans-serif;
+        font-size: 0.8rem;
+        font-weight: 600;
+        line-height: 1.1;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1074,21 +1086,22 @@
 
     .admin-matrix-drawer {
         position: fixed;
-        top: 82px;
-        right: 18px;
-        bottom: 18px;
-        width: min(440px, calc(100vw - 24px));
-        border-radius: 28px;
-        padding: 22px;
-        padding-bottom: max(22px, env(safe-area-inset-bottom));
+        top: 80px;
+        right: 20px;
+        bottom: 20px;
+        width: min(480px, calc(100vw - 40px));
+        border-radius: 32px;
+        padding: 32px;
+        padding-bottom: max(32px, env(safe-area-inset-bottom));
         z-index: 1050;
-        transform: translateX(calc(100% + 24px));
+        transform: translateX(calc(100% + 40px));
         opacity: 0;
         pointer-events: none;
         display: grid;
         grid-template-rows: auto 1fr;
-        gap: 18px;
+        gap: 24px;
         overscroll-behavior: contain;
+        transition: transform 400ms cubic-bezier(0.16, 1, 0.3, 1), opacity 300ms ease;
     }
 
     .admin-matrix-drawer.is-open {
@@ -1100,60 +1113,60 @@
     .drawer-head {
         display: flex;
         justify-content: space-between;
-        gap: 16px;
+        gap: 20px;
         align-items: flex-start;
     }
 
     .drawer-head h2 {
-        font-size: 1.5rem;
+        font-family: 'Lexend', sans-serif;
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--matrix-title);
+        margin-bottom: 4px;
     }
 
     .drawer-close {
-        width: 42px;
-        height: 42px;
+        width: 44px;
+        height: 44px;
         border-radius: 999px;
         border: 1px solid var(--matrix-border);
         background: var(--matrix-surface-strong);
         color: var(--matrix-primary);
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        cursor: pointer;
     }
 
-    .drawer-close:hover,
-    .drawer-close:focus-visible {
+    .drawer-close:hover {
         background: var(--matrix-primary-soft);
-        outline: none;
+        transform: rotate(90deg);
     }
 
     .drawer-body {
         min-height: 0;
         overflow-y: auto;
-        display: grid;
-        gap: 18px;
-        padding-right: 2px;
-        overscroll-behavior: contain;
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+        padding-right: 4px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--matrix-border) transparent;
     }
 
-    .drawer-stat-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 12px;
+    .drawer-body::-webkit-scrollbar {
+        width: 4px;
+    }
+    .drawer-body::-webkit-scrollbar-thumb {
+        background: var(--matrix-border);
+        border-radius: 10px;
     }
 
-    .drawer-stat-card {
-        border-radius: 20px;
-        padding: 16px;
-        background: rgba(255, 255, 255, 0.76);
-        border: 1px solid rgba(24, 40, 60, 0.08);
-        display: grid;
-        gap: 8px;
-    }
 
     .drawer-section {
-        border-radius: 24px;
-        border: 1px solid rgba(24, 40, 60, 0.08);
-        background: rgba(255, 255, 255, 0.76);
-        padding: 16px;
-        display: grid;
-        gap: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
     }
 
     .drawer-section-head {
@@ -1181,56 +1194,224 @@
     }
 
     .drawer-booking-card {
-        border-radius: 20px;
-        padding: 14px;
-        border: 1px solid rgba(24, 40, 60, 0.08);
+        border-radius: 28px;
+        padding: 24px;
         background: var(--matrix-surface-strong);
-        display: grid;
-        gap: 10px;
+        border: 1px solid var(--matrix-border);
+        box-shadow: var(--matrix-shadow-sm);
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        transition: all 300ms ease;
     }
 
-    .drawer-booking-top,
-    .drawer-booking-meta,
-    .drawer-booking-actions {
+    .drawer-booking-card:hover {
+        box-shadow: 0 12px 30px rgba(15, 26, 42, 0.06);
+        border-color: rgba(166, 124, 55, 0.2);
+    }
+
+    .drawer-booking-header {
         display: flex;
         justify-content: space-between;
-        gap: 10px;
-        align-items: center;
-        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 12px;
     }
 
     .drawer-booking-name {
         font-family: 'Lexend', sans-serif;
         color: var(--matrix-title);
-        font-size: 0.98rem;
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-bottom: 2px;
     }
 
-    .drawer-booking-meta span,
-    .drawer-booking-note {
+    .drawer-booking-tagline {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         color: var(--matrix-text-soft);
-        font-size: 0.92rem;
-        line-height: 1.45;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .drawer-booking-tagline i {
+        font-size: 0.75rem;
+        opacity: 0.7;
+    }
+
+    .drawer-booking-timeline {
+        position: relative;
+        padding: 16px;
+        background: var(--matrix-neutral-soft);
+        border-radius: 20px;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .timeline-point {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .timeline-label {
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--matrix-text-soft);
+        letter-spacing: 0.05em;
+    }
+
+    .timeline-time {
+        font-family: 'Lexend', sans-serif;
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--matrix-title);
+    }
+
+    .timeline-date {
+        font-size: 0.8rem;
+        color: var(--matrix-text-soft);
+    }
+
+    .timeline-arrow {
+        color: var(--matrix-text-soft);
+        opacity: 0.4;
+        font-size: 0.9rem;
+    }
+
+    .drawer-booking-contact {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 4px 0;
+    }
+
+    .contact-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .contact-main {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--matrix-text);
+        font-size: 0.95rem;
+    }
+
+    .contact-main i {
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--matrix-surface-strong);
+        border-radius: 8px;
+        color: var(--matrix-gold);
+        font-size: 0.85rem;
+    }
+
+    .zalo-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        border-radius: 10px;
+        background: #f0f5ff;
+        color: #0068ff !important;
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-decoration: none !important;
+        transition: all 200ms ease;
+        border: 1px solid rgba(0, 104, 255, 0.1);
+    }
+
+    .zalo-link:hover {
+        background: #0068ff;
+        color: white !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 104, 255, 0.2);
+    }
+
+    .drawer-booking-note {
+        padding: 14px 16px;
+        background: var(--matrix-pending-soft);
+        border-left: 3px solid var(--matrix-gold);
+        border-radius: 0 16px 16px 0;
+        font-size: 0.9rem;
+        color: var(--matrix-text);
+        line-height: 1.5;
+        font-style: italic;
+    }
+
+    .drawer-booking-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 16px;
+        border-top: 1px dashed var(--matrix-border);
+    }
+
+    .price-block {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .price-label {
+        font-size: 0.75rem;
+        color: var(--matrix-text-soft);
+        font-weight: 600;
+    }
+
+    .price-value {
+        font-family: 'Lexend', sans-serif;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--matrix-title);
+    }
+
+    .drawer-booking-actions {
+        display: flex;
+        gap: 8px;
     }
 
     .drawer-booking-actions a {
+        height: 44px;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 8px;
-        padding: 10px 12px;
+        padding-inline: 18px;
         border-radius: 999px;
-        text-decoration: none;
         font-weight: 700;
-        font-size: 0.92rem;
+        font-size: 0.9rem;
+        text-decoration: none;
+        transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .drawer-booking-actions a.primary {
         background: var(--matrix-primary);
-        color: #fff;
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(30, 58, 95, 0.2);
+    }
+
+    .drawer-booking-actions a.primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(30, 58, 95, 0.3);
     }
 
     .drawer-booking-actions a.secondary {
-        background: var(--matrix-primary-soft);
+        background: var(--matrix-neutral-soft);
         color: var(--matrix-primary);
+    }
+
+    .drawer-booking-actions a.secondary:hover {
+        background: var(--matrix-primary-soft);
     }
 
     .d-none {
@@ -1318,17 +1499,25 @@
 
             const statusToneClass = status => {
                 switch (status) {
-                    case 'Confirmed':
-                        return 'tone-confirmed';
-                    case 'AwaitingApproval':
-                        return 'tone-attention';
+                    case 'Confirmed': return 'tone-confirmed';
+                    case 'AwaitingApproval': return 'tone-attention';
                     case 'AwaitingPayment':
-                    case 'PendingPayment':
-                        return 'tone-pending';
-                    case 'CheckedIn':
-                        return 'tone-inhouse';
-                    default:
-                        return 'tone-neutral';
+                    case 'PendingPayment': return 'tone-pending';
+                    case 'CheckedIn': return 'tone-inhouse';
+                    case 'CheckedOut': return 'tone-neutral';
+                    default: return 'tone-neutral';
+                }
+            };
+
+            const statusLabel = status => {
+                switch (status) {
+                    case 'Confirmed': return 'Đã xác nhận';
+                    case 'AwaitingApproval': return 'Chờ duyệt';
+                    case 'AwaitingPayment':
+                    case 'PendingPayment': return 'Chờ thanh toán';
+                    case 'CheckedIn': return 'Đang ở';
+                    case 'CheckedOut': return 'Đã trả phòng';
+                    default: return status;
                 }
             };
 
@@ -1386,71 +1575,87 @@
                 const modeText = booking.bookingMode === 'Hourly'
                     ? (booking.slotLabel || 'Theo giờ')
                     : 'Theo ngày';
+                
+                const startTime = new Date(booking.startTime);
+                const endTime = new Date(booking.endTime);
+                
+                const formatTime = date => date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                const formatDate = date => date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+
                 const noteHtml = booking.note
                     ? `<div class="drawer-booking-note">${escapeHtml(booking.note)}</div>`
                     : '';
 
                 return `
                     <article class="drawer-booking-card">
-                        <div class="drawer-booking-top">
+                        <div class="drawer-booking-header">
                             <div>
                                 <div class="drawer-booking-name">${escapeHtml(booking.customerName)}</div>
-                                <div class="drawer-booking-meta">
+                                <div class="drawer-booking-tagline">
+                                    <i class="fas fa-tag"></i>
                                     <span>${escapeHtml(modeText)}</span>
+                                    <span>•</span>
+                                    <i class="fas fa-user-friends"></i>
                                     <span>${booking.guestCount} khách</span>
                                 </div>
                             </div>
-                            <span class="legend-pill ${tone}">${escapeHtml(booking.status)}</span>
+                            <span class="legend-pill ${tone}">${escapeHtml(statusLabel(booking.status))}</span>
                         </div>
-                        <div class="drawer-booking-meta">
-                            <span>${formatDateTime(booking.startTime)}</span>
-                            <span>${formatDateTime(booking.endTime)}</span>
+
+                        <div class="drawer-booking-timeline">
+                            <div class="timeline-point">
+                                <span class="timeline-label">Nhận</span>
+                                <span class="timeline-time">${formatTime(startTime)}</span>
+                                <span class="timeline-date">${formatDate(startTime)}</span>
+                            </div>
+                            <div class="timeline-arrow">
+                                <i class="fas fa-long-arrow-alt-right"></i>
+                            </div>
+                            <div class="timeline-point">
+                                <span class="timeline-label">Trả</span>
+                                <span class="timeline-time">${formatTime(endTime)}</span>
+                                <span class="timeline-date">${formatDate(endTime)}</span>
+                            </div>
                         </div>
-                        <div class="drawer-booking-meta">
-                            <span>${escapeHtml(booking.customerPhone)}</span>
-                            <span>${escapeHtml(booking.customerEmail || 'Chưa có email')}</span>
+
+                        <div class="drawer-booking-contact">
+                            <div class="contact-row">
+                                <div class="contact-main">
+                                    <i class="fas fa-phone-alt"></i>
+                                    <strong>${escapeHtml(booking.customerPhone)}</strong>
+                                </div>
+                                <a href="https://zalo.me/${booking.customerPhone.replace(/\D/g, '')}" target="_blank" class="zalo-link" title="Chat Zalo">
+                                    <i class="fas fa-comment-dots"></i>
+                                    <span>Zalo</span>
+                                </a>
+                            </div>
+                            <div class="contact-row">
+                                <div class="contact-main">
+                                    <i class="fas fa-envelope"></i>
+                                    <span>${escapeHtml(booking.customerEmail || 'Chưa có email')}</span>
+                                </div>
+                            </div>
                         </div>
+
                         ${noteHtml}
-                        <div class="drawer-booking-actions">
-                            <a class="primary" href="${detailsUrl}">
-                                <i class="fas fa-arrow-right"></i>
-                                <span>Xem booking</span>
-                            </a>
-                            <a class="secondary" href="${bookingIndexUrl}">
-                                <i class="fas fa-list"></i>
-                                <span>Tới danh sách đơn</span>
-                            </a>
-                        </div>
-                        <div class="drawer-booking-meta">
-                            <span>Tạm tính</span>
-                            <span>${formatMoney(booking.totalPrice)}</span>
+
+                        <div class="drawer-booking-footer">
+                            <div class="price-block">
+                                <span class="price-label">Tổng cộng</span>
+                                <span class="price-value">${formatMoney(booking.totalPrice)}</span>
+                            </div>
+                            <div class="drawer-booking-actions">
+                                <a class="primary" href="${detailsUrl}" title="Xem chi tiết đơn hàng">
+                                    <i class="fas fa-external-link-alt"></i>
+                                    <span>Chi tiết</span>
+                                </a>
+                                <a class="secondary" href="${bookingIndexUrl}" title="Về danh sách quản lý">
+                                    <i class="fas fa-list-ul"></i>
+                                </a>
+                            </div>
                         </div>
                     </article>
                 `;
-            };
-
-            const setDrawerStats = room => {
-                const nextBooking = firstFutureBooking(room.bookings);
-                drawerStats.innerHTML = `
-                    <article class="drawer-stat-card">
-                        <span>Trạng thái phòng</span>
-                        <strong>${roomStatusLabel(room.roomStatus)}</strong>
-                    </article>
-                    <article class="drawer-stat-card">
-                        <span>Số booking trong kỳ</span>
-                        <strong>${room.bookings.length}</strong>
-                    </article>
-                    <article class="drawer-stat-card">
-                        <span>Sức chứa</span>
-                        <strong>${room.capacity}/${room.maxGuests}</strong>
-                    </article>
-                `;
-
-                if (nextBooking) {
-                    drawerRoomMeta.textContent = `${room.branchName} · Lịch tới gần nhất: ${formatDateTime(nextBooking.startTime)}`;
-                } else {
-                    drawerRoomMeta.textContent = `${room.branchName} · Chưa có lịch tiếp theo trong khoảng đang xem`;
-                }
             };
 
             const openDrawer = (roomId, dateKey = null, dateLabel = null) => {
@@ -1461,7 +1666,13 @@
 
                 const bookings = dateKey ? getBookingsForDate(room, dateKey) : room.bookings;
                 drawerRoomName.textContent = room.roomName;
-                setDrawerStats(room);
+                
+                const nextBooking = firstFutureBooking(room.bookings);
+                if (nextBooking) {
+                    drawerRoomMeta.textContent = `${room.branchName} · Lịch tới gần nhất: ${formatDateTime(nextBooking.startTime)}`;
+                } else {
+                    drawerRoomMeta.textContent = `${room.branchName} · Chưa có lịch tiếp theo trong khoảng đang xem`;
+                }
 
                 drawerTimelineTitle.textContent = dateKey
                     ? `Timeline của ${dateLabel ?? dateKey}`

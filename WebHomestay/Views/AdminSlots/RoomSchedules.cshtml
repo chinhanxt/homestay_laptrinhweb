@@ -32,6 +32,15 @@
             </div>
         }
 
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger border-0 shadow-sm mb-4 d-flex align-items-center" style="border-radius: 12px; background: #fef2f2; color: #991b1b;">
+                <i class="fas fa-exclamation-circle me-3 fs-4"></i>
+                <div class="fw-bold">@TempData["ErrorMessage"]</div>
+                <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
         <div class="row g-4">
             <div class="col-lg-4">
                 <div class="admin-card p-4">
@@ -121,9 +130,12 @@
                                         </td>
                                         <td class="text-end">
                                             <div class="admin-actions">
-                                                <button class="admin-btn-icon" title="Tạm dừng">
-                                                    <i class="fas fa-pause-circle"></i>
-                                                </button>
+                                                <form asp-action="ToggleAssignment" method="post" class="d-inline">
+                                                    <input type="hidden" name="assignmentId" value="@assignment.Id" />
+                                                    <button type="submit" class="admin-btn-icon @(assignment.IsActive ? "" : "text-success") border-0 bg-transparent" title="@(assignment.IsActive ? "Tạm dừng" : "Tiếp tục")">
+                                                        <i class="fas @(assignment.IsActive ? "fa-pause-circle" : "fa-play-circle")"></i>
+                                                    </button>
+                                                </form>
                                                 <form asp-action="RemoveAssignment" method="post" class="d-inline" onsubmit="return confirm('Gỡ lịch này sẽ xóa tất cả các ô lịch TRỐNG liên quan trong tương lai của phòng này. Bạn chắc chắn chứ?')">
                                                     <input type="hidden" name="assignmentId" value="@assignment.Id" />
                                                     <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent" title="Gỡ lịch">

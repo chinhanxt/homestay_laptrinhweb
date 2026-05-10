@@ -33,11 +33,26 @@ namespace WebHomestay.Controllers
                 .Include(b => b.RoomSlotInventory)
                     .ThenInclude(i => i.Template)
                 .Where(b => !b.IsDeleted && 
-                           !((b.Status == "AwaitingPayment" || b.Status == "PendingPayment") && b.CreatedAt < DateTime.UtcNow.AddMinutes(-5)));
+                           !( (b.Status == "AwaitingPayment" || b.Status == "PendingPayment" || b.Status == "PENDING") && b.CreatedAt < DateTime.UtcNow.AddMinutes(-5)));
 
             if (role != "SuperAdmin" && branchId.HasValue)
             {
                 query = query.Where(b => b.Room.BranchId == branchId.Value);
+            }
+
+            // Auto-update past confirmed bookings to CheckedOut (Completed)
+            var now = DateTime.UtcNow;
+            var pastConfirmed = await _context.Bookings
+                .Where(b => !b.IsDeleted && b.Status == "Confirmed" && b.EndTime < now)
+                .ToListAsync();
+
+            if (pastConfirmed.Any())
+            {
+                foreach (var b in pastConfirmed)
+                {
+                    b.Status = "CheckedOut";
+                }
+                await _context.SaveChangesAsync();
             }
 
             var bookings = await query
@@ -46,7 +61,7 @@ namespace WebHomestay.Controllers
             return View(bookings);
         }
 
-        [AdminAuthorize(Permission = "bookings.view")]
+        [AdminAuthorize(Permission = "bookings.delete")]
         [HttpGet("trash")]
         public async Task<IActionResult> Trash()
         {
@@ -70,18 +85,26 @@ namespace WebHomestay.Controllers
             return View(bookings);
         }
 
-        [AdminAuthorize(Permission = "bookings.edit")]
+        [AdminAuthorize(Permission = "bookings.delete")]
         [HttpPost("soft-delete")]
         public async Task<IActionResult> SoftDelete(int id)
         {
             var booking = await _context.Bookings.FindAsync(id);
             if (booking == null) return NotFound();
 
-            // Condition: Only CheckedOut, Cancelled, AwaitingPayment or PendingPayment can be deleted
-            if (booking.Status != "CheckedOut" && booking.Status != "Cancelled" && 
-                booking.Status != "AwaitingPayment" && booking.Status != "PendingPayment")
+            // Condition: CANNOT delete Confirmed or AwaitingApproval as they are active bookings
+            var s = booking.Status ?? "";
+            bool isRestricted = s.Equals("Confirmed", StringComparison.OrdinalIgnoreCase) || 
+                                s.Equals("AwaitingApproval", StringComparison.OrdinalIgnoreCase);
+
+            if (isRestricted)
             {
-                TempData["ErrorMessage"] = $"Không thể xóa đơn hàng có trạng thái: {booking.Status}.";
+                string statusVietnamese = s switch {
+                    "Confirmed" => "Đã xác nhận",
+                    "AwaitingApproval" => "Cần duyệt bill",
+                    _ => s
+                };
+                TempData["ErrorMessage"] = $"Không thể xóa đơn hàng đang vận hành ({statusVietnamese}).";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -217,6 +240,7 @@ namespace WebHomestay.Controllers
             var booking = await _context.Bookings.FindAsync(id);
             if (booking == null) return NotFound();
             
+
             string oldStatus = booking.Status;
             booking.Status = status;
 

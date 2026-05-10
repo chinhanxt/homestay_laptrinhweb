@@ -14,10 +14,13 @@
                 <h1>Quản lý Danh sách Phòng</h1>
             </div>
             <div class="admin-hero-actions">
-                <a asp-action="Create" class="btn-premium">
-                    <i class="fas fa-plus"></i>
-                    <span>Thêm phòng mới</span>
-                </a>
+                @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.create"))
+                {
+                    <a asp-action="Create" class="btn-premium">
+                        <i class="fas fa-plus"></i>
+                        <span>Thêm phòng mới</span>
+                    </a>
+                }
             </div>
         </header>
 
@@ -65,28 +68,54 @@
                                 <td>
                                     <div class="small">@item.Capacity người</div>
                                 </td>
-                                <td>
-                                    @if (item.Status == "Available")
-                                    {
-                                        <span class="badge-premium badge-success-soft">Sẵn sàng</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge-premium badge-warning-soft">Đang bảo trì</span>
-                                    }
-                                </td>
+                                 <td>
+                                     <div class="d-flex flex-column gap-2">
+                                         @if (item.Status == "Available")
+                                         {
+                                             <span class="badge-premium badge-success-soft" style="width: fit-content;">Sẵn sàng</span>
+                                         }
+                                         else if (item.Status == "Occupied")
+                                         {
+                                             <span class="badge-premium badge-info-soft" style="width: fit-content;">Đang có khách</span>
+                                         }
+                                         else
+                                         {
+                                             <span class="badge-premium badge-warning-soft" style="width: fit-content;">Đang bảo trì</span>
+                                         }
+
+                                         @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.edit"))
+                                         {
+                                             <div class="form-check form-switch admin-switch-premium">
+                                                 <input class="form-check-input" type="checkbox" role="switch" id="switch-@item.Id" 
+                                                        @(item.Status != "Maintenance" ? "checked" : "")
+                                                        onchange="toggleRoomActivity(@item.Id, this)">
+                                                 <label class="form-check-label small fw-bold activity-label" for="switch-@item.Id" style="cursor: pointer; font-size: 0.7rem; color: #64748b;">
+                                                     @(item.Status != "Maintenance" ? "ĐANG HOẠT ĐỘNG" : "TẠM NGƯNG")
+                                                 </label>
+                                             </div>
+                                         }
+                                     </div>
+                                 </td>
                                 <td class="text-end">
-                                    <div class="admin-actions">
+                                     <div class="admin-actions">
                                         <a asp-controller="AdminSlots" asp-action="RoomSchedules" asp-route-roomId="@item.Id" class="admin-btn-icon" title="Quản lý lịch trình">
                                             <i class="fas fa-clock"></i>
                                         </a>
-                                        <a asp-action="Edit" asp-route-id="@item.Id" class="admin-btn-icon" title="Chỉnh sửa">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <a asp-action="Delete" asp-route-id="@item.Id" class="admin-btn-icon is-danger" title="Xóa">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
-                                    </div>
+                                        @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.edit"))
+                                        {
+                                            <a asp-action="Edit" asp-route-id="@item.Id" class="admin-btn-icon" title="Chỉnh sửa">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        }
+                                        @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.delete"))
+                                        {
+                                            <form asp-action="Delete" asp-route-id="@item.Id" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa phòng này?');">
+                                                <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent" title="Xóa">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        }
+                                     </div>
                                 </td>
                             </tr>
                         }
@@ -107,3 +136,78 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        function showLuxToast(message, type = 'success') {
+            let container = document.querySelector('.lux-toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'lux-toast-container';
+                document.body.appendChild(container);
+            }
+            
+            const toast = document.createElement('div');
+            toast.className = `lux-toast ${type === 'error' ? 'is-danger' : 'is-success'}`;
+            toast.innerHTML = `
+                <div class="lux-toast-accent"></div>
+                <div class="lux-toast-content">${message}</div>
+            `;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('fade-out');
+                setTimeout(() => toast.remove(), 500);
+            }, 4000);
+        }
+
+        async function toggleRoomActivity(id, checkbox) {
+            const label = checkbox.nextElementSibling;
+            const originalChecked = !checkbox.checked;
+            const originalText = label.innerText;
+            
+            // Tạm thời đổi text để tạo cảm giác mượt
+            label.innerText = checkbox.checked ? "ĐANG HOẠT ĐỘNG" : "TẠM NGƯNG";
+
+            try {
+                const response = await fetch(`/admin/rooms/toggle-status/${id}`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showLuxToast(result.message, 'success');
+                    // Cập nhật Badge trạng thái (nếu có)
+                    const badgeContainer = checkbox.closest('.d-flex').querySelector('.badge-premium');
+                    if (badgeContainer) {
+                        if (result.newStatus === 'Available') {
+                            badgeContainer.className = 'badge-premium badge-success-soft';
+                            badgeContainer.innerText = 'Sẵn sàng';
+                        } else if (result.newStatus === 'Occupied') {
+                            badgeContainer.className = 'badge-premium badge-info-soft';
+                            badgeContainer.innerText = 'Đang có khách';
+                        } else {
+                            badgeContainer.className = 'badge-premium badge-warning-soft';
+                            badgeContainer.innerText = 'Đang bảo trì';
+                        }
+                    }
+                } else {
+                    // Thất bại -> Revert lại checkbox và text
+                    checkbox.checked = originalChecked;
+                    label.innerText = originalText;
+                    showLuxToast(result.message, 'error');
+                }
+            } catch (error) {
+                checkbox.checked = originalChecked;
+                label.innerText = originalText;
+                showLuxToast('Lỗi kết nối máy chủ!', 'error');
+            }
+        }
+    </script>
+}

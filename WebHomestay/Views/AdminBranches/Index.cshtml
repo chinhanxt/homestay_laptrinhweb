@@ -14,10 +14,13 @@
                 <h1>Quản lý Chi nhánh</h1>
             </div>
             <div class="admin-hero-actions">
-                <a asp-action="Create" class="btn-premium">
-                    <i class="fas fa-plus"></i>
-                    <span>Thêm chi nhánh mới</span>
-                </a>
+                @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "branches.create"))
+                {
+                    <a asp-action="Create" class="btn-premium">
+                        <i class="fas fa-plus"></i>
+                        <span>Thêm chi nhánh mới</span>
+                    </a>
+                }
             </div>
         </header>
 
@@ -47,17 +50,25 @@
                                     <div class="small"><i class="fas fa-phone me-2 text-muted"></i>@item.Hotline</div>
                                 </td>
                                 <td class="text-end">
-                                    <div class="admin-actions">
-                                        <a asp-action="Edit" asp-route-id="@item.Id" class="admin-btn-icon" title="Chỉnh sửa">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
+                                     <div class="admin-actions">
+                                        @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "branches.edit"))
+                                        {
+                                            <a asp-action="Edit" asp-route-id="@item.Id" class="admin-btn-icon" title="Chỉnh sửa">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        }
                                         <a asp-action="Details" asp-route-id="@item.Id" class="admin-btn-icon" title="Chi tiết">
                                             <i class="fas fa-eye"></i>
                                         </a>
-                                        <a asp-action="Delete" asp-route-id="@item.Id" class="admin-btn-icon is-danger" title="Xóa">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
-                                    </div>
+                                        @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "branches.delete"))
+                                        {
+                                            <form asp-action="Delete" asp-route-id="@item.Id" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa chi nhánh này?');">
+                                                <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent" title="Xóa">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        }
+                                     </div>
                                 </td>
                             </tr>
                         }
@@ -78,3 +89,40 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        function showLuxToast(message, type = 'success') {
+            let container = document.querySelector('.lux-toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'lux-toast-container';
+                document.body.appendChild(container);
+            }
+            
+            const toast = document.createElement('div');
+            toast.className = `lux-toast ${type === 'error' ? 'is-danger' : 'is-success'}`;
+            toast.innerHTML = `
+                <div class="lux-toast-accent"></div>
+                <div class="lux-toast-content">${message}</div>
+            `;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('fade-out');
+                setTimeout(() => toast.remove(), 500);
+            }, 4000);
+        }
+
+        // Tự động hiển thị TempData message nếu có
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <text>showLuxToast('@TempData["SuccessMessage"]', 'success');</text>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <text>showLuxToast('@TempData["ErrorMessage"]', 'error');</text>
+        }
+    </script>
+}
