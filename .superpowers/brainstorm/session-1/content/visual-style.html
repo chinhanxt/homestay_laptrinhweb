@@ -1,0 +1,29 @@
+<h2>Chọn phong cách hiển thị</h2>
+<p class="subtitle">Bạn muốn trang thống kê trông như thế nào?</p>
+
+<div class="options">
+  <div class="option" data-choice="dense" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Dạng Bảng điều khiển (Dense)</h3>
+      <p>Nhiều thẻ nhỏ, hiển thị tối đa thông tin trên một màn hình. Phù hợp để theo dõi chi tiết tất cả chỉ số cùng lúc.</p>
+      <div class="placeholder" style="height: 100px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+        <div style="background: #333; border-radius: 4px;"></div>
+        <div style="background: #333; border-radius: 4px;"></div>
+        <div style="background: #333; border-radius: 4px;"></div>
+        <div style="background: #333; border-radius: 4px;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="focused" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Dạng Hiện đại & Tập trung (Clean/Focused)</h3>
+      <p>Ít thẻ hơn nhưng lớn hơn, tập trung vào các biểu đồ quan trọng nhất. Sử dụng nhiều khoảng trắng và hiệu ứng cao cấp.</p>
+      <div class="placeholder" style="height: 100px; display: flex; flex-direction: column; gap: 5px;">
+        <div style="background: #333; border-radius: 4px; flex: 2;"></div>
+        <div style="background: #333; border-radius: 4px; flex: 1;"></div>
+      </div>
+    </div>
+  </div>
+</div>

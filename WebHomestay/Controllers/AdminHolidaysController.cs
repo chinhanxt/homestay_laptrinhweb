@@ -18,11 +18,11 @@ namespace WebHomestay.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public IActionResult Index()
         {
-            var holidays = await _context.Holidays.OrderBy(h => h.Date).ToListAsync();
-            return View(holidays);
+            return Redirect("/admin/settings?tab=holiday");
         }
+
 
         [HttpPost("create")]
         [ValidateAntiForgeryToken]
@@ -31,14 +31,14 @@ namespace WebHomestay.Controllers
             if (date == default)
             {
                 TempData["ErrorMessage"] = "Vui lòng chọn ngày hợp lệ.";
-                return RedirectToAction(nameof(Index));
+                return Redirect("/admin/settings?tab=holiday");
             }
 
             var exists = await _context.Holidays.AnyAsync(h => h.Date.Date == date.Date);
             if (exists)
             {
                 TempData["ErrorMessage"] = "Ngày này đã được cấu hình là ngày Lễ.";
-                return RedirectToAction(nameof(Index));
+                return Redirect("/admin/settings?tab=holiday");
             }
 
             var holiday = new Holiday
@@ -51,7 +51,7 @@ namespace WebHomestay.Controllers
             await _context.SaveChangesAsync();
 
             TempData["SuccessMessage"] = $"Đã thêm ngày Lễ: {date:dd/MM/yyyy}";
-            return RedirectToAction(nameof(Index));
+            return Redirect("/admin/settings?tab=holiday");
         }
 
         [HttpPost("delete/{id}")]
@@ -65,7 +65,7 @@ namespace WebHomestay.Controllers
                 await _context.SaveChangesAsync();
                 TempData["SuccessMessage"] = " Đã xóa ngày Lễ.";
             }
-            return RedirectToAction(nameof(Index));
+            return Redirect("/admin/settings?tab=holiday");
         }
 
         [HttpPost("create-range")]
@@ -75,7 +75,7 @@ namespace WebHomestay.Controllers
             if (startDate == default || endDate == default || startDate > endDate)
             {
                 TempData["ErrorMessage"] = "Khoảng ngày không hợp lệ.";
-                return RedirectToAction(nameof(Index));
+                return Redirect("/admin/settings?tab=holiday");
             }
 
             int addedCount = 0;
@@ -103,7 +103,21 @@ namespace WebHomestay.Controllers
                 TempData["ErrorMessage"] = "Không có ngày mới nào được thêm (có thể đã tồn tại).";
             }
 
-            return RedirectToAction(nameof(Index));
+            return Redirect("/admin/settings?tab=holiday");
+        }
+
+        [HttpPost("delete-by-desc")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteByDescription(string description)
+        {
+            var holidays = await _context.Holidays.Where(h => h.Description == description).ToListAsync();
+            if (holidays.Any())
+            {
+                _context.Holidays.RemoveRange(holidays);
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = $"Đã xóa dịp lễ: {description}";
+            }
+            return Redirect("/admin/settings?tab=holiday");
         }
     }
 }

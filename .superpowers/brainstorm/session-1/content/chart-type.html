@@ -1,0 +1,30 @@
+<h2>Biểu đồ khung giờ/ngày bận rộn</h2>
+<p class="subtitle">Bạn muốn hình dung dữ liệu thời gian như thế nào?</p>
+
+<div class="options">
+  <div class="option" data-choice="heatmap" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Bản đồ nhiệt (Heatmap)</h3>
+      <p>Một lưới hiển thị các ngày trong tuần và khung giờ trong ngày. Màu đậm hơn biểu thị lượng đặt phòng nhiều hơn. Rất chuyên nghiệp và dễ nhìn ra quy luật.</p>
+      <div class="placeholder" style="height: 120px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; background: #1a1a1a; padding: 5px;">
+        <div style="background: #0e4429;"></div><div style="background: #006d32;"></div><div style="background: #26a641;"></div><div style="background: #0e4429;"></div><div style="background: #39d353;"></div><div style="background: #006d32;"></div><div style="background: #0e4429;"></div>
+        <div style="background: #006d32;"></div><div style="background: #39d353;"></div><div style="background: #26a641;"></div><div style="background: #0e4429;"></div><div style="background: #006d32;"></div><div style="background: #39d353;"></div><div style="background: #26a641;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="barchart" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Biểu đồ cột truyền thống (Bar Chart)</h3>
+      <p>Hai biểu đồ riêng biệt: một cho các thứ trong tuần, một cho các khung giờ. Đơn giản, rõ ràng, dễ so sánh các giá trị tuyệt đối.</p>
+      <div class="placeholder" style="height: 120px; display: flex; align-items: flex-end; gap: 5px; padding: 10px;">
+        <div style="background: #3b82f6; width: 10%; height: 40%;"></div>
+        <div style="background: #3b82f6; width: 10%; height: 70%;"></div>
+        <div style="background: #3b82f6; width: 10%; height: 50%;"></div>
+        <div style="background: #3b82f6; width: 10%; height: 90%;"></div>
+        <div style="background: #3b82f6; width: 10%; height: 60%;"></div>
+      </div>
+    </div>
+  </div>
+</div>

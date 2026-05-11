@@ -1,0 +1,427 @@
+@{
+    ViewData["Title"] = "Thống Kê Doanh Thu - STAYLUXE";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/admin-bento-stats.css" asp-append-version="true" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+}
+
+<div class="stats-dashboard">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-4">
+        <div class="stats-header">
+            <h1 class="mb-1">Phân Tích Hệ Thống</h1>
+            <p class="text-muted">Báo cáo dữ liệu vận hành toàn hệ thống Homestay</p>
+        </div>
+        
+        <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2 bg-white border rounded-pill px-4 py-2 shadow-sm">
+                <input type="date" id="startDate" class="border-0 bg-transparent small fw-bold" style="outline: none; font-size: 0.85rem;" />
+                <span class="text-muted">→</span>
+                <input type="date" id="endDate" class="border-0 bg-transparent small fw-bold" style="outline: none; font-size: 0.85rem;" />
+            </div>
+            <select id="branchFilter" class="form-select rounded-pill border-soft shadow-sm px-4 py-2 fw-bold" style="width: 200px;">
+                <option value="">Tất cả chi nhánh</option>
+            </select>
+            <button id="applyFilter" class="btn btn-dark rounded-pill px-4 shadow-sm fw-bold">
+                Cập nhật
+            </button>
+            <div class="dropdown">
+                <button class="btn btn-outline-dark dropdown-toggle rounded-pill px-4 shadow-sm fw-bold" type="button" data-bs-toggle="dropdown">
+                    Xuất báo cáo
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-4 p-2">
+                    <li><a class="dropdown-item py-2 px-3 fw-bold small rounded-3" href="#" onclick="exportData('excel')"><i class="far fa-file-excel me-2 text-success"></i>Xuất Excel</a></li>
+                    <li><a class="dropdown-item py-2 px-3 fw-bold small rounded-3 disabled" href="#"><i class="far fa-file-pdf me-2 text-danger"></i>Xuất PDF</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Metrics -->
+    <div class="metrics-row">
+        <div class="metric-card">
+            <div class="m-label">Tổng doanh thu</div>
+            <div id="combinedRevenue" class="m-value">0 ₫</div>
+            <div class="mt-2 pt-2 border-top border-soft">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="text-muted small">Thực tế:</span>
+                    <span id="totalRevenue" class="text-accent small fw-bold">0 ₫</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">Dự tính:</span>
+                    <span id="activeRevenue" class="text-success small fw-bold">0 ₫</span>
+                </div>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="m-label">Tổng lượt đặt</div>
+            <div id="combinedBookings" class="m-value">0</div>
+            <div class="mt-2 pt-2 border-top border-soft">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="text-muted small">Hoàn thành:</span>
+                    <span id="completedBookings" class="text-accent small fw-bold">0</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">Đang hoạt động:</span>
+                    <span id="activeBookings" class="text-success small fw-bold">0</span>
+                </div>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="m-label">Phụ phí</div>
+            <div id="surchargeRatio" class="m-value">0%</div>
+            <div class="mt-2 pt-2 border-top border-soft">
+                <span class="text-muted small">Tỉ lệ khách vượt sức chứa</span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="m-label">Tỉ lệ hủy</div>
+            <div id="cancelRate" class="m-value">0%</div>
+            <div class="mt-2 pt-2 border-top border-soft">
+                <span class="text-muted small">Đơn đã hủy / Tổng đơn</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4 MAIN AREAS -->
+    <div class="quad-grid">
+        
+        <!-- AREA 1: REVENUE TRENDS -->
+        <div class="quad-card">
+            <div class="quad-title">
+                <i class="fas fa-chart-line"></i>
+                Xu hướng doanh thu
+            </div>
+            <div class="chart-container">
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+
+        <!-- AREA 2: BRANCH DISTRIBUTION -->
+        <div class="quad-card">
+            <div class="quad-title">
+                <i class="fas fa-chart-pie"></i>
+                Tỉ lệ chi nhánh
+            </div>
+            <div class="chart-container">
+                <canvas id="branchChart"></canvas>
+            </div>
+        </div>
+
+        <!-- AREA 3: BOOKING DENSITY -->
+        <div class="quad-card">
+            <div class="quad-title">
+                <i class="far fa-clock"></i>
+                Mật độ đặt phòng
+            </div>
+            <div class="d-flex flex-column gap-5 flex-1 mt-3">
+                <!-- Days Grid -->
+                <div>
+                    <p class="text-muted small mb-3 fw-bold">Theo ngày trong tuần (T2 - CN)</p>
+                    <div id="dayDensityGrid" class="github-track"></div>
+                    <div class="d-flex justify-content-between mt-2 px-1 text-muted" style="font-size: 0.65rem; font-weight: 700;">
+                        <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
+                    </div>
+                </div>
+                
+                <!-- Hours Grid -->
+                <div>
+                    <p class="text-muted small mb-3 fw-bold">Theo khung giờ (00:00 - 23:00)</p>
+                    <div class="heatmap-overflow">
+                        <div id="hourDensityGrid" class="github-track" style="grid-template-columns: repeat(24, 1fr); min-width: 500px;"></div>
+                        <div class="d-grid mt-2 text-muted fw-bold" style="grid-template-columns: repeat(24, 1fr); min-width: 500px; font-size: 0.6rem;">
+                            <span style="grid-column: 1;">00:00</span>
+                            <span style="grid-column: 5;">04:00</span>
+                            <span style="grid-column: 9;">08:00</span>
+                            <span style="grid-column: 13;">12:00</span>
+                            <span style="grid-column: 17;">16:00</span>
+                            <span style="grid-column: 21;">20:00</span>
+                            <span style="grid-column: 24; text-align: right;">23:00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex justify-content-end gap-2 mt-auto pt-4 border-top border-soft flex-wrap">
+                <div class="d-flex align-items-center gap-1 small text-muted" style="font-size: 0.6rem;"><div style="width:8px;height:8px;background:#F0F2F0;border-radius:2px"></div>Trống</div>
+                <div class="d-flex align-items-center gap-1 small text-muted" style="font-size: 0.6rem;"><div style="width:8px;height:8px;background:#E7F0E6;border-radius:2px"></div>Rất thấp</div>
+                <div class="d-flex align-items-center gap-1 small text-muted" style="font-size: 0.6rem;"><div style="width:8px;height:8px;background:#D0DFCF;border-radius:2px"></div>Thấp</div>
+                <div class="d-flex align-items-center gap-1 small text-muted" style="font-size: 0.6rem;"><div style="width:8px;height:8px;background:#A8B2A0;border-radius:2px"></div>Trung bình</div>
+                <div class="d-flex align-items-center gap-1 small text-muted" style="font-size: 0.6rem;"><div style="width:8px;height:8px;background:#7D8C75;border-radius:2px"></div>Cao</div>
+                <div class="d-flex align-items-center gap-1 small text-muted" style="font-size: 0.6rem;"><div style="width:8px;height:8px;background:#3D4F3C;border-radius:2px"></div>Rất cao</div>
+            </div>
+        </div>
+
+        <!-- AREA 4: TOP PERFORMANCE -->
+        <div class="quad-card">
+            <div class="quad-title justify-content-between">
+                <span><i class="fas fa-medal"></i> Hiệu suất phòng</span>
+                <div class="btn-group btn-group-sm bg-light p-1 rounded-pill">
+                    <button class="btn btn-link btn-xs text-dark text-decoration-none px-3 active fw-bold" id="rankByRevenue" style="font-size: 0.7rem;">DOANH THU</button>
+                    <button class="btn btn-link btn-xs text-muted text-decoration-none px-3 fw-bold" id="rankByOrders" style="font-size: 0.7rem;">LƯỢT ĐẶT</button>
+                </div>
+            </div>
+            <div class="podium-wrap" id="podiumContainer"></div>
+        </div>
+
+    </div>
+
+    <!-- Secondary Data: Table -->
+    <div class="mt-5 bg-white p-4 rounded-4 shadow-sm border border-soft">
+        <h3 class="quad-title mb-4">Chi tiết phòng</h3>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="roomTable">
+                <thead class="table-light">
+                    <tr>
+                        <th class="py-3 px-4">Tên phòng</th>
+                        <th>Chi nhánh</th>
+                        <th>Số đơn</th>
+                        <th>Doanh thu</th>
+                        <th class="text-end px-4">Hành động</th>
+                    </tr>
+                </thead>
+                <tbody class="border-top-0"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="customTooltip" class="stats-tooltip"></div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let revenueChart, branchChart, dayChart, hourChart;
+        const daysVi = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+        // Init Dates
+        const today = new Date();
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        document.getElementById('startDate').valueAsDate = thirtyDaysAgo;
+        document.getElementById('endDate').valueAsDate = today;
+
+        async function fetchBranches() {
+            const resp = await fetch('/admin/Statistics/GetBranches');
+            const data = await resp.json();
+            const select = document.getElementById('branchFilter');
+            data.forEach(b => {
+                const opt = new Option(b.label, b.value);
+                select.add(opt);
+            });
+        }
+
+        async function fetchStats() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const branchId = document.getElementById('branchFilter').value;
+            
+            const resp = await fetch(`/admin/Statistics/GetStats?start=${start}&end=${end}&branchId=${branchId}`);
+            const data = await resp.json();
+            window.lastData = data;
+            updateUI(data);
+        }
+
+        function updateUI(data) {
+            const fmt = (v) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(v);
+            
+            const totalRev = data.totalRevenue + data.activeRevenue;
+            document.getElementById('combinedRevenue').innerText = fmt(totalRev);
+            document.getElementById('totalRevenue').innerText = fmt(data.totalRevenue);
+            document.getElementById('activeRevenue').innerText = fmt(data.activeRevenue);
+            
+            const totalBookings = data.completedBookings + data.activeBookings;
+            document.getElementById('combinedBookings').innerText = totalBookings;
+            document.getElementById('completedBookings').innerText = data.completedBookings;
+            document.getElementById('activeBookings').innerText = data.activeBookings;
+
+            document.getElementById('surchargeRatio').innerText = data.surchargeRatio.toFixed(1) + '%';
+            document.getElementById('cancelRate').innerText = data.cancellationRate.toFixed(1) + '%';
+
+            initCharts(data);
+            renderDensityGrids(data);
+            renderPodium(data.roomPerformance, 'revenue');
+            
+            const tbody = document.querySelector('#roomTable tbody');
+            tbody.innerHTML = '';
+            [...data.roomPerformance].sort((a,b) => b.revenue - a.revenue).forEach(rp => {
+                tbody.insertAdjacentHTML('beforeend', `
+                    <tr>
+                        <td class="fw-bold py-3 px-4">${rp.roomName}</td>
+                        <td class="text-muted">${rp.branchName}</td>
+                        <td>${rp.totalOrders}</td>
+                        <td class="fw-bold text-success">${new Intl.NumberFormat('vi-VN').format(rp.revenue)} ₫</td>
+                        <td class="text-end px-4"><button class="btn btn-sm btn-outline-dark rounded-pill px-3">Chi tiết</button></td>
+                    </tr>
+                `);
+            });
+        }
+
+        function initCharts(data) {
+            Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
+            
+            // Revenue Chart
+            const ctxRev = document.getElementById('revenueChart').getContext('2d');
+            if (revenueChart) revenueChart.destroy();
+            revenueChart = new Chart(ctxRev, {
+                type: 'line',
+                data: {
+                    labels: data.revenueTrends.map(x => x.label),
+                    datasets: [{
+                        label: 'Doanh thu',
+                        data: data.revenueTrends.map(x => x.value),
+                        borderColor: '#3D4F3C',
+                        backgroundColor: 'rgba(61, 79, 60, 0.08)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 3,
+                        pointRadius: 0,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { grid: { borderDash: [5, 5] }, ticks: { callback: v => v.toLocaleString() + ' ₫' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // Branch Chart
+            const ctxBr = document.getElementById('branchChart').getContext('2d');
+            if (branchChart) branchChart.destroy();
+            branchChart = new Chart(ctxBr, {
+                type: 'doughnut',
+                data: {
+                    labels: data.branchRevenueSplit.map(x => x.label),
+                    datasets: [{
+                        data: data.branchRevenueSplit.map(x => x.value),
+                        backgroundColor: ['#3D4F3C', '#A8B2A0', '#D6B4A8', '#EBD8D0'],
+                        borderWidth: 0,
+                        hoverOffset: 15
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '75%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 25, font: { weight: '700' } } }
+                    }
+                }
+            });
+        }
+
+        function renderDensityGrids(data) {
+            const getColor = (count, max) => {
+                if (count === 0) return { color: '#F0F2F0', label: 'Trống' };
+                if (max === 0) return { color: '#F0F2F0', label: 'Trống' };
+                const ratio = count / max;
+                if (ratio <= 0.2) return { color: '#E7F0E6', label: 'Rất thấp' };
+                if (ratio <= 0.4) return { color: '#D0DFCF', label: 'Thấp' };
+                if (ratio <= 0.6) return { color: '#A8B2A0', label: 'Trung bình' };
+                if (ratio <= 0.8) return { color: '#7D8C75', label: 'Cao' };
+                return { color: '#3D4F3C', label: 'Rất cao' };
+            };
+
+            const tooltip = document.getElementById('customTooltip');
+            const showTooltip = (e, text) => {
+                tooltip.innerHTML = text;
+                tooltip.style.display = 'block';
+                tooltip.style.left = (e.clientX + 15) + 'px';
+                tooltip.style.top = (e.clientY + 15) + 'px';
+            };
+            const hideTooltip = () => tooltip.style.display = 'none';
+
+            // Day Grid
+            const dayContainer = document.getElementById('dayDensityGrid');
+            dayContainer.innerHTML = '';
+            const dayOrder = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+            const maxDay = Math.max(...data.dayDistribution.map(x => x.value), 0);
+            
+            dayOrder.forEach(label => {
+                const point = data.dayDistribution.find(x => x.label === label);
+                const count = point ? point.value : 0;
+                const info = getColor(count, maxDay);
+                const cell = document.createElement('div');
+                cell.className = 'h-cell';
+                cell.style.background = info.color;
+                cell.onmousemove = (e) => showTooltip(e, `${label}: ${count} đơn - <span style="color:${info.color}">${info.label}</span>`);
+                cell.onmouseleave = hideTooltip;
+                dayContainer.appendChild(cell);
+            });
+
+            // Hour Grid
+            const hourContainer = document.getElementById('hourDensityGrid');
+            hourContainer.innerHTML = '';
+            const maxHour = Math.max(...data.hourDistribution.map(x => x.value), 0);
+            
+            data.hourDistribution.forEach(h => {
+                const count = h.value;
+                const info = getColor(count, maxHour);
+                const cell = document.createElement('div');
+                cell.className = 'h-cell';
+                cell.style.background = info.color;
+                cell.onmousemove = (e) => showTooltip(e, `${h.label}: ${count} đơn - <span style="color:${info.color}">${info.label}</span>`);
+                cell.onmouseleave = hideTooltip;
+                hourContainer.appendChild(cell);
+            });
+        }
+
+
+        function renderPodium(performance, criteria) {
+            const sorted = [...performance].sort((a,b) => criteria === 'revenue' ? b.revenue - a.revenue : b.totalOrders - a.totalOrders);
+            const container = document.getElementById('podiumContainer');
+            container.innerHTML = '';
+            
+            const orders = [1, 0, 2]; // 2nd - 1st - 3rd
+            orders.forEach(idx => {
+                const item = sorted[idx];
+                if (!item) {
+                    container.insertAdjacentHTML('beforeend', `<div class="p-item opacity-10"><div class="p-bar" style="height:50px"></div></div>`);
+                    return;
+                }
+                const pos = idx + 1;
+                const value = criteria === 'revenue' 
+                    ? new Intl.NumberFormat('vi-VN').format(item.revenue) + ' ₫' 
+                    : item.totalOrders + ' lượt';
+
+                container.insertAdjacentHTML('beforeend', `
+                    <div class="p-item p-${pos}">
+                        <div class="p-name">${item.roomName}</div>
+                        <div class="p-bar">
+                            <span style="opacity:0.3">${pos}</span>
+                        </div>
+                        <div class="p-value">${value}</div>
+                    </div>
+                `);
+            });
+        }
+
+        function exportData(type) {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const branchId = document.getElementById('branchFilter').value;
+            window.location.href = `/admin/Statistics/Export?type=${type}&start=${start}&end=${end}&branchId=${branchId}`;
+        }
+
+        document.getElementById('applyFilter').onclick = fetchStats;
+        document.getElementById('rankByRevenue').onclick = () => {
+            document.getElementById('rankByRevenue').classList.add('active', 'text-dark');
+            document.getElementById('rankByOrders').classList.remove('active', 'text-dark');
+            renderPodium(window.lastData.roomPerformance, 'revenue');
+        };
+        document.getElementById('rankByOrders').onclick = () => {
+            document.getElementById('rankByOrders').classList.add('active', 'text-dark');
+            document.getElementById('rankByRevenue').classList.remove('active', 'text-dark');
+            renderPodium(window.lastData.roomPerformance, 'orders');
+        };
+
+        fetchBranches();
+        fetchStats();
+    </script>
+}

@@ -27,8 +27,13 @@ namespace WebHomestay.Controllers
             {
                 var settings = await _context.SystemSettings.OrderBy(s => s.GroupName).ThenBy(s => s.SettingKey).ToListAsync();
                 var branches = await _context.Branches.OrderBy(b => b.Name).ToListAsync();
+                var holidays = await _context.Holidays.OrderByDescending(h => h.Date).ToListAsync();
+                var templates = await _context.RoomSlotTemplates.OrderBy(t => t.Name).ToListAsync();
                 
                 ViewBag.Branches = branches;
+                ViewBag.Holidays = holidays;
+                ViewBag.Templates = templates;
+
                 return View(settings);
             }
             catch (Exception ex)

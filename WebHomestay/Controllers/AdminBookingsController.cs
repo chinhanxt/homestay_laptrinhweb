@@ -13,11 +13,13 @@ namespace WebHomestay.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IMailService _mailService;
+        private readonly ISettingService _settingService;
 
-        public AdminBookingsController(ApplicationDbContext context, IMailService mailService)
+        public AdminBookingsController(ApplicationDbContext context, IMailService mailService, ISettingService settingService)
         {
             _context = context;
             _mailService = mailService;
+            _settingService = settingService;
         }
 
         [AdminAuthorize(Permission = "bookings.view")]
@@ -40,19 +42,22 @@ namespace WebHomestay.Controllers
                 query = query.Where(b => b.Room.BranchId == branchId.Value);
             }
 
-            // Auto-update past confirmed bookings to CheckedOut (Completed)
-            var now = DateTime.UtcNow;
-            var pastConfirmed = await _context.Bookings
-                .Where(b => !b.IsDeleted && b.Status == "Confirmed" && b.EndTime < now)
-                .ToListAsync();
+            // Auto-complete logic based on system settings
+            var checkoutMode = await _settingService.GetStringAsync("CheckoutMode", "Auto");
+            ViewBag.CheckoutMode = checkoutMode;
 
-            if (pastConfirmed.Any())
+            if (checkoutMode == "Auto")
             {
-                foreach (var b in pastConfirmed)
+                var now = DateTime.UtcNow;
+                var pastConfirmed = await _context.Bookings
+                    .Where(b => !b.IsDeleted && b.Status == "Confirmed" && b.EndTime < now)
+                    .ToListAsync();
+
+                if (pastConfirmed.Any())
                 {
-                    b.Status = "CheckedOut";
+                    foreach (var b in pastConfirmed) b.Status = "CheckedOut";
+                    await _context.SaveChangesAsync();
                 }
-                await _context.SaveChangesAsync();
             }
 
             var bookings = await query
@@ -171,7 +176,15 @@ namespace WebHomestay.Controllers
             var booking = await _context.Bookings.Include(b => b.Room).Include(b => b.Room.Branch).FirstOrDefaultAsync(b => b.Id == id);
             if (booking == null) return NotFound();
 
-            booking.Status = "Confirmed";
+            var checkoutMode = await _settingService.GetStringAsync("CheckoutMode", "Auto");
+            if (checkoutMode == "Auto" && booking.EndTime < DateTime.UtcNow)
+            {
+                booking.Status = "CheckedOut";
+            }
+            else
+            {
+                booking.Status = "Confirmed";
+            }
             booking.PaymentStatus = "Paid";
             booking.SmartLockCode = smartLockCode;
             booking.WifiPassword = wifiPassword;
@@ -255,6 +268,23 @@ namespace WebHomestay.Controllers
             }
 
             await _context.SaveChangesAsync();
+            return RedirectToAction(nameof(Index));
+        }
+
+        [AdminAuthorize(Permission = "bookings.edit")]
+        [HttpPost("checkout")]
+        public async Task<IActionResult> Checkout(int id)
+        {
+            var booking = await _context.Bookings.FindAsync(id);
+            if (booking == null) return NotFound();
+
+            if (booking.Status == "Confirmed")
+            {
+                booking.Status = "CheckedOut";
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = $"Đơn hàng #{id} đã được xác nhận hoàn thành.";
+            }
+            
             return RedirectToAction(nameof(Index));
         }
     }

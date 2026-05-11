@@ -1,0 +1,45 @@
+<h2>Bố cục Bento Dashboard (Phác thảo)</h2>
+<p class="subtitle">Cấu trúc các khối dữ liệu trên một màn hình</p>
+
+<div class="mockup">
+  <div class="mockup-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>Bộ lọc: [Tất cả Chi nhánh] | [30 ngày qua]</div>
+    <div>
+      <button class="mock-button" style="background: #10b981;">Excel</button>
+      <button class="mock-button" style="background: #ef4444;">PDF</button>
+    </div>
+  </div>
+  <div class="mockup-body" style="padding: 15px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+    <!-- Summary Cards -->
+    <div class="placeholder" style="height: 80px; background: #262626; border: 1px solid #333;">Summary 1</div>
+    <div class="placeholder" style="height: 80px; background: #262626; border: 1px solid #333;">Summary 2</div>
+    <div class="placeholder" style="height: 80px; background: #262626; border: 1px solid #333;">Summary 3</div>
+    <div class="placeholder" style="height: 80px; background: #262626; border: 1px solid #333;">Summary 4</div>
+
+    <!-- Main Charts -->
+    <div class="placeholder" style="grid-column: span 3; height: 250px; background: #262626; border: 1px solid #333;">Biểu đồ xu hướng Doanh thu (Lớn)</div>
+    <div class="placeholder" style="grid-column: span 1; height: 250px; background: #262626; border: 1px solid #333;">Cơ cấu Doanh thu (Tròn)</div>
+
+    <!-- Heatmap & Top Rooms -->
+    <div class="placeholder" style="grid-column: span 2; height: 300px; background: #262626; border: 1px solid #333;">
+      <div class="label" style="padding: 10px;">Time Heatmap (Thứ vs Giờ)</div>
+      <div style="padding: 10px; display: grid; grid-template-columns: repeat(24, 1fr); grid-template-rows: repeat(7, 1fr); gap: 2px; height: 200px;">
+        <!-- Heatmap cells -->
+        <script>
+          for(let i=0; i<24*7; i++) document.write('<div style="background: rgba(16, 185, 129, ' + Math.random() + ');"></div>');
+        </script>
+      </div>
+    </div>
+    <div class="placeholder" style="grid-column: span 2; height: 300px; background: #262626; border: 1px solid #333;">
+      <div class="label" style="padding: 10px;">Top Xếp hạng Phòng</div>
+      <div style="padding: 20px;">
+        <div style="background: #333; height: 30px; margin-bottom: 10px; width: 90%;">#1 Room Deluxe</div>
+        <div style="background: #333; height: 30px; margin-bottom: 10px; width: 80%;">#2 Room Suite</div>
+        <div style="background: #333; height: 30px; margin-bottom: 10px; width: 70%;">#3 Room Standard</div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="placeholder" style="grid-column: span 4; height: 200px; background: #262626; border: 1px solid #333;">Bảng chi tiết hiệu suất từng phòng</div>
+  </div>
+</div>

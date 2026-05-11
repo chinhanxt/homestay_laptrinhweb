@@ -138,6 +138,21 @@
                                                 Duyệt & Gửi vé
                                             </button>
                                         }
+                                        
+                                        @if (ViewBag.CheckoutMode == "Manual" && item.Status == "Confirmed")
+                                        {
+                                            bool canCheckout = item.EndTime <= DateTime.UtcNow;
+                                            <form asp-action="Checkout" method="post" class="d-inline">
+                                                <input type="hidden" name="id" value="@item.Id" />
+                                                <button type="submit" class="btn btn-sm py-1 px-3 fw-bold @(canCheckout ? "btn-success" : "btn-light opacity-50")" 
+                                                        style="font-size: 0.75rem; border-radius: 6px;"
+                                                        title="@(canCheckout ? "Xác nhận hoàn thành" : "Chưa đến giờ trả phòng")"
+                                                        @(canCheckout ? "" : "disabled")>
+                                                    <i class="fas fa-check-double me-1"></i> Trả phòng
+                                                </button>
+                                            </form>
+                                        }
+
                                         <a asp-action="Details" asp-route-id="@item.Id" class="admin-btn-icon" title="Chi tiết">
                                             <i class="fas fa-eye"></i>
                                         </a>

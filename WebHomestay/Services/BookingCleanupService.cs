@@ -67,6 +67,28 @@ namespace WebHomestay.Services
                             await context.SaveChangesAsync(stoppingToken);
                             _logger.LogInformation($"Permanently deleted {oldDeletedBookings.Count} bookings from trash.");
                         }
+
+                        // 3. Auto-update past confirmed bookings to CheckedOut (Completed)
+                        var settingService = scope.ServiceProvider.GetRequiredService<ISettingService>();
+                        var checkoutMode = await settingService.GetStringAsync("CheckoutMode", "Auto");
+
+                        if (checkoutMode == "Auto")
+                        {
+                            var now = DateTime.UtcNow;
+                            var pastConfirmed = await context.Bookings
+                                .Where(b => !b.IsDeleted && b.Status == "Confirmed" && b.EndTime < now)
+                                .ToListAsync(stoppingToken);
+
+                            if (pastConfirmed.Any())
+                            {
+                                foreach (var b in pastConfirmed)
+                                {
+                                    b.Status = "CheckedOut";
+                                }
+                                await context.SaveChangesAsync(stoppingToken);
+                                _logger.LogInformation($"Auto-completed {pastConfirmed.Count} past confirmed bookings (Mode: Auto).");
+                            }
+                        }
                     }
                 }
                 catch (Exception ex)

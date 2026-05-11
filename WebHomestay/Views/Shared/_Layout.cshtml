@@ -50,7 +50,6 @@
                                     @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.view"))
                                     {
                                         <li><a class="dropdown-item py-2" asp-controller="AdminRooms" asp-action="Index">Quản lý Phòng</a></li>
-                                        <li><a class="dropdown-item py-2" asp-controller="AdminSlots" asp-action="Index">Mẫu khung giờ</a></li>
                                     }
                                     @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "bookings.view"))
                                     {
@@ -59,7 +58,7 @@
                                         {
                                             <li><a class="dropdown-item py-2" asp-controller="AdminImages" asp-action="Index"><i class="fas fa-images me-2 text-muted"></i>Kho ảnh Đơn hàng</a></li>
                                         }
-                                        <li><a class="dropdown-item py-2" asp-controller="Statistics" asp-action="Index">Thống kê doanh thu</a></li>
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminStatistics" asp-action="Index">Thống kê doanh thu</a></li>
                                     }
                                     @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.view"))
                                     {
@@ -67,7 +66,6 @@
                                     }
                                     @if (Context.Session.GetString("AdminRole") == "SuperAdmin")
                                     {
-                                        <li><a class="dropdown-item py-2" asp-controller="AdminHolidays" asp-action="Index">Ma trận Ngày Lễ</a></li>
                                         <li><a class="dropdown-item py-2" asp-controller="AdminSettings" asp-action="Index">Cấu hình hệ thống</a></li>
                                     }
                                     <li><hr class="dropdown-divider"></li>

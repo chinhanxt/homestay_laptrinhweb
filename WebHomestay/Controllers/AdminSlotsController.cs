@@ -18,10 +18,9 @@ public class AdminSlotsController : Controller
         _slotManagementService = slotManagementService;
     }
 
-    public async Task<IActionResult> Index()
+    public IActionResult Index()
     {
-        var templates = await _context.RoomSlotTemplates.ToListAsync();
-        return View(templates);
+        return Redirect("/admin/settings?tab=time");
     }
 
     [HttpGet]
@@ -34,7 +33,7 @@ public class AdminSlotsController : Controller
         {
             _context.RoomSlotTemplates.Add(template);
             await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
+            return Redirect("/admin/settings?tab=time");
         }
         return View(template);
     }
@@ -59,7 +58,7 @@ public class AdminSlotsController : Controller
             await _slotManagementService.SyncTemplateChangesAsync(template.Id);
             
             TempData["SuccessMessage"] = "Đã cập nhật mẫu và đồng bộ lịch trình các phòng.";
-            return RedirectToAction(nameof(Index));
+            return Redirect("/admin/settings?tab=time");
         }
         return View(template);
     }
@@ -69,7 +68,7 @@ public class AdminSlotsController : Controller
     {
         await _slotManagementService.DeleteTemplateAndCleanInventoryAsync(id);
         TempData["SuccessMessage"] = "Đã xóa mẫu và dọn dẹp các ô lịch trống liên quan.";
-        return RedirectToAction(nameof(Index));
+        return Redirect("/admin/settings?tab=time");
     }
 
     public async Task<IActionResult> RoomSchedules(int roomId)
