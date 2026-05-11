@@ -10,6 +10,7 @@
 }
 
 <link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/admin-ai-hub.css" asp-append-version="true" />
 
 <div class="premium-settings-wrapper">
     <div class="settings-sidebar">
@@ -30,6 +31,9 @@
             </button>
             <button class="nav-link" id="tab-branch" data-bs-toggle="pill" data-bs-target="#panel-branch" type="button" role="tab">
                 <i class="fas fa-map-marked-alt me-3"></i> Cấu hình Chi nhánh
+            </button>
+            <button class="nav-link" id="tab-ai" data-bs-toggle="pill" data-bs-target="#panel-ai" type="button" role="tab">
+                <i class="fas fa-robot me-3"></i> AI Tư vấn đặt phòng
             </button>
         </div>
         
@@ -322,6 +326,146 @@
                         </div>
                     }
                 </div>
+            </div>
+
+            <!-- PANEL: AI TƯ VẤN -->
+            <div class="tab-pane fade" id="panel-ai" role="tabpanel">
+                <div class="panel-header">
+                    <h2>AI Tư vấn đặt phòng</h2>
+                    <p>Ngôi trường tri thức và trung tâm điều hành nhân sự AI.</p>
+                </div>
+
+                <div class="ai-hub-container">
+                    <!-- Sidebar: Danh mục kỹ năng -->
+                    <div class="ai-sidebar">
+                        <div class="px-3 mb-3">
+                            <h6 class="text-uppercase small fw-bold text-muted tracking-wider">Kho tri thức</h6>
+                        </div>
+                        <div id="ai-collections-list">
+                            <!-- Loaded via JS -->
+                            <div class="text-center py-4">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-auto px-3 pt-3 border-top">
+                            <div class="p-3 bg-light rounded-4">
+                                <div class="small fw-bold mb-1">Trạng thái AI</div>
+                                <div class="d-flex align-items-center gap-2 small">
+                                    <span class="dot dot-success"></span>
+                                    <span>Đang trực tuyến</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main: Danh sách bài viết -->
+                    <div class="ai-main-content">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h4 id="current-collection-name" class="fw-bold mb-0">Chọn một danh mục...</h4>
+                            <button class="btn-premium btn-sm rounded-pill px-4" id="btn-add-article" style="display:none;" onclick="createNewArticle()">
+                                <i class="fas fa-plus me-2"></i> Thêm bài học
+                            </button>
+                        </div>
+                        
+                        <div id="ai-articles-list" class="articles-grid">
+                            <div class="text-center py-5 w-100 opacity-50">
+                                <i class="fas fa-books fa-3x mb-3"></i>
+                                <p>Vui lòng chọn một danh mục bên trái để bắt đầu đào tạo AI.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Live Data & Playground -->
+                    <div class="ai-right-panel">
+                        <div class="bento-item">
+                            <div class="bento-inner">
+                                <h6 class="fw-bold mb-3 d-flex align-items-center">
+                                    <i class="fas fa-rss-square text-success me-2"></i> 
+                                    Live Data Feed
+                                </h6>
+                                <div class="data-feed-list">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="small text-muted">Chi nhánh & Vị trí</span>
+                                        <span class="badge bg-soft-success text-success rounded-pill">Đang kết nối</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="small text-muted">Trạng thái Phòng trống</span>
+                                        <span class="badge bg-soft-success text-success rounded-pill">Real-time</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="small text-muted">Biểu giá & Khung giờ</span>
+                                        <span class="badge bg-soft-success text-success rounded-pill">Đồng bộ</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bento-item flex-grow-1 overflow-hidden d-flex flex-column" style="min-height: 400px;">
+                            <div class="bento-inner d-flex flex-column h-100 p-0">
+                                <div class="p-3 border-bottom">
+                                    <h6 class="fw-bold mb-0 d-flex align-items-center">
+                                        <i class="fas fa-vial text-primary me-2"></i> 
+                                        Testing Playground
+                                    </h6>
+                                </div>
+                                <div id="ai-chat-history" class="chat-history flex-grow-1 p-3">
+                                    <div class="chat-msg ai">
+                                        Xin chào Admin! Tôi là Trợ lý AI đang chờ được học việc. 
+                                        Bạn hãy chọn một bài học hoặc nhắn tin để thử thách tôi nhé.
+                                    </div>
+                                </div>
+                                <div class="p-3 border-top">
+                                    <div class="chat-input-group">
+                                        <input type="text" id="ai-test-input" class="form-control form-control-lg border-0 shadow-none small" 
+                                               placeholder="Nhắn tin cho AI..." style="background: transparent;">
+                                        <button class="btn btn-primary rounded-circle" style="width: 40px; height: 40px; padding: 0;" onclick="sendTestMessage()">
+                                            <i class="fas fa-paper-plane"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: BIÊN TẬP BÀI HỌC AI -->
+<div class="modal fade" id="articleEditorModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content premium-modal">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold">Biên tập Nội dung Đào tạo AI</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body py-0">
+                <div class="row g-0 h-100">
+                    <div class="col-lg-6 border-end p-4">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Tiêu đề bài học</label>
+                            <input type="text" id="edit-article-title" class="form-control form-control-lg rounded-3 border-light-subtle shadow-sm" placeholder="Nhập tiêu đề...">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Nội dung (Markdown/HTML)</label>
+                            <textarea id="edit-article-content" class="form-control border-light-subtle rounded-3 shadow-sm" style="height: 450px; font-family: monospace; font-size: 0.9rem;"></textarea>
+                        </div>
+                    </div>
+                    <div class="col-lg-6 p-4 bg-light bg-opacity-50">
+                        <label class="form-label small fw-bold text-muted text-uppercase mb-3">Xem trước kết quả</label>
+                        <div id="article-preview" class="markdown-preview bg-white">
+                            <!-- Preview content -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-2">
+                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn-premium rounded-pill px-5" onclick="saveArticle()">
+                    <i class="fas fa-save me-2"></i> Lưu & Huấn luyện AI
+                </button>
             </div>
         </div>
     </div>
@@ -1091,7 +1235,8 @@
                     'ops': 'tab-ops',
                     'time': 'tab-time',
                     'holiday': 'tab-holiday',
-                    'branch': 'tab-branch'
+                    'branch': 'tab-branch',
+                    'ai': 'tab-ai'
                 };
                 const tabId = tabMap[tabParam];
                 if (tabId) {
@@ -1114,5 +1259,7 @@
             if(toast) toast.classList.remove('show');
         }, 3000);
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="~/js/admin-ai-hub.js" asp-append-version="true"></script>
 }
 

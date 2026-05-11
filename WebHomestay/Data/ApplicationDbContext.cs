@@ -23,6 +23,8 @@ namespace WebHomestay.Data
         public DbSet<RoomSlotOverride> RoomSlotOverrides { get; set; }
         public DbSet<SystemSetting> SystemSettings { get; set; }
         public DbSet<Holiday> Holidays { get; set; }
+        public DbSet<AIKnowledgeCollection> AIKnowledgeCollections { get; set; }
+        public DbSet<AIKnowledgeArticle> AIKnowledgeArticles { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -42,6 +44,8 @@ namespace WebHomestay.Data
             modelBuilder.Entity<SystemSetting>().ToTable("system_settings");
             modelBuilder.Entity<RoomSlotOverride>().ToTable("room_slot_overrides");
             modelBuilder.Entity<Holiday>().ToTable("holidays");
+            modelBuilder.Entity<AIKnowledgeCollection>().ToTable("ai_knowledge_collections");
+            modelBuilder.Entity<AIKnowledgeArticle>().ToTable("ai_knowledge_articles");
 
             // AdminUser - Branch relationship
             modelBuilder.Entity<AdminUser>()
