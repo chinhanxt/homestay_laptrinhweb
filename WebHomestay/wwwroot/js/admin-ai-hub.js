@@ -44,6 +44,13 @@ async function loadCollections() {
         }
     } catch (err) {
         console.error('Failed to load collections', err);
+        $('#ai-collections-list').html(`
+            <div class="px-3 py-4 text-center">
+                <i class="fas fa-exclamation-triangle text-danger mb-2"></i>
+                <div class="small text-muted">Không thể tải dữ liệu. Vui lòng thử lại sau.</div>
+                <button class="btn btn-sm btn-light mt-2 rounded-pill" onclick="loadCollections()">Thử lại</button>
+            </div>
+        `);
     }
 }
 
@@ -199,7 +206,11 @@ function appendChatMessage(role, text) {
             ${text}
         </div>
     `);
-    history.scrollTop(history[0].scrollHeight);
+    
+    // Auto-scroll to bottom
+    setTimeout(() => {
+        history.animate({ scrollTop: history.prop("scrollHeight") }, 300);
+    }, 10);
 }
 
 function showToast(msg) {
