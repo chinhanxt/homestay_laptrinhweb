@@ -14,6 +14,9 @@
 
 <div class="premium-settings-wrapper">
     <div class="settings-sidebar">
+        <div class="main-sidebar-toggle" onclick="toggleMainSettingsSidebar()">
+            <i class="fas fa-chevron-left"></i>
+        </div>
         <div class="sidebar-brand">
             <i class="fas fa-sliders-h me-2"></i>
             <span>Cấu hình Hệ thống</span>
@@ -21,19 +24,19 @@
         
         <div class="nav flex-column nav-pills" id="settings-tabs" role="tablist" aria-orientation="vertical">
             <button class="nav-link active" id="tab-ops" data-bs-toggle="pill" data-bs-target="#panel-ops" type="button" role="tab">
-                <i class="fas fa-magic me-3"></i> Vận hành & Tự động
+                <i class="fas fa-magic me-3"></i> <span>Vận hành & Tự động</span>
             </button>
             <button class="nav-link" id="tab-time" data-bs-toggle="pill" data-bs-target="#panel-time" type="button" role="tab">
-                <i class="fas fa-clock me-3"></i> Thời gian & Khung giờ
+                <i class="fas fa-clock me-3"></i> <span>Thời gian & Khung giờ</span>
             </button>
             <button class="nav-link" id="tab-holiday" data-bs-toggle="pill" data-bs-target="#panel-holiday" type="button" role="tab">
-                <i class="fas fa-star me-3"></i> Ma trận Ngày Lễ
+                <i class="fas fa-star me-3"></i> <span>Ma trận Ngày Lễ</span>
             </button>
             <button class="nav-link" id="tab-branch" data-bs-toggle="pill" data-bs-target="#panel-branch" type="button" role="tab">
-                <i class="fas fa-map-marked-alt me-3"></i> Cấu hình Chi nhánh
+                <i class="fas fa-map-marked-alt me-3"></i> <span>Cấu hình Chi nhánh</span>
             </button>
             <button class="nav-link" id="tab-ai" data-bs-toggle="pill" data-bs-target="#panel-ai" type="button" role="tab">
-                <i class="fas fa-robot me-3"></i> AI Tư vấn đặt phòng
+                <i class="fas fa-robot me-3"></i> <span>AI Tư vấn đặt phòng</span>
             </button>
         </div>
         
@@ -330,30 +333,39 @@
 
             <!-- PANEL: AI TƯ VẤN -->
             <div class="tab-pane fade" id="panel-ai" role="tabpanel">
-                <div class="panel-header">
-                    <h2>AI Tư vấn đặt phòng</h2>
-                    <p>Ngôi trường tri thức và trung tâm điều hành nhân sự AI.</p>
+                <div class="panel-header d-flex justify-content-between align-items-end mb-4">
+                    <div>
+                        <h2 class="fw-800 tracking-tighter">Trung tâm Điều hành AI</h2>
+                        <p class="text-muted opacity-75">Quản lý tri thức và thử nghiệm phản hồi nhân sự AI.</p>
+                    </div>
+                    <div class="pb-2">
+                        <span class="badge bg-white text-primary border rounded-pill px-3 py-2 fw-bold">
+                            <i class="fas fa-brain me-2"></i> Trí tuệ Nhân tạo v2.4
+                        </span>
+                    </div>
                 </div>
 
-                <div class="ai-hub-container">
+                <div class="ai-hub-container" id="ai-hub-main-container">
                     <!-- Sidebar: Danh mục kỹ năng -->
                     <div class="ai-sidebar">
-                        <div class="px-3 mb-3">
-                            <h6 class="text-uppercase small fw-bold text-muted tracking-wider">Kho tri thức</h6>
+                        <div class="sidebar-toggle" onclick="toggleAISidebar()">
+                            <i class="fas fa-chevron-left"></i>
                         </div>
-                        <div id="ai-collections-list">
+                        <div class="sidebar-add-wrapper">
+                            <h6 class="text-uppercase fw-bold tracking-widest">HỌC VIỆN TRI THỨC</h6>
+                            <button class="btn-add-sidebar" onclick="openCollectionManager()" title="Thêm danh mục mới">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        <div id="ai-collections-list" class="flex-grow-1">
                             <!-- Loaded via JS -->
-                            <div class="text-center py-4">
-                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                            </div>
                         </div>
                         
-                        <div class="mt-auto px-3 pt-3 border-top">
-                            <div class="p-3 bg-light rounded-4">
-                                <div class="small fw-bold mb-1">Trạng thái AI</div>
-                                <div class="d-flex align-items-center gap-2 small">
-                                    <span class="dot dot-success"></span>
-                                    <span>Đang trực tuyến</span>
+                        <div class="px-3 mt-auto sidebar-footer-content">
+                            <div class="p-3 bg-white rounded-4 border shadow-sm">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="dot dot-success"></div>
+                                    <div class="small fw-800 text-dark">AI Trực tuyến</div>
                                 </div>
                             </div>
                         </div>
@@ -361,70 +373,73 @@
 
                     <!-- Main: Danh sách bài viết -->
                     <div class="ai-main-content">
-                        <div class="d-flex justify-content-between align-items-center mb-4">
-                            <h4 id="current-collection-name" class="fw-bold mb-0">Chọn một danh mục...</h4>
-                            <button class="btn-premium btn-sm rounded-pill px-4" id="btn-add-article" style="display:none;" onclick="createNewArticle()">
-                                <i class="fas fa-plus me-2"></i> Thêm bài học
-                            </button>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h3 id="current-collection-name" class="fw-800 mb-0">Chào mừng Admin</h3>
+                            <div class="d-flex gap-3 align-items-center">
+                                <div class="sync-panel" id="sync-panel-box">
+                                    <div class="sync-header" onclick="toggleSyncPanel()">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="dot-success" style="width: 6px; height: 6px;"></div>
+                                            <span class="smaller fw-800 text-uppercase text-primary">Dữ liệu</span>
+                                        </div>
+                                        <i class="fas fa-chevron-down smaller text-muted ms-3" id="sync-icon"></i>
+                                    </div>
+                                    <div class="sync-content" id="sync-body" style="display: none;">
+                                        <div class="sync-item"><span>Chi nhánh</span><span class="sync-status">Đã kết nối</span></div>
+                                        <div class="sync-item"><span>Phòng trống</span><span class="sync-status">Live</span></div>
+                                        <div class="sync-item"><span>Biểu giá</span><span class="sync-status">Đã đồng bộ</span></div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-dark rounded-pill px-4 py-2 small fw-bold" id="btn-add-article" style="display:none;" onclick="createNewArticle()">
+                                    <i class="fas fa-plus-circle me-2"></i> Huấn luyện bài mới
+                                </button>
+                            </div>
                         </div>
                         
                         <div id="ai-articles-list" class="articles-grid">
-                            <div class="text-center py-5 w-100 opacity-50">
-                                <i class="fas fa-books fa-3x mb-3"></i>
-                                <p>Vui lòng chọn một danh mục bên trái để bắt đầu đào tạo AI.</p>
-                            </div>
+                            <!-- Loaded via JS -->
                         </div>
                     </div>
+                </div>
 
-                    <!-- Right: Live Data & Playground -->
-                    <div class="ai-right-panel">
-                        <div class="bento-item">
-                            <div class="bento-inner">
-                                <h6 class="fw-bold mb-3 d-flex align-items-center">
-                                    <i class="fas fa-rss-square text-success me-2"></i> 
-                                    Live Data Feed
-                                </h6>
-                                <div class="data-feed-list">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span class="small text-muted">Chi nhánh & Vị trí</span>
-                                        <span class="badge bg-soft-success text-success rounded-pill">Đang kết nối</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span class="small text-muted">Trạng thái Phòng trống</span>
-                                        <span class="badge bg-soft-success text-success rounded-pill">Real-time</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <span class="small text-muted">Biểu giá & Khung giờ</span>
-                                        <span class="badge bg-soft-success text-success rounded-pill">Đồng bộ</span>
-                                    </div>
-                                </div>
+                <!-- Floating Chat Toggle Button -->
+                <div class="chat-toggle-btn" onclick="toggleFloatingChat()">
+                    <i class="fas fa-robot fa-lg"></i>
+                </div>
+
+                <!-- Floating Chat Container -->
+                <div class="floating-chat-container minimized" id="floating-chatbox">
+                    <div class="chat-header">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                <i class="fas fa-robot text-white small"></i>
+                            </div>
+                            <div>
+                                <div class="small fw-800">Thử nghiệm Phản hồi</div>
+                                <div class="smaller opacity-75">Kiểm tra kiến thức AI</div>
                             </div>
                         </div>
-
-                        <div class="bento-item flex-grow-1 overflow-hidden d-flex flex-column" style="min-height: 400px;">
-                            <div class="bento-inner d-flex flex-column h-100 p-0">
-                                <div class="p-3 border-bottom">
-                                    <h6 class="fw-bold mb-0 d-flex align-items-center">
-                                        <i class="fas fa-vial text-primary me-2"></i> 
-                                        Testing Playground
-                                    </h6>
-                                </div>
-                                <div id="ai-chat-history" class="chat-history flex-grow-1 p-3">
-                                    <div class="chat-msg ai">
-                                        Xin chào Admin! Tôi là Trợ lý AI đang chờ được học việc. 
-                                        Bạn hãy chọn một bài học hoặc nhắn tin để thử thách tôi nhé.
-                                    </div>
-                                </div>
-                                <div class="p-3 border-top">
-                                    <div class="chat-input-group">
-                                        <input type="text" id="ai-test-input" class="form-control form-control-lg border-0 shadow-none small" 
-                                               placeholder="Nhắn tin cho AI..." style="background: transparent;">
-                                        <button class="btn btn-primary rounded-circle" style="width: 40px; height: 40px; padding: 0;" onclick="sendTestMessage()">
-                                            <i class="fas fa-paper-plane"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-link text-white p-0 opacity-75 hover-opacity-100" onclick="clearAIChat()" title="Xóa lịch sử chat">
+                                <i class="fas fa-trash-alt small"></i>
+                            </button>
+                            <button class="btn btn-link text-white p-0" onclick="toggleFloatingChat()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="ai-chat-history" class="chat-history">
+                        <div class="chat-msg ai">
+                            Xin chào! Tôi là Trợ lý AI. Hãy đặt câu hỏi để kiểm tra kiến thức của tôi nhé!
+                        </div>
+                    </div>
+                    <div class="p-3 bg-white border-top">
+                        <div class="input-group bg-light rounded-pill border p-1">
+                            <input type="text" id="ai-test-input" class="form-control border-0 bg-transparent shadow-none px-3" 
+                                   placeholder="Nhập câu hỏi thử nghiệm...">
+                            <button class="btn btn-primary rounded-circle shadow-sm" style="width: 38px; height: 38px;" onclick="sendTestMessage()">
+                                <i class="fas fa-arrow-up"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -433,38 +448,80 @@
     </div>
 </div>
 
-<!-- Modal: BIÊN TẬP BÀI HỌC AI -->
-<div class="modal fade" id="articleEditorModal" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
+<!-- Modal: QUẢN LÝ DANH MỤC -->
+<div class="modal fade" id="collectionManagerModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content premium-modal">
             <div class="modal-header border-0">
-                <h5 class="modal-title fw-bold">Biên tập Nội dung Đào tạo AI</h5>
+                <h5 class="modal-title fw-bold">Quản lý Danh mục Tri thức</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body py-0">
-                <div class="row g-0 h-100">
-                    <div class="col-lg-6 border-end p-4">
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Tiêu đề bài học</label>
-                            <input type="text" id="edit-article-title" class="form-control form-control-lg rounded-3 border-light-subtle shadow-sm" placeholder="Nhập tiêu đề...">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Nội dung (Markdown/HTML)</label>
-                            <textarea id="edit-article-content" class="form-control border-light-subtle rounded-3 shadow-sm" style="height: 450px; font-family: monospace; font-size: 0.9rem;"></textarea>
-                        </div>
+            <div class="modal-body py-4">
+                <div class="mb-4">
+                    <label class="form-label small fw-bold text-muted">Thêm danh mục mới</label>
+                    <div class="input-group">
+                        <input type="text" id="new-collection-name" class="form-control rounded-start-4 border-light-subtle" placeholder="Tên danh mục mới...">
+                        <button class="btn btn-primary rounded-end-4 px-4" onclick="saveCollection()"><i class="fas fa-plus"></i></button>
                     </div>
-                    <div class="col-lg-6 p-4 bg-light bg-opacity-50">
-                        <label class="form-label small fw-bold text-muted text-uppercase mb-3">Xem trước kết quả</label>
-                        <div id="article-preview" class="markdown-preview bg-white">
-                            <!-- Preview content -->
+                </div>
+
+                <h6 class="fw-bold small text-muted text-uppercase mb-3">Danh sách hiện tại</h6>
+                <div id="manager-collections-list" class="list-group list-group-flush rounded-4 overflow-hidden border">
+                    <!-- Loaded via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: BIÊN TẬP BÀI HỌC AI -->
+<div class="modal fade ai-editor-modal" id="articleEditorModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title fw-800 tracking-tighter">Biên tập Nội dung Đào tạo AI</h5>
+                    <p class="smaller text-muted mb-0">Nạp kiến thức để AI hỗ trợ khách hàng chuyên nghiệp hơn.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="editor-left-pane">
+                    <div class="mb-4">
+                        <label class="editor-label">
+                            <i class="fas fa-heading"></i> TIÊU ĐỀ BÀI HỌC
+                        </label>
+                        <input type="text" id="edit-article-title" class="form-control premium-input" placeholder="Nhập tiêu đề cô đọng...">
+                    </div>
+                    <div>
+                        <label class="editor-label">
+                            <i class="fas fa-edit"></i> NỘI DUNG CHI TIẾT (MARKDOWN)
+                        </label>
+                        <textarea id="edit-article-content" class="form-control premium-input" 
+                                  style="height: 380px; font-family: 'JetBrains Mono', monospace; font-size: 0.95rem;" 
+                                  placeholder="Sử dụng Markdown để trình bày có cấu trúc..."></textarea>
+                    </div>
+                </div>
+                <div class="editor-right-pane">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <label class="editor-label text-muted">
+                            <i class="fas fa-eye"></i> XEM TRƯỚC KẾT QUẢ
+                        </label>
+                        <span class="badge bg-white text-primary border rounded-pill px-2 py-1 smaller fw-bold">Live Preview</span>
+                    </div>
+                    <div id="article-preview" class="preview-container shadow-sm">
+                        <!-- Preview content -->
+                        <div class="text-center py-5 opacity-25">
+                            <i class="fas fa-terminal fa-3x mb-3"></i>
+                            <p>Đang chờ nhập dữ liệu...</p>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer border-0 p-4 pt-2">
-                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Đóng</button>
-                <button type="button" class="btn-premium rounded-pill px-5" onclick="saveArticle()">
-                    <i class="fas fa-save me-2"></i> Lưu & Huấn luyện AI
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link text-muted fw-bold text-decoration-none px-4" data-bs-dismiss="modal">Hủy bỏ</button>
+                <button type="button" class="btn-premium-save shadow-sm" onclick="saveArticle()">
+                    <i class="fas fa-cloud-upload-alt"></i> Lưu & Huấn luyện AI
                 </button>
             </div>
         </div>
@@ -638,8 +695,9 @@
 
     .premium-settings-wrapper {
         display: flex;
-        min-height: calc(100vh - 70px);
-        background: var(--settings-bg);
+        background: #f1f5f9;
+        min-height: 100vh; /* Allow page to grow */
+        position: relative;
     }
 
     /* Sidebar Styles */
@@ -650,9 +708,73 @@
         padding: 2rem 0;
         display: flex;
         flex-direction: column;
-        position: sticky;
+        position: sticky; /* Anchor it like a top header */
         top: 0;
         height: 100vh;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1000;
+        flex-shrink: 0;
+        overflow: visible !important;
+    }
+
+    .main-sidebar-collapsed .settings-sidebar {
+        width: 80px;
+    }
+
+    .main-sidebar-collapsed .settings-sidebar {
+        width: 80px;
+    }
+
+    .main-sidebar-toggle {
+        position: absolute;
+        right: -13px; /* Slightly more out */
+        top: 32px;
+        width: 26px;
+        height: 26px;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 9999; /* Super high z-index */
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        color: #64748b;
+        font-size: 0.75rem;
+        transition: all 0.2s;
+    }
+
+    .main-sidebar-toggle:hover { color: #2563eb; border-color: #2563eb; }
+    
+    .main-sidebar-collapsed .main-sidebar-toggle i { transform: rotate(180deg); }
+
+    .main-sidebar-collapsed .sidebar-brand span,
+    .main-sidebar-collapsed .settings-sidebar .nav-link span,
+    .main-sidebar-collapsed .sidebar-footer {
+        display: none;
+    }
+
+    .main-sidebar-collapsed .settings-sidebar .nav-link {
+        padding: 0.9rem 0;
+        display: flex;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .main-sidebar-collapsed .sidebar-brand {
+        padding: 2rem 0;
+        display: flex;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .main-sidebar-collapsed .sidebar-brand i,
+    .main-sidebar-collapsed .settings-sidebar .nav-link i {
+        margin: 0 !important;
+        font-size: 1.25rem;
+        width: 24px;
+        text-align: center;
     }
 
     .sidebar-brand {
@@ -702,8 +824,23 @@
     .settings-content {
         flex-grow: 1;
         padding: 3rem;
-        max-width: 1200px;
-        margin: 0 auto;
+        min-height: 100vh;
+        background: transparent;
+        position: relative;
+        overflow: visible; /* NO INTERNAL SCROLLBAR */
+    }
+
+    .tab-content {
+        flex: 1; /* Stretch to fill space */
+    }
+
+    /* Global Slim Scrollbar for Content */
+    .settings-content::-webkit-scrollbar {
+        width: 6px;
+    }
+    .settings-content::-webkit-scrollbar-thumb {
+        background: #e2e8f0;
+        border-radius: 10px;
     }
 
     .panel-header {
@@ -995,6 +1132,10 @@
 
 @section Scripts {
     <script>
+        function toggleMainSettingsSidebar() {
+            $('.premium-settings-wrapper').toggleClass('main-sidebar-collapsed');
+        }
+
         // Tab switching logic (optional, Bootstrap handles mostly)
         document.querySelectorAll('.nav-link').forEach(tab => {
             tab.addEventListener('shown.bs.tab', function (event) {

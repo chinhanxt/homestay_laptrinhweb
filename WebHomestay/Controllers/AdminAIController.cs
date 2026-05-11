@@ -38,6 +38,43 @@ namespace WebHomestay.Controllers
             return Ok(collections);
         }
 
+        [HttpPost("save-collection")]
+        public async Task<IActionResult> SaveCollection([FromBody] AIKnowledgeCollection collection)
+        {
+            if (collection.Id == Guid.Empty) collection.Id = Guid.NewGuid();
+
+            var existing = await _context.AIKnowledgeCollections.FindAsync(collection.Id);
+            if (existing == null)
+            {
+                _context.AIKnowledgeCollections.Add(collection);
+            }
+            else
+            {
+                existing.Name = collection.Name;
+                existing.Icon = collection.Icon;
+                existing.Description = collection.Description;
+                existing.Order = collection.Order;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, id = collection.Id });
+        }
+
+        [HttpDelete("collection/{id}")]
+        public async Task<IActionResult> DeleteCollection(Guid id)
+        {
+            var collection = await _context.AIKnowledgeCollections.FindAsync(id);
+            if (collection == null) return NotFound();
+
+            // Also delete all articles in this collection
+            var articles = _context.AIKnowledgeArticles.Where(a => a.CollectionId == id);
+            _context.AIKnowledgeArticles.RemoveRange(articles);
+
+            _context.AIKnowledgeCollections.Remove(collection);
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true });
+        }
+
         [HttpGet("articles/{collectionId}")]
         public async Task<IActionResult> GetArticles(Guid collectionId)
         {
