@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
 using WebHomestay.Models;
 using WebHomestay.Filters;
+using WebHomestay.Services;
 
 namespace WebHomestay.Controllers
 {
@@ -11,10 +12,12 @@ namespace WebHomestay.Controllers
     public class AdminMatrixController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly ISettingService _settingService;
 
-        public AdminMatrixController(ApplicationDbContext context)
+        public AdminMatrixController(ApplicationDbContext context, ISettingService settingService)
         {
             _context = context;
+            _settingService = settingService;
         }
 
         [AdminAuthorize(Permission = "matrix.view")]
@@ -40,6 +43,43 @@ namespace WebHomestay.Controllers
                     .OrderBy(b => b.Name)
                     .ToListAsync() ?? new List<Branch>();
 
+                // Auto-complete logic for past bookings
+                var checkoutMode = await _settingService.GetStringAsync("CheckoutMode", "Auto");
+                if (checkoutMode == "Auto")
+                {
+                    var nowTime = DateTime.Now;
+                    bool changed = false;
+
+                    // 1. Auto Check-In: Confirmed -> CheckedIn when StartTime reached
+                    var bookingsToCheckIn = await _context.Bookings
+                        .Where(b => !b.IsDeleted && b.Status == "Confirmed" && b.StartTime <= nowTime)
+                        .ToListAsync();
+
+                    if (bookingsToCheckIn.Any())
+                    {
+                        foreach (var b in bookingsToCheckIn) b.Status = "CheckedIn";
+                        changed = true;
+                    }
+
+                    // 2. Auto Check-Out: Confirmed/CheckedIn -> CheckedOut when EndTime passed
+                    var pastActiveBookings = await _context.Bookings
+                        .Where(b => !b.IsDeleted && 
+                                   (b.Status == "Confirmed" || b.Status == "CheckedIn") && 
+                                   b.EndTime < nowTime)
+                        .ToListAsync();
+
+                    if (pastActiveBookings.Any())
+                    {
+                        foreach (var b in pastActiveBookings) b.Status = "CheckedOut";
+                        changed = true;
+                    }
+
+                    if (changed)
+                    {
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
                 var bookingsQuery = _context.Bookings
                     .Include(b => b.Room)
                     .Where(b =>
@@ -47,7 +87,7 @@ namespace WebHomestay.Controllers
                         b.Status != "Cancelled" &&
                         !((b.Status == "AwaitingPayment" || b.Status == "PendingPayment") && b.CreatedAt < DateTime.UtcNow.AddMinutes(-5)) &&
                         b.StartTime < end &&
-                        b.EndTime > DateTime.Now);
+                        b.EndTime >= start);
 
                 if (role != "SuperAdmin" && branchId.HasValue)
                 {

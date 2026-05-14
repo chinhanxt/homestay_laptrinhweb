@@ -121,9 +121,13 @@
                                     {
                                         <span class="badge-premium badge-success-soft">Đã xác nhận</span>
                                     }
+                                    else if (item.Status?.Equals("CheckedIn", StringComparison.OrdinalIgnoreCase) == true)
+                                    {
+                                        <span class="badge-premium" style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Check-in</span>
+                                    }
                                     else if (item.Status?.Equals("CheckedOut", StringComparison.OrdinalIgnoreCase) == true)
                                     {
-                                        <span class="badge-premium" style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Hoàn thành</span>
+                                        <span class="badge-premium" style="background: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Check-out</span>
                                     }
                                     else
                                     {
@@ -148,7 +152,7 @@
                                                         style="font-size: 0.75rem; border-radius: 6px;"
                                                         title="@(canCheckout ? "Xác nhận hoàn thành" : "Chưa đến giờ trả phòng")"
                                                         @(canCheckout ? "" : "disabled")>
-                                                    <i class="fas fa-check-double me-1"></i> Trả phòng
+                                                    <i class="fas fa-check-double me-1"></i> Check-out
                                                 </button>
                                             </form>
                                         }

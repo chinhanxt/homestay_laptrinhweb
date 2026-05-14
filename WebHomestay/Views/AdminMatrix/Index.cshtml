@@ -175,9 +175,14 @@
 
             <div class="admin-matrix-toolbar-group is-compact">
                 <div class="admin-matrix-legend">
-                    <span class="legend-pill tone-confirmed">Đã xác nhận</span>
-                    <span class="legend-pill tone-attention">Chờ duyệt</span>
+                    <span class="legend-pill tone-inhouse" title="Khách đang ở">Check-in</span>
+                    <i class="fas fa-chevron-right legend-sep"></i>
                     <span class="legend-pill tone-pending">Chờ thanh toán</span>
+                    <span class="legend-pill tone-attention">Chờ duyệt</span>
+                    <i class="fas fa-chevron-right legend-sep"></i>
+                    <span class="legend-pill tone-confirmed">Đã xác nhận</span>
+                    <i class="fas fa-chevron-right legend-sep"></i>
+                    <span class="legend-pill tone-neutral">Check-out</span>
                 </div>
             </div>
         </section>
@@ -306,8 +311,8 @@
                                                                 "AwaitingApproval" => "CHỜ DUYỆT",
                                                                 "AwaitingPayment" or "PendingPayment" => "CHỜ THANH TOÁN",
                                                                 "Confirmed" => "ĐÃ XÁC NHẬN",
-                                                                "CheckedIn" => "ĐANG Ở",
-                                                                "CheckedOut" => "ĐÃ TRẢ",
+                                                                "CheckedIn" => "CHECK-IN",
+                                                                "CheckedOut" => "CHECK-OUT",
                                                                 _ => "ĐẶT CHỖ"
                                                             };
 
@@ -741,6 +746,12 @@
         font-size: 0.82rem;
         font-weight: 700;
         padding: 6px 12px;
+    }
+
+    .legend-sep {
+        font-size: 0.7rem;
+        color: var(--matrix-border-strong);
+        margin: 0 -2px;
     }
 
     .room-status-chip,
@@ -1515,8 +1526,8 @@
                     case 'AwaitingApproval': return 'Chờ duyệt';
                     case 'AwaitingPayment':
                     case 'PendingPayment': return 'Chờ thanh toán';
-                    case 'CheckedIn': return 'Đang ở';
-                    case 'CheckedOut': return 'Đã trả phòng';
+                    case 'CheckedIn': return 'Check-in';
+                    case 'CheckedOut': return 'Check-out';
                     default: return status;
                 }
             };

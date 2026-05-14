@@ -48,14 +48,35 @@ namespace WebHomestay.Controllers
 
             if (checkoutMode == "Auto")
             {
-                var now = DateTime.UtcNow;
-                var pastConfirmed = await _context.Bookings
-                    .Where(b => !b.IsDeleted && b.Status == "Confirmed" && b.EndTime < now)
+                var nowTime = DateTime.Now;
+                bool changed = false;
+
+                // 1. Auto Check-In: Confirmed -> CheckedIn when StartTime reached
+                var bookingsToCheckIn = await _context.Bookings
+                    .Where(b => !b.IsDeleted && b.Status == "Confirmed" && b.StartTime <= nowTime)
                     .ToListAsync();
 
-                if (pastConfirmed.Any())
+                if (bookingsToCheckIn.Any())
                 {
-                    foreach (var b in pastConfirmed) b.Status = "CheckedOut";
+                    foreach (var b in bookingsToCheckIn) b.Status = "CheckedIn";
+                    changed = true;
+                }
+
+                // 2. Auto Check-Out: Confirmed/CheckedIn -> CheckedOut when EndTime passed
+                var pastActiveBookings = await _context.Bookings
+                    .Where(b => !b.IsDeleted && 
+                               (b.Status == "Confirmed" || b.Status == "CheckedIn") && 
+                               b.EndTime < nowTime)
+                    .ToListAsync();
+
+                if (pastActiveBookings.Any())
+                {
+                    foreach (var b in pastActiveBookings) b.Status = "CheckedOut";
+                    changed = true;
+                }
+
+                if (changed)
+                {
                     await _context.SaveChangesAsync();
                 }
             }
@@ -177,7 +198,7 @@ namespace WebHomestay.Controllers
             if (booking == null) return NotFound();
 
             var checkoutMode = await _settingService.GetStringAsync("CheckoutMode", "Auto");
-            if (checkoutMode == "Auto" && booking.EndTime < DateTime.UtcNow)
+            if (checkoutMode == "Auto" && booking.EndTime < DateTime.Now)
             {
                 booking.Status = "CheckedOut";
             }

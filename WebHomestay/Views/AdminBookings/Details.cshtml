@@ -31,8 +31,8 @@
                             var statusDisplay = Model.Status switch {
                                 "AwaitingApproval" => "Cần duyệt bill",
                                 "Confirmed" => "Đã xác nhận",
-                                "CheckedIn" => "Đã nhận phòng",
-                                "CheckedOut" => "Hoàn thành",
+                                "CheckedIn" => "Check-in",
+                                "CheckedOut" => "Check-out",
                                 "Cancelled" => "Đã hủy",
                                 "AwaitingPayment" or "PendingPayment" or "PENDING" => "Chờ thanh toán",
                                 _ => Model.Status

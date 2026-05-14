@@ -1,2 +1,12 @@
 cd "C:\Users\admin\Documents\VS Tím\web_homestay\web_homestay\WebHomestay"; dotnet run
 dotnet build
+
+.\run.ps1 up: (Tương đương make up) Tự động chạy toàn bộ quy trình.
+.\run.ps1 watch: Chạy chế độ tự động cập nhật code.
+.\run.ps1 build: Build dự án.
+.\run.ps1 clean: Dọn dẹp file rác.
+
+.\r c (Clean)
+.\r u (Up)
+.\r b (Build)
+.\w (Watch - file bat)
