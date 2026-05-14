@@ -10,3 +10,4 @@ dotnet build
 .\r u (Up)
 .\r b (Build)
 .\w (Watch - file bat)
+cd web_homestay

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/admin/.claude/projects/c--Users-admin-Documents-VS-T-m-web-homestay-web-homestay/memory/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\admin\\.claude\\projects\\c--Users-admin-Documents-VS-T-m-web-homestay-web-homestay\\memory"
+    ]
+  }
+}
