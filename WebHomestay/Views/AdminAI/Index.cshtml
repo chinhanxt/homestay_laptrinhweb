@@ -1,0 +1,372 @@
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "AI Brain Center";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/admin-ai-brain-center.css" asp-append-version="true" />
+}
+
+<div class="brain-page">
+    <section class="workflow-board" id="brain-flow">
+        <div class="workflow-header">
+            <div>
+                <div class="brain-eyebrow dark"><i class="fas fa-diagram-project me-2"></i>n8n-style AI Workflow</div>
+                <h1>Luồng AI Brain xử lý câu hỏi khách</h1>
+                <p>Input từ khách được truyền qua các agent chuyên trách. Mỗi node chỉ làm một việc rõ ràng, dữ liệu chạy theo các đường đứt động và cuối cùng sinh output có kiểm soát.</p>
+            </div>
+            <a class="btn btn-light rounded-pill fw-bold px-4" asp-controller="AdminSettings" asp-action="Index">
+                <i class="fas fa-vial me-2"></i>Mở AI Test Console
+            </a>
+        </div>
+
+        <div class="workflow-canvas code-accurate-flow">
+            <div class="caf-node caf-entry" style="--x: 6%; --y: 22%;">
+                <i class="fas fa-comments"></i>
+                <strong>AI Brain Console / Chat</strong>
+                <span>Admin hoặc khách nhập câu hỏi</span>
+            </div>
+
+            <div class="caf-node caf-api" style="--x: 24%; --y: 22%;">
+                <i class="fas fa-route"></i>
+                <strong>POST /admin/ai/brain-chat</strong>
+                <span>AdminAIController.BrainChat</span>
+            </div>
+
+            <div class="caf-node caf-core" style="--x: 46%; --y: 22%;">
+                <i class="fas fa-robot"></i>
+                <strong>AIBrainOrchestrator</strong>
+                <span>Service điều phối thật trong code</span>
+            </div>
+
+            <div class="caf-node caf-model" style="--x: 70%; --y: 22%;">
+                <i class="fas fa-brain"></i>
+                <strong>AIModelClient</strong>
+                <span>Mock · Groq · OpenRouter/9router</span>
+            </div>
+
+            <div class="caf-node caf-answer" style="--x: 89%; --y: 22%;">
+                <i class="fas fa-paper-plane"></i>
+                <strong>Final Answer</strong>
+                <span>Câu tư vấn trả về UI</span>
+            </div>
+
+            <div class="caf-tool" style="--x: 28%; --y: 66%;">
+                <i class="fas fa-user-check"></i>
+                <strong>Persona Summary</strong>
+                <span>BuildPersonaSummary()</span>
+            </div>
+
+            <div class="caf-tool" style="--x: 40%; --y: 66%;">
+                <i class="fas fa-hotel"></i>
+                <strong>Live Snapshot</strong>
+                <span>DbContext + IAvailabilityService</span>
+            </div>
+
+            <div class="caf-tool" style="--x: 52%; --y: 66%;">
+                <i class="fas fa-book-open"></i>
+                <strong>Knowledge Retrieval</strong>
+                <span>AIKnowledgeUnits</span>
+            </div>
+
+            <div class="caf-tool" style="--x: 64%; --y: 66%;">
+                <i class="fas fa-project-diagram"></i>
+                <strong>Graph Reasoning</strong>
+                <span>AIGraphNodes + AIGraphEdges</span>
+            </div>
+
+            <div class="caf-tool" style="--x: 76%; --y: 66%;">
+                <i class="fas fa-shield-halved"></i>
+                <strong>Guard Result</strong>
+                <span>BuildGuardResult()</span>
+            </div>
+
+            <div class="caf-node caf-trace" style="--x: 89%; --y: 66%;">
+                <i class="fas fa-database"></i>
+                <strong>AIConversationTrace</strong>
+                <span>Lưu persona, live, knowledge, graph, guard, answer</span>
+            </div>
+
+            <svg class="caf-lines" viewBox="0 0 1400 430" preserveAspectRatio="none" aria-hidden="true">
+                <path class="caf-solid" d="M225 95 L375 95" />
+                <path class="caf-solid" d="M510 95 L670 95" />
+                <path class="caf-solid" d="M735 95 L880 95" />
+                <path class="caf-solid" d="M995 95 L1195 95" />
+                <path class="caf-dash" d="M715 140 C500 190 410 230 390 285" />
+                <path class="caf-dash" d="M715 140 C560 190 550 230 550 285" />
+                <path class="caf-dash" d="M715 140 C620 190 700 230 710 285" />
+                <path class="caf-dash" d="M715 140 C720 190 845 230 870 285" />
+                <path class="caf-dash" d="M715 140 C780 185 1000 230 1035 285" />
+                <path class="caf-dash" d="M940 140 C1030 195 1190 235 1210 285" />
+                <path class="caf-dash" d="M1230 140 C1260 200 1260 250 1230 285" />
+            </svg>
+        </div>
+    </section>
+
+    <section class="brain-section">
+        <ul class="nav nav-pills brain-tabs" id="brainIdeaTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-agents" type="button">Agents AI</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-knowledge" type="button">Knowledge</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-graph" type="button">Graph</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-conversation-trace" type="button" onclick="loadBrainConversationTraces()">Conversation Trace</button>
+            </li>
+        </ul>
+
+        <div class="tab-content brain-tab-content">
+            <div class="tab-pane fade show active" id="tab-agents">
+                <div class="brain-manager-toolbar">
+                    <div>
+                        <h3>Phòng test 6 Agent AI</h3>
+                        <p>Mỗi agent có màn test riêng để kiểm tra nó nhận input gì, xử lý ra sao và preview kết quả trước khi ghép vào Orchestrator.</p>
+                    </div>
+                </div>
+
+                <ul class="nav nav-pills agent-test-tabs" role="tablist">
+                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#agent-orchestrator" type="button">Orchestrator</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#agent-live" type="button">Live System</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#agent-knowledge" type="button">Knowledge RAG</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#agent-graph" type="button">Graph</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#agent-persona" type="button">Persona</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#agent-guard" type="button">Guard</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#agent-final" type="button" onclick="loadFinalSynthesizerConfig()">Final Synthesizer</button></li>
+                </ul>
+
+                <div class="tab-content agent-test-content">
+                    <div class="tab-pane fade show active" id="agent-orchestrator">@await Html.PartialAsync("_AgentTestPanel", ("orchestrator", "Orchestrator Agent", "Lập kế hoạch gọi agent nào và gom kết quả.", "fa-network-wired"))</div>
+                    <div class="tab-pane fade" id="agent-live">@await Html.PartialAsync("_AgentTestPanel", ("live", "Live System Agent", "Preview dữ liệu thật: chi nhánh, phòng, giá, availability.", "fa-database"))</div>
+                    <div class="tab-pane fade" id="agent-knowledge">@await Html.PartialAsync("_AgentTestPanel", ("knowledge", "Knowledge RAG Agent", "Kiểm tra query lấy được knowledge unit nào.", "fa-book-open"))</div>
+                    <div class="tab-pane fade" id="agent-graph">@await Html.PartialAsync("_AgentTestPanel", ("graph", "Graph Reasoning Agent", "Kiểm tra node/edge nào liên quan đến câu hỏi.", "fa-project-diagram"))</div>
+                    <div class="tab-pane fade" id="agent-persona">@await Html.PartialAsync("_AgentTestPanel", ("persona", "Persona Agent", "Nhận diện tín hiệu nhu cầu và kiểu khách.", "fa-user-check"))</div>
+                    <div class="tab-pane fade" id="agent-guard">@await Html.PartialAsync("_AgentTestPanel", ("guard", "Safety Guard Agent", "Kiểm tra thiếu dữ liệu, rủi ro bịa và rule vận hành.", "fa-shield-halved"))</div>
+                    <div class="tab-pane fade" id="agent-final">
+                        <div class="final-synth-grid">
+                            <div class="final-config-card">
+                                <div class="agent-test-info mb-3">
+                                    <div class="agent-test-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                                    <div>
+                                        <h3>Final Response Synthesizer</h3>
+                                        <p>Agent này phụ trách phong cách trả lời cuối cùng cho khách và quyết định có hiển thị form thu thập thông tin hay không.</p>
+                                        <div class="agent-function-note">
+                                            <span>Chức năng: nhận persona, live snapshot, knowledge, graph, guard và viết câu trả lời cuối cùng.</span>
+                                            <span>Cấu hình ở đây sẽ được đưa vào system prompt, không cần hard-code lại trong code.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <label class="form-label fw-bold">Phong cách trả lời tự do</label>
+                                <textarea id="final-style-config" class="form-control final-style-text" rows="9" placeholder="VD: Trả lời thân thiện, ngắn gọn, như lễ tân chuyên nghiệp..."></textarea>
+                                <button class="btn btn-primary rounded-pill fw-bold mt-3" onclick="saveFinalSynthesizerConfig()"><i class="fas fa-save me-2"></i>Lưu cấu hình</button>
+                            </div>
+
+                            <div class="final-designer-card">
+                                <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                                    <div>
+                                        <h3 class="fw-800 mb-1">Form Designer</h3>
+                                        <p class="text-muted mb-0">Kéo các trường vào preview để AI có thể hỏi khách điền thông tin thay vì chat tự do.</p>
+                                    </div>
+                                    <button class="btn btn-outline-danger btn-sm rounded-pill" onclick="clearFinalFormDesigner()">Xóa form</button>
+                                </div>
+                                <div class="designer-layout">
+                                    <div class="field-palette">
+                                        <button draggable="true" data-field="branch">Chi nhánh</button>
+                                        <button draggable="true" data-field="datetime">Ngày giờ</button>
+                                        <button draggable="true" data-field="guestCount">Số khách</button>
+                                        <button draggable="true" data-field="budget">Ngân sách</button>
+                                        <button draggable="true" data-field="note">Ghi chú</button>
+                                    </div>
+                                    <div id="final-form-dropzone" class="form-dropzone">
+                                        <div class="empty-state">Kéo trường vào đây để tạo form preview.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="final-preview-card">
+                                <h3 class="fw-800 mb-3">Chatbot Preview</h3>
+                                <div class="chatbot-preview-window">
+                                    <div class="preview-bubble ai">Xin chào, mình có thể tư vấn phòng phù hợp cho bạn. Bạn cho mình thêm vài thông tin nhé.</div>
+                                    <div id="final-chat-form-preview" class="chat-form-preview"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-knowledge">
+                <div class="brain-manager-toolbar">
+                    <div>
+                        <h3>Ngân hàng kiến thức AI</h3>
+                        <p>Đây là nơi nạp tri thức mềm cho RAG Agent: sales script, chính sách, nội quy, hướng dẫn và cách tư vấn.</p>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button class="btn btn-outline-primary rounded-pill fw-bold" onclick="loadBrainKnowledge()"><i class="fas fa-rotate me-2"></i>Tải lại</button>
+                        <button class="btn btn-primary rounded-pill fw-bold" onclick="openKnowledgeEditor()"><i class="fas fa-plus me-2"></i>Thêm Knowledge</button>
+                    </div>
+                </div>
+                <div class="brain-bank-layout">
+                    <div class="brain-bank-sidebar">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <strong>Scopes</strong>
+                            <button class="btn btn-sm btn-light border" onclick="openScopeEditor()"><i class="fas fa-plus"></i></button>
+                        </div>
+                        <div id="brain-scope-list" class="brain-bank-list"></div>
+                    </div>
+                    <div class="brain-bank-main">
+                        <div id="brain-knowledge-list" class="brain-card-list">
+                            <div class="empty-state">Bấm “Tải lại” để xem ngân hàng kiến thức.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-graph">
+                <div class="brain-manager-toolbar">
+                    <div>
+                        <h3>Graph quan hệ AI</h3>
+                        <p>Graph mô tả quan hệ giữa chi nhánh, phòng, persona, chính sách và tình huống để AI suy luận có cấu trúc.</p>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <div class="btn-group rounded-pill overflow-hidden" role="group">
+                            <button class="btn btn-outline-dark fw-bold" onclick="setGraphViewMode('cards')"><i class="fas fa-table-cells-large me-2"></i>Card</button>
+                            <button class="btn btn-outline-dark fw-bold" onclick="setGraphViewMode('network')"><i class="fas fa-circle-nodes me-2"></i>Node View</button>
+                        </div>
+                        <button class="btn btn-outline-primary rounded-pill fw-bold" onclick="loadBrainGraph()"><i class="fas fa-rotate me-2"></i>Tải lại</button>
+                        <button class="btn btn-primary rounded-pill fw-bold" onclick="openGraphNodeEditor()"><i class="fas fa-circle-plus me-2"></i>Thêm Node</button>
+                        <button class="btn btn-dark rounded-pill fw-bold" onclick="openGraphEdgeEditor()"><i class="fas fa-link me-2"></i>Thêm Edge</button>
+                    </div>
+                </div>
+                <div id="graph-card-mode" class="graph-manager-grid">
+                    <div>
+                        <h4>Nodes</h4>
+                        <div id="brain-graph-nodes" class="brain-card-list"></div>
+                    </div>
+                    <div>
+                        <h4>Edges</h4>
+                        <div id="brain-graph-edges" class="brain-card-list"></div>
+                    </div>
+                </div>
+                <div id="graph-network-mode" class="graph-network-mode" style="display:none;">
+                    <svg id="brain-graph-network" viewBox="0 0 1200 620" preserveAspectRatio="xMidYMid meet"></svg>
+                </div>
+            </div>
+
+
+
+
+            <div class="tab-pane fade" id="tab-conversation-trace">
+                <div class="brain-manager-toolbar">
+                    <div>
+                        <h3>Conversation Trace</h3>
+                        <p>Xem AI đã lưu gì sau mỗi phiên: persona, live snapshot, knowledge, graph reasoning, guard và final answer.</p>
+                    </div>
+                    <button class="btn btn-outline-primary rounded-pill fw-bold" onclick="loadBrainConversationTraces()"><i class="fas fa-rotate me-2"></i>Tải trace</button>
+                </div>
+                <div class="trace-manager-layout">
+                    <div class="trace-list-panel">
+                        <div id="conversation-trace-list" class="trace-list-items">
+                            <div class="empty-state">Bấm “Tải trace” để xem lịch sử AIConversationTrace.</div>
+                        </div>
+                    </div>
+                    <div class="trace-detail-panel" id="conversation-trace-detail">
+                        <div class="empty-state">Chọn một trace để xem chi tiết.</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+</div>
+
+
+<div class="modal fade" id="brainScopeModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content brain-modal">
+            <div class="modal-header"><h5 class="modal-title fw-bold">Scope kiến thức</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="scope-id" />
+                <label class="form-label fw-bold">Tên scope</label>
+                <input id="scope-name" class="form-control mb-3" placeholder="VD: Chính sách đặt phòng" />
+                <label class="form-label fw-bold">Mô tả</label>
+                <textarea id="scope-description" class="form-control mb-3" rows="3"></textarea>
+                <label class="form-label fw-bold">Thứ tự</label>
+                <input id="scope-order" type="number" class="form-control" value="1" />
+            </div>
+            <div class="modal-footer"><button class="btn btn-primary rounded-pill px-4" onclick="saveBrainScope()">Lưu scope</button></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="brainKnowledgeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content brain-modal">
+            <div class="modal-header"><h5 class="modal-title fw-bold">Knowledge Unit</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="knowledge-id" />
+                <label class="form-label fw-bold">Scope</label>
+                <select id="knowledge-scope" class="form-select mb-3"></select>
+                <label class="form-label fw-bold">Tiêu đề</label>
+                <input id="knowledge-title" class="form-control mb-3" placeholder="VD: Quy tắc không xác nhận booking" />
+                <label class="form-label fw-bold">Nội dung tri thức</label>
+                <textarea id="knowledge-content" class="form-control mb-3" rows="7" placeholder="Viết chính sách, kịch bản tư vấn, hướng dẫn..."></textarea>
+                <div class="row g-3">
+                    <div class="col-md-8"><label class="form-label fw-bold">Tags</label><input id="knowledge-tags" class="form-control" placeholder="sales,policy,checkin" /></div>
+                    <div class="col-md-4"><label class="form-label fw-bold">Priority</label><input id="knowledge-priority" type="number" class="form-control" value="10" /></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-primary rounded-pill px-4" onclick="saveBrainKnowledgeUnit()">Lưu knowledge</button></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="brainGraphNodeModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content brain-modal">
+            <div class="modal-header"><h5 class="modal-title fw-bold">Graph Node</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="graph-node-id" />
+                <label class="form-label fw-bold">Loại node</label>
+                <input id="graph-node-type" class="form-control mb-3" placeholder="branch, room, persona, policy" />
+                <label class="form-label fw-bold">Tên node</label>
+                <input id="graph-node-label" class="form-control mb-3" />
+                <label class="form-label fw-bold">Tóm tắt</label>
+                <textarea id="graph-node-summary" class="form-control mb-3" rows="4"></textarea>
+                <label class="form-label fw-bold">Metadata JSON</label>
+                <textarea id="graph-node-metadata" class="form-control" rows="3">{}</textarea>
+            </div>
+            <div class="modal-footer"><button class="btn btn-primary rounded-pill px-4" onclick="saveBrainGraphNode()">Lưu node</button></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="brainGraphEdgeModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content brain-modal">
+            <div class="modal-header"><h5 class="modal-title fw-bold">Graph Edge</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="graph-edge-id" />
+                <label class="form-label fw-bold">From node</label>
+                <select id="graph-edge-from" class="form-select mb-3"></select>
+                <label class="form-label fw-bold">To node</label>
+                <select id="graph-edge-to" class="form-select mb-3"></select>
+                <label class="form-label fw-bold">Quan hệ</label>
+                <input id="graph-edge-type" class="form-control mb-3" placeholder="contains_room, best_for, requires_policy" />
+                <label class="form-label fw-bold">Weight</label>
+                <input id="graph-edge-weight" type="number" step="0.1" class="form-control mb-3" value="1" />
+                <label class="form-label fw-bold">Evidence</label>
+                <textarea id="graph-edge-evidence" class="form-control" rows="3"></textarea>
+            </div>
+            <div class="modal-footer"><button class="btn btn-dark rounded-pill px-4" onclick="saveBrainGraphEdge()">Lưu edge</button></div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <script src="~/js/admin-ai-brain-center.js" asp-append-version="true"></script>
+}

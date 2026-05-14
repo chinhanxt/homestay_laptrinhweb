@@ -66,6 +66,7 @@
                                     }
                                     @if (Context.Session.GetString("AdminRole") == "SuperAdmin")
                                     {
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminAI" asp-action="Index"><i class="fas fa-brain me-2 text-muted"></i>AI Brain Center</a></li>
                                         <li><a class="dropdown-item py-2" asp-controller="AdminSettings" asp-action="Index">Cấu hình hệ thống</a></li>
                                     }
                                     <li><hr class="dropdown-divider"></li>

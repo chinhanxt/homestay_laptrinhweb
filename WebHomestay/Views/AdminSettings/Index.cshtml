@@ -331,115 +331,94 @@
                 </div>
             </div>
 
-            <!-- PANEL: AI TƯ VẤN -->
+            <!-- PANEL: AI TEST CHATBOT -->
             <div class="tab-pane fade" id="panel-ai" role="tabpanel">
-                <div class="panel-header d-flex justify-content-between align-items-end mb-4">
-                    <div>
-                        <h2 class="fw-800 tracking-tighter">Trung tâm Điều hành AI</h2>
-                        <p class="text-muted opacity-75">Quản lý tri thức và thử nghiệm phản hồi nhân sự AI.</p>
+                <div class="ai-test-page">
+                    <div class="ai-test-hero">
+                        <div>
+                            <div class="small text-uppercase fw-800 text-primary mb-2">AI Chatbot Connection Test</div>
+                            <h2 class="fw-800 tracking-tighter">Kiểm thử chatbot trước khi đưa ra cho khách</h2>
+                            <p class="text-muted mb-0">Trang này chỉ dùng để test kết nối, dữ liệu live, provider và chất lượng phản hồi. Việc cấu hình Knowledge/Graph/Agents nằm ở trang AI Brain Center riêng.</p>
+                        </div>
+                        <a class="btn btn-dark rounded-pill px-4 fw-bold" asp-controller="AdminAI" asp-action="Index">
+                            <i class="fas fa-brain me-2"></i>Mở AI Brain Center
+                        </a>
                     </div>
-                    <div class="pb-2">
-                        <span class="badge bg-white text-primary border rounded-pill px-3 py-2 fw-bold">
-                            <i class="fas fa-brain me-2"></i> Trí tuệ Nhân tạo v2.4
-                        </span>
-                    </div>
-                </div>
 
-                <div class="ai-hub-container" id="ai-hub-main-container">
-                    <!-- Sidebar: Danh mục kỹ năng -->
-                    <div class="ai-sidebar">
-                        <div class="sidebar-toggle" onclick="toggleAISidebar()">
-                            <i class="fas fa-chevron-left"></i>
-                        </div>
-                        <div class="sidebar-add-wrapper">
-                            <h6 class="text-uppercase fw-bold tracking-widest">HỌC VIỆN TRI THỨC</h6>
-                            <button class="btn-add-sidebar" onclick="openCollectionManager()" title="Thêm danh mục mới">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                        <div id="ai-collections-list" class="flex-grow-1">
-                            <!-- Loaded via JS -->
-                        </div>
-                        
-                        <div class="px-3 mt-auto sidebar-footer-content">
-                            <div class="p-3 bg-white rounded-4 border shadow-sm">
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="dot dot-success"></div>
-                                    <div class="small fw-800 text-dark">AI Trực tuyến</div>
+                    <div class="ai-test-grid">
+                        <div class="ai-test-card ai-test-chat-card">
+                            <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
+                                <div>
+                                    <div class="small text-uppercase fw-800 text-primary mb-1">Test Console</div>
+                                    <h3 class="fw-800 mb-1">Gửi câu hỏi như khách thật</h3>
+                                    <p class="text-muted mb-0">Kiểm tra chatbot có hỏi lại đúng, tư vấn đúng phòng và không tự xác nhận booking.</p>
+                                </div>
+                                <span class="badge rounded-pill text-bg-light border px-3 py-2" id="ai-brain-provider-badge">Provider: groq</span>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-3">
+                                    <label class="form-label small fw-bold text-muted">Chi nhánh</label>
+                                    <select id="ai-brain-branch" class="form-select premium-input">
+                                        <option value="">Chưa chọn</option>
+                                        @foreach (var branch in branches)
+                                        {
+                                            <option value="@branch.Id">@branch.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small fw-bold text-muted">Bắt đầu</label>
+                                    <input type="datetime-local" id="ai-brain-start" class="form-control premium-input">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small fw-bold text-muted">Kết thúc</label>
+                                    <input type="datetime-local" id="ai-brain-end" class="form-control premium-input">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small fw-bold text-muted">Số khách</label>
+                                    <input type="number" id="ai-brain-guests" class="form-control premium-input" min="1" value="1">
                                 </div>
                             </div>
-                        </div>
-                    </div>
 
-                    <!-- Main: Danh sách bài viết -->
-                    <div class="ai-main-content">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h3 id="current-collection-name" class="fw-800 mb-0">Chào mừng Admin</h3>
-                            <div class="d-flex gap-3 align-items-center">
-                                <div class="sync-panel" id="sync-panel-box">
-                                    <div class="sync-header" onclick="toggleSyncPanel()">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <div class="dot-success" style="width: 6px; height: 6px;"></div>
-                                            <span class="smaller fw-800 text-uppercase text-primary">Dữ liệu</span>
-                                        </div>
-                                        <i class="fas fa-chevron-down smaller text-muted ms-3" id="sync-icon"></i>
-                                    </div>
-                                    <div class="sync-content" id="sync-body" style="display: none;">
-                                        <div class="sync-item"><span>Chi nhánh</span><span class="sync-status">Đã kết nối</span></div>
-                                        <div class="sync-item"><span>Phòng trống</span><span class="sync-status">Live</span></div>
-                                        <div class="sync-item"><span>Biểu giá</span><span class="sync-status">Đã đồng bộ</span></div>
-                                    </div>
-                                </div>
-                                <button class="btn btn-dark rounded-pill px-4 py-2 small fw-bold" id="btn-add-article" style="display:none;" onclick="createNewArticle()">
-                                    <i class="fas fa-plus-circle me-2"></i> Huấn luyện bài mới
+                            <div class="input-group mb-3">
+                                <input type="text" id="ai-brain-message" class="form-control premium-input" placeholder="Ví dụ: Tư vấn phòng cho 2 người tối nay, ưu tiên giá tốt">
+                                <button type="button" id="ai-brain-send-btn" class="btn btn-dark px-4 fw-bold" onclick="sendBrainConsoleMessage()">
+                                    <i class="fas fa-paper-plane me-2"></i>Gửi test
                                 </button>
                             </div>
+
+                            <div class="ai-brain-result" id="ai-brain-result">
+                                <div class="text-muted small">Chưa có phiên kiểm thử. Kết quả chatbot sẽ hiển thị ở đây.</div>
+                            </div>
                         </div>
-                        
-                        <div id="ai-articles-list" class="articles-grid">
-                            <!-- Loaded via JS -->
+
+                        <div class="ai-test-card">
+                            <div class="small text-uppercase fw-800 text-primary mb-2">Checklist trước khi public</div>
+                            <ul class="ai-test-checklist">
+                                <li><i class="fas fa-circle-check"></i><span>Provider hoạt động: Groq/OpenRouter.</span></li>
+                                <li><i class="fas fa-circle-check"></i><span>Chatbot lấy đúng live room/availability.</span></li>
+                                <li><i class="fas fa-circle-check"></i><span>Không tự xác nhận đặt phòng.</span></li>
+                                <li><i class="fas fa-circle-check"></i><span>Thiếu dữ liệu thì hỏi lại khách.</span></li>
+                                <li><i class="fas fa-circle-check"></i><span>Câu trả lời dễ hiểu, đúng giọng tư vấn.</span></li>
+                            </ul>
+                            <button class="btn btn-outline-dark rounded-pill fw-bold w-100 mt-3" onclick="loadBrainTraces()">
+                                <i class="fas fa-clock-rotate-left me-2"></i>Xem trace test gần nhất
+                            </button>
                         </div>
                     </div>
-                </div>
 
-                <!-- Floating Chat Toggle Button -->
-                <div class="chat-toggle-btn" onclick="toggleFloatingChat()">
-                    <i class="fas fa-robot fa-lg"></i>
-                </div>
-
-                <!-- Floating Chat Container -->
-                <div class="floating-chat-container minimized" id="floating-chatbox">
-                    <div class="chat-header">
-                        <div class="d-flex align-items-center gap-2">
-                            <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
-                                <i class="fas fa-robot text-white small"></i>
-                            </div>
+                    <div class="ai-brain-traces mt-4" id="ai-brain-traces" style="display:none;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
                             <div>
-                                <div class="small fw-800">Thử nghiệm Phản hồi</div>
-                                <div class="smaller opacity-75">Kiểm tra kiến thức AI</div>
+                                <div class="small text-uppercase fw-800 text-primary mb-1">Test Trace</div>
+                                <h4 class="fw-800 mb-0">Lịch sử test chatbot gần nhất</h4>
                             </div>
+                            <button class="btn btn-sm btn-light border rounded-pill px-3" onclick="$('#ai-brain-traces').hide()">Ẩn</button>
                         </div>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-link text-white p-0 opacity-75 hover-opacity-100" onclick="clearAIChat()" title="Xóa lịch sử chat">
-                                <i class="fas fa-trash-alt small"></i>
-                            </button>
-                            <button class="btn btn-link text-white p-0" onclick="toggleFloatingChat()">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div id="ai-chat-history" class="chat-history">
-                        <div class="chat-msg ai">
-                            Xin chào! Tôi là Trợ lý AI. Hãy đặt câu hỏi để kiểm tra kiến thức của tôi nhé!
-                        </div>
-                    </div>
-                    <div class="p-3 bg-white border-top">
-                        <div class="input-group bg-light rounded-pill border p-1">
-                            <input type="text" id="ai-test-input" class="form-control border-0 bg-transparent shadow-none px-3" 
-                                   placeholder="Nhập câu hỏi thử nghiệm...">
-                            <button class="btn btn-primary rounded-circle shadow-sm" style="width: 38px; height: 38px;" onclick="sendTestMessage()">
-                                <i class="fas fa-arrow-up"></i>
-                            </button>
+                        <div class="row g-3">
+                            <div class="col-lg-4"><div id="ai-brain-trace-list" class="ai-brain-trace-list"></div></div>
+                            <div class="col-lg-8"><div id="ai-brain-trace-detail" class="ai-brain-trace-detail text-muted">Chọn một trace để xem dữ liệu chatbot đã dùng.</div></div>
                         </div>
                     </div>
                 </div>

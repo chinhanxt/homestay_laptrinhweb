@@ -43,3 +43,6 @@ logs/
 node_modules/
 dist/
 build/
+
+# Local AI provider secrets
+key.md

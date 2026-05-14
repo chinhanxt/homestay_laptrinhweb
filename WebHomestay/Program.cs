@@ -3,11 +3,24 @@ using WebHomestay.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var localGroqKeyPath = Path.Combine(builder.Environment.ContentRootPath, "..", "key.md");
+if (File.Exists(localGroqKeyPath))
+{
+    var localGroqKey = File.ReadAllText(localGroqKeyPath).Trim();
+    if (localGroqKey.Contains('=')) localGroqKey = localGroqKey.Split('=', 2)[1].Trim().Trim('"');
+    builder.Configuration["AIModel:Provider"] = "groq";
+    builder.Configuration["AIModel:ApiKey"] = localGroqKey;
+    builder.Configuration["AIModel:Model"] = string.IsNullOrWhiteSpace(builder.Configuration["AIModel:Model"])
+        ? "llama-3.3-70b-versatile"
+        : builder.Configuration["AIModel:Model"];
+}
+
 // Fix PostgreSQL DateTime issue
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.Configure<WebHomestay.Services.AIModelOptions>(builder.Configuration.GetSection("AIModel"));
 
 // Configure PostgreSQL Connection
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -25,6 +38,8 @@ builder.Services.AddMemoryCache();
 builder.Services.AddScoped<WebHomestay.Services.ISettingService, WebHomestay.Services.SettingService>();
 builder.Services.AddScoped<WebHomestay.Services.IStatisticsService, WebHomestay.Services.StatisticsService>();
 builder.Services.AddScoped<WebHomestay.Services.IImageMaskingService, WebHomestay.Services.ImageMaskingService>();
+builder.Services.AddHttpClient<WebHomestay.Services.IAIModelClient, WebHomestay.Services.AIModelClient>();
+builder.Services.AddScoped<WebHomestay.Services.IAIBrainOrchestrator, WebHomestay.Services.AIBrainOrchestrator>();
 builder.Services.AddScoped<WebHomestay.Services.PricingService>();
 builder.Services.AddHostedService<WebHomestay.Services.BookingCleanupService>();
 

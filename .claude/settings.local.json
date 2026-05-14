@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Read(//c/Users/admin/.claude/projects/c--Users-admin-Documents-VS-T-m-web-homestay-web-homestay/memory/**)"
+      "Read(//c/Users/admin/.claude/projects/c--Users-admin-Documents-VS-T-m-web-homestay-web-homestay/memory/**)",
+      "Bash(python -)",
+      "Bash(dotnet build *)",
+      "Bash(dotnet ef *)",
+      "Bash(cat)",
+      "Bash(dotnet run *)",
+      "Bash(git check-ignore *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\admin\\.claude\\projects\\c--Users-admin-Documents-VS-T-m-web-homestay-web-homestay\\memory"

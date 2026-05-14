@@ -1,0 +1,72 @@
+@model (string Key, string Name, string Description, string Icon)
+
+<div class="agent-test-panel" data-agent="@Model.Key">
+    <div class="agent-test-info">
+        <div class="agent-test-icon"><i class="fas @Model.Icon"></i></div>
+        <div>
+            <h3>@Model.Name</h3>
+            <p>@Model.Description</p>
+            <div class="agent-function-note">
+                @switch (Model.Key)
+                {
+                    case "orchestrator":
+                        <span>Chức năng: nhận input, quyết định agent nào cần chạy, gom preview của từng agent và chuẩn bị dữ liệu cho Final Synthesizer.</span>
+                        <span>Test tốt khi: plannedFlow đúng với dữ liệu bạn nhập và không bỏ sót Live/Knowledge/Graph/Guard.</span>
+                        break;
+                    case "live":
+                        <span>Chức năng: đọc dữ liệu thật từ hệ thống như chi nhánh, phòng, giá, sức chứa và trạng thái phòng.</span>
+                        <span>Test tốt khi: preview trả đúng danh sách phòng phù hợp branch, thời gian và số khách.</span>
+                        break;
+                    case "knowledge":
+                        <span>Chức năng: tìm trong ngân hàng kiến thức những policy, sales script, nội quy hoặc hướng dẫn liên quan câu hỏi.</span>
+                        <span>Test tốt khi: matched knowledge sát câu hỏi; nếu không sát thì cần thêm/sửa Knowledge Unit.</span>
+                        break;
+                    case "graph":
+                        <span>Chức năng: kiểm tra quan hệ giữa node như chi nhánh → phòng → persona → policy để AI có logic tư vấn.</span>
+                        <span>Test tốt khi: match được node/edge liên quan; nếu trống thì cần bổ sung Graph Node/Edge.</span>
+                        break;
+                    case "persona":
+                        <span>Chức năng: nhận diện kiểu khách: nhạy giá, cần gấp, thích trải nghiệm, đi nhóm hoặc hỏi chung.</span>
+                        <span>Test tốt khi: signals phản ánh đúng ý định trong câu hỏi và số khách.</span>
+                        break;
+                    case "guard":
+                        <span>Chức năng: kiểm tra rủi ro trước khi trả lời: thiếu dữ liệu, thời gian sai, bịa availability hoặc tự xác nhận booking.</span>
+                        <span>Test tốt khi: cảnh báo đúng các input thiếu/sai và pass khi đủ điều kiện.</span>
+                        break;
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="agent-test-grid">
+        <div class="agent-test-form">
+            <label class="form-label fw-bold">Câu hỏi / input test</label>
+            <textarea class="form-control agent-message" rows="4" placeholder="VD: phòng 2 người tối nay, ưu tiên giá tốt"></textarea>
+            <div class="row g-3 mt-1">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Branch ID</label>
+                    <input class="form-control agent-branch" type="number" placeholder="VD: 1" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Số khách</label>
+                    <input class="form-control agent-guests" type="number" value="2" min="1" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Bắt đầu</label>
+                    <input class="form-control agent-start" type="datetime-local" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Kết thúc</label>
+                    <input class="form-control agent-end" type="datetime-local" />
+                </div>
+            </div>
+            <button class="btn btn-primary rounded-pill fw-bold mt-3" onclick="runAgentTest('@Model.Key')">
+                <i class="fas fa-play me-2"></i>Chạy test @Model.Name
+            </button>
+        </div>
+        <div class="agent-test-preview">
+            <div class="preview-title">Preview kết quả agent</div>
+            <pre id="agent-preview-@Model.Key">Chưa chạy test.</pre>
+        </div>
+    </div>
+</div>

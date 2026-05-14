@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
 using WebHomestay.Models;
+using WebHomestay.Services;
 
 namespace WebHomestay.Controllers
 {
@@ -9,10 +10,573 @@ namespace WebHomestay.Controllers
     public class AdminAIController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly IAIModelClient _aiModelClient;
+        private readonly IAIBrainOrchestrator _aiBrainOrchestrator;
 
-        public AdminAIController(ApplicationDbContext context)
+        public AdminAIController(ApplicationDbContext context, IAIModelClient aiModelClient, IAIBrainOrchestrator aiBrainOrchestrator)
         {
             _context = context;
+            _aiModelClient = aiModelClient;
+            _aiBrainOrchestrator = aiBrainOrchestrator;
+        }
+
+
+
+
+        [HttpGet("final-synthesizer-config")]
+        public async Task<IActionResult> GetFinalSynthesizerConfig()
+        {
+            var style = await _context.SystemSettings.FirstOrDefaultAsync(s => s.SettingKey == "AIFinalSynthesizerStyle");
+            var form = await _context.SystemSettings.FirstOrDefaultAsync(s => s.SettingKey == "AIFinalSynthesizerFormSchema");
+
+            return Ok(new
+            {
+                style = style?.SettingValue ?? "Giọng thân thiện, rõ ràng, tư vấn như lễ tân chuyên nghiệp. Trả lời ngắn gọn nhưng đủ ý. Nếu thiếu thông tin thì hỏi lại bằng các câu hỏi cụ thể.",
+                formSchema = form?.SettingValue ?? "[]"
+            });
+        }
+
+        [HttpPost("final-synthesizer-config")]
+        public async Task<IActionResult> SaveFinalSynthesizerConfig([FromBody] FinalSynthesizerConfigRequest request)
+        {
+            await UpsertAISetting("AIFinalSynthesizerStyle", request.Style ?? string.Empty, "Phong cách trả lời của Final Response Synthesizer");
+            await UpsertAISetting("AIFinalSynthesizerFormSchema", request.FormSchema ?? "[]", "Schema form gợi ý cho chatbot preview/user input");
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true });
+        }
+
+        private async Task UpsertAISetting(string key, string value, string description)
+        {
+            var setting = await _context.SystemSettings.FirstOrDefaultAsync(s => s.SettingKey == key);
+            if (setting == null)
+            {
+                _context.SystemSettings.Add(new SystemSetting
+                {
+                    SettingKey = key,
+                    SettingValue = value,
+                    Description = description,
+                    GroupName = "AI",
+                    LastUpdated = DateTime.Now
+                });
+                return;
+            }
+
+            setting.SettingValue = value;
+            setting.Description = description;
+            setting.GroupName = "AI";
+            setting.LastUpdated = DateTime.Now;
+        }
+
+        [HttpPost("test-agent")]
+        public async Task<IActionResult> TestAgent([FromBody] AIAgentTestRequest request)
+        {
+            var agent = request.AgentKey?.Trim().ToLowerInvariant() ?? string.Empty;
+            var result = agent switch
+            {
+                "orchestrator" => await TestOrchestratorAgent(request),
+                "live" => await TestLiveSystemAgent(request),
+                "knowledge" => await TestKnowledgeAgent(request),
+                "graph" => await TestGraphAgent(request),
+                "persona" => TestPersonaAgent(request),
+                "guard" => TestGuardAgent(request),
+                _ => new { agent = "unknown", ok = false, message = "Agent không hợp lệ." }
+            };
+
+            return Ok(result);
+        }
+
+        private async Task<object> TestOrchestratorAgent(AIAgentTestRequest request)
+        {
+            var requiredAgents = new List<string> { "persona", "guard" };
+            if (request.BranchId.HasValue && request.StartTime.HasValue && request.EndTime.HasValue) requiredAgents.Add("live");
+            if (!string.IsNullOrWhiteSpace(request.Message)) requiredAgents.Add("knowledge");
+            requiredAgents.Add("graph");
+            requiredAgents.Add("synthesizer");
+
+            return new
+            {
+                agent = "orchestrator",
+                ok = true,
+                input = request.Message,
+                decision = "Chia câu hỏi thành các bước xử lý độc lập rồi gom lại trước khi trả lời.",
+                plannedFlow = requiredAgents,
+                nextAction = "Gọi từng agent, kiểm tra guard, sau đó lưu trace."
+            };
+        }
+
+        private async Task<object> TestLiveSystemAgent(AIAgentTestRequest request)
+        {
+            if (!request.BranchId.HasValue || !request.StartTime.HasValue || !request.EndTime.HasValue)
+            {
+                var branches = await _context.Branches.Select(b => new { b.Id, b.Name, b.Address, b.Hotline }).ToListAsync();
+                return new { agent = "live", ok = false, missing = "Cần branchId, startTime, endTime để kiểm tra phòng trống.", branches };
+            }
+
+            var availableIds = await _context.Rooms
+                .Where(r => r.BranchId == request.BranchId.Value && r.Status == "Available" && r.MaxGuests >= request.GuestCount)
+                .Select(r => r.Id)
+                .ToListAsync();
+
+            var rooms = await _context.Rooms
+                .Where(r => availableIds.Contains(r.Id))
+                .Include(r => r.Branch)
+                .Select(r => new { r.Id, r.Name, r.PricePerHour, r.PricePerDay, r.Capacity, r.MaxGuests, Branch = r.Branch!.Name })
+                .ToListAsync();
+
+            return new { agent = "live", ok = true, request.BranchId, request.StartTime, request.EndTime, request.GuestCount, rooms };
+        }
+
+        private async Task<object> TestKnowledgeAgent(AIAgentTestRequest request)
+        {
+            var terms = (request.Message ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(t => t.Length >= 3).Take(8).ToList();
+            var units = await _context.AIKnowledgeUnits
+                .Where(k => k.IsActive)
+                .OrderByDescending(k => k.Priority)
+                .ThenByDescending(k => k.LastUpdated)
+                .Take(30)
+                .Select(k => new { k.Id, k.Title, k.Content, k.Tags, k.Priority })
+                .ToListAsync();
+            var matched = units.Where(k => terms.Count == 0 || terms.Any(t => k.Title.Contains(t, StringComparison.OrdinalIgnoreCase) || k.Content.Contains(t, StringComparison.OrdinalIgnoreCase) || k.Tags.Contains(t, StringComparison.OrdinalIgnoreCase))).Take(5).ToList();
+            return new { agent = "knowledge", ok = true, terms, matchedCount = matched.Count, matched };
+        }
+
+        private async Task<object> TestGraphAgent(AIAgentTestRequest request)
+        {
+            var nodes = await _context.AIGraphNodes.Where(n => n.IsActive).Select(n => new { n.Id, n.NodeType, n.Label, n.Summary }).ToListAsync();
+            var matchedNodes = nodes.Where(n => (request.Message ?? string.Empty).Contains(n.Label, StringComparison.OrdinalIgnoreCase) || n.Summary.Contains(request.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase)).Take(5).ToList();
+            var nodeIds = matchedNodes.Select(n => n.Id).ToList();
+            var edges = await _context.AIGraphEdges
+                .Where(e => nodeIds.Contains(e.FromNodeId) || nodeIds.Contains(e.ToNodeId))
+                .Include(e => e.FromNode)
+                .Include(e => e.ToNode)
+                .Select(e => new { From = e.FromNode.Label, To = e.ToNode.Label, e.RelationshipType, e.Weight, e.Evidence })
+                .Take(10)
+                .ToListAsync();
+            return new { agent = "graph", ok = true, matchedNodes, edges, hint = matchedNodes.Any() ? "Graph có dữ liệu liên quan." : "Chưa match node; cần thêm label/summary sát cách khách hỏi." };
+        }
+
+        private object TestPersonaAgent(AIAgentTestRequest request)
+        {
+            var message = request.Message?.ToLowerInvariant() ?? string.Empty;
+            var signals = new List<string>();
+            if (message.Contains("rẻ") || message.Contains("giá")) signals.Add("price-sensitive");
+            if (message.Contains("gấp") || message.Contains("hôm nay") || message.Contains("ngay")) signals.Add("urgent");
+            if (message.Contains("view") || message.Contains("đẹp") || message.Contains("chill")) signals.Add("experience-oriented");
+            if (request.GuestCount >= 3) signals.Add("group");
+            if (!signals.Any()) signals.Add("general-booking");
+            return new { agent = "persona", ok = true, signals, summary = $"Khách thuộc nhóm {string.Join(", ", signals)}; nên tư vấn ngắn, rõ lựa chọn và hỏi thêm thông tin thiếu." };
+        }
+
+        private object TestGuardAgent(AIAgentTestRequest request)
+        {
+            var warnings = new List<string>();
+            if (string.IsNullOrWhiteSpace(request.Message)) warnings.Add("Câu hỏi trống.");
+            if (request.StartTime.HasValue && request.EndTime.HasValue && request.EndTime <= request.StartTime) warnings.Add("Khoảng thời gian không hợp lệ.");
+            if (!request.BranchId.HasValue) warnings.Add("Thiếu chi nhánh, không nên khẳng định phòng trống.");
+            if (!request.StartTime.HasValue || !request.EndTime.HasValue) warnings.Add("Thiếu thời gian, không nên báo availability.");
+            return new { agent = "guard", ok = !warnings.Any(), warnings, policy = "Không xác nhận booking, không bịa giá/phòng trống, không tạo mã khóa/check-in code." };
+        }
+
+        [HttpGet("")]
+        public IActionResult Index()
+        {
+            return View();
+        }
+
+
+
+
+
+        [HttpGet("brain-knowledge")]
+        public async Task<IActionResult> GetBrainKnowledge()
+        {
+            var scopes = await _context.AIBrainScopes
+                .OrderBy(s => s.Order)
+                .Select(s => new
+                {
+                    s.Id,
+                    s.Name,
+                    s.Description,
+                    s.IsActive,
+                    s.Order,
+                    Units = s.KnowledgeUnits
+                        .OrderByDescending(k => k.Priority)
+                        .ThenByDescending(k => k.LastUpdated)
+                        .Select(k => new
+                        {
+                            k.Id,
+                            k.Title,
+                            k.Content,
+                            k.Tags,
+                            k.Priority,
+                            k.IsActive,
+                            k.LastUpdated
+                        })
+                        .ToList()
+                })
+                .ToListAsync();
+
+            return Ok(scopes);
+        }
+
+        [HttpPost("brain-scope")]
+        public async Task<IActionResult> SaveBrainScope([FromBody] AIBrainScope scope)
+        {
+            if (scope.Id == Guid.Empty) scope.Id = Guid.NewGuid();
+
+            var existing = await _context.AIBrainScopes.FindAsync(scope.Id);
+            if (existing == null)
+            {
+                _context.AIBrainScopes.Add(scope);
+            }
+            else
+            {
+                existing.Name = scope.Name;
+                existing.Description = scope.Description;
+                existing.IsActive = scope.IsActive;
+                existing.Order = scope.Order;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, id = scope.Id });
+        }
+
+        [HttpPost("brain-knowledge-unit")]
+        public async Task<IActionResult> SaveBrainKnowledgeUnit([FromBody] AIKnowledgeUnit unit)
+        {
+            if (unit.Id == Guid.Empty) unit.Id = Guid.NewGuid();
+
+            var existing = await _context.AIKnowledgeUnits.FindAsync(unit.Id);
+            if (existing == null)
+            {
+                unit.LastUpdated = DateTime.Now;
+                _context.AIKnowledgeUnits.Add(unit);
+            }
+            else
+            {
+                existing.ScopeId = unit.ScopeId;
+                existing.Title = unit.Title;
+                existing.Content = unit.Content;
+                existing.Tags = unit.Tags;
+                existing.Priority = unit.Priority;
+                existing.IsActive = unit.IsActive;
+                existing.LastUpdated = DateTime.Now;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, id = unit.Id });
+        }
+
+        [HttpDelete("brain-knowledge-unit/{id}")]
+        public async Task<IActionResult> DeleteBrainKnowledgeUnit(Guid id)
+        {
+            var unit = await _context.AIKnowledgeUnits.FindAsync(id);
+            if (unit == null) return NotFound();
+            _context.AIKnowledgeUnits.Remove(unit);
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true });
+        }
+
+        [HttpGet("brain-graph")]
+        public async Task<IActionResult> GetBrainGraph()
+        {
+            var nodes = await _context.AIGraphNodes
+                .OrderBy(n => n.NodeType)
+                .ThenBy(n => n.Label)
+                .Select(n => new { n.Id, n.NodeType, n.Label, n.Summary, n.MetadataJson, n.IsActive })
+                .ToListAsync();
+
+            var edges = await _context.AIGraphEdges
+                .Include(e => e.FromNode)
+                .Include(e => e.ToNode)
+                .OrderBy(e => e.RelationshipType)
+                .Select(e => new
+                {
+                    e.Id,
+                    e.FromNodeId,
+                    FromLabel = e.FromNode.Label,
+                    e.ToNodeId,
+                    ToLabel = e.ToNode.Label,
+                    e.RelationshipType,
+                    e.Weight,
+                    e.Evidence
+                })
+                .ToListAsync();
+
+            return Ok(new { nodes, edges });
+        }
+
+        [HttpPost("brain-graph-node")]
+        public async Task<IActionResult> SaveBrainGraphNode([FromBody] AIGraphNode node)
+        {
+            if (node.Id == Guid.Empty) node.Id = Guid.NewGuid();
+
+            var existing = await _context.AIGraphNodes.FindAsync(node.Id);
+            if (existing == null)
+            {
+                _context.AIGraphNodes.Add(node);
+            }
+            else
+            {
+                existing.NodeType = node.NodeType;
+                existing.Label = node.Label;
+                existing.Summary = node.Summary;
+                existing.MetadataJson = string.IsNullOrWhiteSpace(node.MetadataJson) ? "{}" : node.MetadataJson;
+                existing.IsActive = node.IsActive;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, id = node.Id });
+        }
+
+        [HttpDelete("brain-graph-node/{id}")]
+        public async Task<IActionResult> DeleteBrainGraphNode(Guid id)
+        {
+            var node = await _context.AIGraphNodes.FindAsync(id);
+            if (node == null) return NotFound();
+            _context.AIGraphNodes.Remove(node);
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true });
+        }
+
+        [HttpPost("brain-graph-edge")]
+        public async Task<IActionResult> SaveBrainGraphEdge([FromBody] AIGraphEdge edge)
+        {
+            if (edge.Id == Guid.Empty) edge.Id = Guid.NewGuid();
+
+            var existing = await _context.AIGraphEdges.FindAsync(edge.Id);
+            if (existing == null)
+            {
+                _context.AIGraphEdges.Add(edge);
+            }
+            else
+            {
+                existing.FromNodeId = edge.FromNodeId;
+                existing.ToNodeId = edge.ToNodeId;
+                existing.RelationshipType = edge.RelationshipType;
+                existing.Weight = edge.Weight;
+                existing.Evidence = edge.Evidence;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, id = edge.Id });
+        }
+
+        [HttpDelete("brain-graph-edge/{id}")]
+        public async Task<IActionResult> DeleteBrainGraphEdge(Guid id)
+        {
+            var edge = await _context.AIGraphEdges.FindAsync(id);
+            if (edge == null) return NotFound();
+            _context.AIGraphEdges.Remove(edge);
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true });
+        }
+
+        [HttpGet("brain-traces")]
+        public async Task<IActionResult> GetBrainTraces()
+        {
+            var traces = await _context.AIConversationTraces
+                .OrderByDescending(t => t.CreatedAt)
+                .Take(20)
+                .Select(t => new
+                {
+                    t.Id,
+                    t.CreatedAt,
+                    t.CustomerMessage,
+                    t.ModelProvider,
+                    t.GuardResult,
+                    AnswerPreview = t.FinalAnswer.Length > 120 ? t.FinalAnswer.Substring(0, 120) + "..." : t.FinalAnswer
+                })
+                .ToListAsync();
+
+            return Ok(traces);
+        }
+
+        [HttpGet("brain-trace/{id}")]
+        public async Task<IActionResult> GetBrainTrace(Guid id)
+        {
+            var trace = await _context.AIConversationTraces.FindAsync(id);
+            if (trace == null) return NotFound();
+            return Ok(trace);
+        }
+
+        [HttpPost("seed-brain-data")]
+        public async Task<IActionResult> SeedBrainData()
+        {
+            var createdScopes = 0;
+            var createdKnowledgeUnits = 0;
+            var createdNodes = 0;
+            var createdEdges = 0;
+
+            var systemScope = await _context.AIBrainScopes.FirstOrDefaultAsync(s => s.Name == "Tri thức vận hành hiện có");
+            if (systemScope == null)
+            {
+                systemScope = new AIBrainScope
+                {
+                    Name = "Tri thức vận hành hiện có",
+                    Description = "Dữ liệu được đồng bộ từ AI Knowledge Hub, chi nhánh và phòng để Brain Center tư vấn.",
+                    Order = 1
+                };
+                _context.AIBrainScopes.Add(systemScope);
+                createdScopes++;
+            }
+
+            var articles = await _context.AIKnowledgeArticles.Include(a => a.Collection).ToListAsync();
+            if (!articles.Any() && !await _context.AIKnowledgeUnits.AnyAsync(k => k.ScopeId == systemScope.Id))
+            {
+                var defaultKnowledge = new[]
+                {
+                    new AIKnowledgeUnit
+                    {
+                        ScopeId = systemScope.Id,
+                        Title = "Tư vấn phòng theo nhu cầu khách",
+                        Content = "Khi khách hỏi phòng, cần hỏi đủ chi nhánh, thời gian nhận/trả, số khách và ngân sách. Chỉ gợi ý phòng xuất hiện trong Live System Snapshot.",
+                        Tags = "sales,availability,policy",
+                        Priority = 20
+                    },
+                    new AIKnowledgeUnit
+                    {
+                        ScopeId = systemScope.Id,
+                        Title = "Quy tắc an toàn khi xác nhận đặt phòng",
+                        Content = "AI không được tự xác nhận đặt phòng, không hứa giữ phòng và không tạo mã khóa. Luôn hướng khách sang luồng đặt phòng chính thức sau khi tư vấn.",
+                        Tags = "safety,booking,policy",
+                        Priority = 30
+                    },
+                    new AIKnowledgeUnit
+                    {
+                        ScopeId = systemScope.Id,
+                        Title = "Chiến thuật upsell mềm",
+                        Content = "Nếu khách đi nhóm hoặc cần trải nghiệm đẹp, ưu tiên nêu lợi ích về sức chứa, view, tiện nghi và sự thuận tiện thay vì chỉ nói giá.",
+                        Tags = "sales,upsell,persona",
+                        Priority = 15
+                    }
+                };
+
+                _context.AIKnowledgeUnits.AddRange(defaultKnowledge);
+                createdKnowledgeUnits += defaultKnowledge.Length;
+            }
+
+            foreach (var article in articles)
+            {
+                var exists = await _context.AIKnowledgeUnits.AnyAsync(k => k.Title == article.Title && k.ScopeId == systemScope.Id);
+                if (exists) continue;
+
+                _context.AIKnowledgeUnits.Add(new AIKnowledgeUnit
+                {
+                    ScopeId = systemScope.Id,
+                    Title = article.Title,
+                    Content = article.Content,
+                    Tags = article.Collection != null ? article.Collection.Name : "Knowledge Hub",
+                    Priority = 10,
+                    LastUpdated = article.LastUpdated
+                });
+                createdKnowledgeUnits++;
+            }
+
+            var branches = await _context.Branches.Include(b => b.Rooms).ToListAsync();
+            foreach (var branch in branches)
+            {
+                var branchNode = await _context.AIGraphNodes.FirstOrDefaultAsync(n => n.NodeType == "branch" && n.Label == branch.Name);
+                if (branchNode == null)
+                {
+                    branchNode = new AIGraphNode
+                    {
+                        NodeType = "branch",
+                        Label = branch.Name,
+                        Summary = $"Chi nhánh tại {branch.Address}. Hotline: {branch.Hotline}. Lead time đặt phòng: {branch.BookingLeadTimeHours} giờ."
+                    };
+                    _context.AIGraphNodes.Add(branchNode);
+                    createdNodes++;
+                }
+
+                foreach (var room in branch.Rooms)
+                {
+                    var roomNode = await _context.AIGraphNodes.FirstOrDefaultAsync(n => n.NodeType == "room" && n.Label == room.Name);
+                    if (roomNode == null)
+                    {
+                        roomNode = new AIGraphNode
+                        {
+                            NodeType = "room",
+                            Label = room.Name,
+                            Summary = $"Phòng sức chứa {room.Capacity}, tối đa {room.MaxGuests} khách, giá giờ {room.PricePerHour:N0}, giá ngày {room.PricePerDay:N0}. Trạng thái: {room.Status}."
+                        };
+                        _context.AIGraphNodes.Add(roomNode);
+                        createdNodes++;
+                    }
+
+                    var edgeExists = await _context.AIGraphEdges.AnyAsync(e => e.FromNodeId == branchNode.Id && e.ToNodeId == roomNode.Id && e.RelationshipType == "contains_room");
+                    if (!edgeExists)
+                    {
+                        _context.AIGraphEdges.Add(new AIGraphEdge
+                        {
+                            FromNodeId = branchNode.Id,
+                            ToNodeId = roomNode.Id,
+                            RelationshipType = "contains_room",
+                            Weight = 1,
+                            Evidence = "Đồng bộ từ dữ liệu Branch.Rooms hiện có."
+                        });
+                        createdEdges++;
+                    }
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            var totalScopes = await _context.AIBrainScopes.CountAsync();
+            var totalKnowledgeUnits = await _context.AIKnowledgeUnits.CountAsync();
+            var totalNodes = await _context.AIGraphNodes.CountAsync();
+            var totalEdges = await _context.AIGraphEdges.CountAsync();
+
+            return Ok(new
+            {
+                success = true,
+                createdScopes,
+                createdKnowledgeUnits,
+                createdNodes,
+                createdEdges,
+                totalScopes,
+                totalKnowledgeUnits,
+                totalNodes,
+                totalEdges
+            });
+        }
+
+        [HttpPost("brain-chat")]
+        public async Task<IActionResult> BrainChat([FromBody] AIBrainChatRequest request, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var response = await _aiBrainOrchestrator.ChatAsync(request, cancellationToken);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    error = ex.Message,
+                    exceptionType = ex.GetType().FullName,
+                    stackTrace = ex.StackTrace,
+                    innerException = ex.InnerException?.Message,
+                    innerExceptionType = ex.InnerException?.GetType().FullName
+                });
+            }
+        }
+
+        [HttpPost("brain-preview")]
+        public async Task<IActionResult> BrainPreview([FromBody] AIModelRequest request, CancellationToken cancellationToken)
+        {
+            var response = await _aiModelClient.CompleteAsync(new AIModelRequest
+            {
+                SystemPrompt = string.IsNullOrWhiteSpace(request.SystemPrompt)
+                    ? "Bạn là Hospitality Brain đa tác nhân cho hệ thống homestay self check-in/self check-out. Tư vấn ngắn gọn, đúng chính sách và không bịa dữ liệu phòng trống."
+                    : request.SystemPrompt,
+                UserMessage = request.UserMessage,
+                Temperature = request.Temperature,
+                MaxTokens = request.MaxTokens
+            }, cancellationToken);
+
+            return Ok(response);
         }
 
         [HttpGet("collections")]

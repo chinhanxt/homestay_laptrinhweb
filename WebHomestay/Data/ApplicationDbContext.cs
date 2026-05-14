@@ -25,6 +25,12 @@ namespace WebHomestay.Data
         public DbSet<Holiday> Holidays { get; set; }
         public DbSet<AIKnowledgeCollection> AIKnowledgeCollections { get; set; }
         public DbSet<AIKnowledgeArticle> AIKnowledgeArticles { get; set; }
+        public DbSet<AIBrainScope> AIBrainScopes { get; set; }
+        public DbSet<AIKnowledgeUnit> AIKnowledgeUnits { get; set; }
+        public DbSet<AIGraphNode> AIGraphNodes { get; set; }
+        public DbSet<AIGraphEdge> AIGraphEdges { get; set; }
+        public DbSet<AIAgentDefinition> AIAgentDefinitions { get; set; }
+        public DbSet<AIConversationTrace> AIConversationTraces { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -46,6 +52,12 @@ namespace WebHomestay.Data
             modelBuilder.Entity<Holiday>().ToTable("holidays");
             modelBuilder.Entity<AIKnowledgeCollection>().ToTable("ai_knowledge_collections");
             modelBuilder.Entity<AIKnowledgeArticle>().ToTable("ai_knowledge_articles");
+            modelBuilder.Entity<AIBrainScope>().ToTable("ai_brain_scopes");
+            modelBuilder.Entity<AIKnowledgeUnit>().ToTable("ai_knowledge_units");
+            modelBuilder.Entity<AIGraphNode>().ToTable("ai_graph_nodes");
+            modelBuilder.Entity<AIGraphEdge>().ToTable("ai_graph_edges");
+            modelBuilder.Entity<AIAgentDefinition>().ToTable("ai_agent_definitions");
+            modelBuilder.Entity<AIConversationTrace>().ToTable("ai_conversation_traces");
 
             // AdminUser - Branch relationship
             modelBuilder.Entity<AdminUser>()
@@ -213,6 +225,78 @@ namespace WebHomestay.Data
                 entity.Property(e => e.Description).HasColumnName("description");
                 entity.Property(e => e.GroupName).HasColumnName("group_name");
                 entity.Property(e => e.LastUpdated).HasColumnName("last_updated");
+            });
+
+
+            modelBuilder.Entity<AIBrainScope>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.Name).HasColumnName("name");
+                entity.Property(e => e.Description).HasColumnName("description");
+                entity.Property(e => e.IsActive).HasColumnName("is_active");
+                entity.Property(e => e.Order).HasColumnName("order");
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            });
+
+            modelBuilder.Entity<AIKnowledgeUnit>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.ScopeId).HasColumnName("scope_id");
+                entity.Property(e => e.Title).HasColumnName("title");
+                entity.Property(e => e.Content).HasColumnName("content");
+                entity.Property(e => e.Tags).HasColumnName("tags");
+                entity.Property(e => e.Priority).HasColumnName("priority");
+                entity.Property(e => e.IsActive).HasColumnName("is_active");
+                entity.Property(e => e.LastUpdated).HasColumnName("last_updated");
+                entity.HasOne(e => e.Scope).WithMany(e => e.KnowledgeUnits).HasForeignKey(e => e.ScopeId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<AIGraphNode>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.NodeType).HasColumnName("node_type");
+                entity.Property(e => e.Label).HasColumnName("label");
+                entity.Property(e => e.Summary).HasColumnName("summary");
+                entity.Property(e => e.MetadataJson).HasColumnName("metadata_json");
+                entity.Property(e => e.IsActive).HasColumnName("is_active");
+            });
+
+            modelBuilder.Entity<AIGraphEdge>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.FromNodeId).HasColumnName("from_node_id");
+                entity.Property(e => e.ToNodeId).HasColumnName("to_node_id");
+                entity.Property(e => e.RelationshipType).HasColumnName("relationship_type");
+                entity.Property(e => e.Weight).HasColumnName("weight");
+                entity.Property(e => e.Evidence).HasColumnName("evidence");
+                entity.HasOne(e => e.FromNode).WithMany(e => e.OutgoingEdges).HasForeignKey(e => e.FromNodeId).OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.ToNode).WithMany(e => e.IncomingEdges).HasForeignKey(e => e.ToNodeId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<AIAgentDefinition>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.Name).HasColumnName("name");
+                entity.Property(e => e.Role).HasColumnName("role");
+                entity.Property(e => e.SystemPrompt).HasColumnName("system_prompt");
+                entity.Property(e => e.Order).HasColumnName("order");
+                entity.Property(e => e.IsActive).HasColumnName("is_active");
+                entity.Property(e => e.LastUpdated).HasColumnName("last_updated");
+            });
+
+            modelBuilder.Entity<AIConversationTrace>(entity =>
+            {
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.SessionId).HasColumnName("session_id");
+                entity.Property(e => e.CustomerMessage).HasColumnName("customer_message");
+                entity.Property(e => e.PersonaSummary).HasColumnName("persona_summary");
+                entity.Property(e => e.LiveSystemSnapshot).HasColumnName("live_system_snapshot");
+                entity.Property(e => e.RetrievedKnowledgeJson).HasColumnName("retrieved_knowledge_json");
+                entity.Property(e => e.GraphReasoningJson).HasColumnName("graph_reasoning_json");
+                entity.Property(e => e.GuardResult).HasColumnName("guard_result");
+                entity.Property(e => e.FinalAnswer).HasColumnName("final_answer");
+                entity.Property(e => e.ModelProvider).HasColumnName("model_provider");
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
             });
 
             modelBuilder.Entity<Holiday>(entity =>
