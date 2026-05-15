@@ -7,10 +7,13 @@
       "Bash(dotnet ef *)",
       "Bash(cat)",
       "Bash(dotnet run *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(node --check \"WebHomestay/wwwroot/js/admin-ai-brain-center.js\")"
     ],
     "additionalDirectories": [
-      "c:\\Users\\admin\\.claude\\projects\\c--Users-admin-Documents-VS-T-m-web-homestay-web-homestay\\memory"
+      "c:\\Users\\admin\\.claude\\projects\\c--Users-admin-Documents-VS-T-m-web-homestay-web-homestay\\memory",
+      "C:\\Users\\admin\\Documents\\VS Tím\\web_homestay\\web_homestay\\.claude\\tmp-build-check",
+      "C:\\Users\\admin\\.claude\\plans"
     ]
   }
 }

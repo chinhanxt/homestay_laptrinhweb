@@ -523,6 +523,9 @@ function shortGraphLabel(label) {
 }
 
 let finalFormFields = [];
+let editingFinalFormFieldId = null;
+let finalIntentOptions = [];
+let finalMissingDataOptions = [];
 const finalFieldLabels = {
     branch: 'Chi nhánh mong muốn',
     datetime: 'Ngày giờ nhận/trả phòng',
@@ -530,6 +533,23 @@ const finalFieldLabels = {
     budget: 'Ngân sách dự kiến',
     note: 'Ghi chú thêm'
 };
+const defaultFinalIntentOptions = [
+    { value: 'always', label: 'Luôn hiện', keywords: '', promptRule: 'Luôn hiển thị field này khi form được dùng.', locked: true },
+    { value: 'booking_ready', label: 'Muốn đặt/chốt phòng', keywords: 'đặt,chốt,book,giữ phòng,lấy phòng,đặt phòng', promptRule: 'Dùng khi khách thể hiện ý định muốn giữ phòng hoặc đặt phòng.', locked: true },
+    { value: 'pricing', label: 'Hỏi giá/ngân sách', keywords: 'giá,rẻ,budget,ngân sách,bao nhiêu,tầm tiền', promptRule: 'Dùng khi khách hỏi về giá hoặc ngân sách.', locked: true },
+    { value: 'availability', label: 'Hỏi phòng trống', keywords: 'còn phòng,trống,available,phòng nào,có phòng', promptRule: 'Dùng khi khách hỏi còn phòng hay không.', locked: true },
+    { value: 'consulting', label: 'Cần tư vấn', keywords: 'tư vấn,gợi ý,phù hợp,nên chọn,recommend', promptRule: 'Dùng khi khách cần gợi ý phòng phù hợp.', locked: true },
+    { value: 'payment_ready', label: 'Sẵn sàng thanh toán/chuyển khoản', keywords: 'thanh toán,chuyển khoản,ck,cọc,đặt cọc,chốt,giữ phòng', promptRule: 'Dùng khi khách đã muốn thanh toán, đặt cọc hoặc giữ phòng.', locked: true }
+];
+const defaultFinalMissingDataOptions = [
+    { value: '', label: 'Không xét', keywords: '', promptRule: 'Không xét dữ liệu thiếu.', locked: true },
+    { value: 'branch', label: 'Chi nhánh', keywords: 'chi nhánh,khu vực,quận,địa chỉ', promptRule: 'Thiếu khi chưa biết khách muốn ở chi nhánh/khu vực nào.', locked: true },
+    { value: 'datetime', label: 'Ngày giờ', keywords: 'ngày,giờ,khi nào,hôm nay,tối nay,checkin,checkout', promptRule: 'Thiếu khi chưa biết thời gian nhận/trả phòng.', locked: true },
+    { value: 'guestCount', label: 'Số khách', keywords: 'người,khách,số lượng,đi mấy người', promptRule: 'Thiếu khi chưa biết số khách.', locked: true },
+    { value: 'budget', label: 'Ngân sách', keywords: 'giá,rẻ,budget,ngân sách,k,triệu', promptRule: 'Thiếu khi khách cần tư vấn theo giá nhưng chưa nói ngân sách.', locked: true },
+    { value: 'phone', label: 'Số điện thoại', keywords: 'số điện thoại,sđt,phone,zalo,liên hệ', promptRule: 'Thiếu khi khách chưa cung cấp số điện thoại liên hệ.', locked: true },
+    { value: 'note', label: 'Ghi chú', keywords: 'ghi chú,yêu cầu,lưu ý,đặc biệt', promptRule: 'Thiếu khi cần khách nói yêu cầu đặc biệt.', locked: true }
+];
 
 async function loadFinalSynthesizerConfig() {
     try {
@@ -538,6 +558,8 @@ async function loadFinalSynthesizerConfig() {
         const config = await response.json();
         $('#final-style-config').val(config.style || '');
         try { finalFormFields = JSON.parse(config.formSchema || '[]'); } catch { finalFormFields = []; }
+        loadFinalConditionOptions(config.conditionOptions);
+        renderFinalConditionSelects();
         renderFinalFormDesigner();
     } catch (err) {
         alert(`Không tải được Final Synthesizer config: ${err.message}`);
@@ -547,7 +569,8 @@ async function loadFinalSynthesizerConfig() {
 async function saveFinalSynthesizerConfig() {
     const payload = {
         style: $('#final-style-config').val(),
-        formSchema: JSON.stringify(finalFormFields)
+        formSchema: JSON.stringify(finalFormFields),
+        conditionOptions: JSON.stringify(getFinalConditionOptionsPayload())
     };
     const response = await fetch('/admin/ai/final-synthesizer-config', {
         method: 'POST',
@@ -580,6 +603,161 @@ $(document).on('drop', '#final-form-dropzone', function (event) {
     renderFinalFormDesigner();
 });
 
+function loadFinalConditionOptions(rawOptions) {
+    let parsed = {};
+    try { parsed = rawOptions ? JSON.parse(rawOptions) : {}; } catch { parsed = {}; }
+    finalIntentOptions = mergeFinalConditionOptions(defaultFinalIntentOptions, parsed.intents || []);
+    finalMissingDataOptions = mergeFinalConditionOptions(defaultFinalMissingDataOptions, parsed.missingData || []);
+}
+
+function mergeFinalConditionOptions(defaultOptions, savedOptions) {
+    const map = new Map();
+    defaultOptions.forEach(option => map.set(option.value, { ...option }));
+    savedOptions.forEach(option => {
+        if (!option || option.value === undefined || option.value === null) return;
+        const value = String(option.value).trim();
+        if (!value && !defaultOptions.some(defaultOption => defaultOption.value === '')) return;
+        map.set(value, { ...map.get(value), ...option, value, locked: map.get(value)?.locked || false });
+    });
+    return Array.from(map.values());
+}
+
+function getFinalConditionOptionsPayload() {
+    return {
+        intents: finalIntentOptions,
+        missingData: finalMissingDataOptions
+    };
+}
+
+function renderFinalConditionSelects() {
+    renderFinalConditionSelect('#final-form-field-intent', finalIntentOptions);
+    renderFinalConditionSelect('#final-form-field-missing', finalMissingDataOptions);
+}
+
+function renderFinalConditionSelect(selector, options) {
+    const select = $(selector);
+    const currentValue = select.val();
+    select.html(options.map(option => `<option value="${escapeBrainHtml(option.value)}">${escapeBrainHtml(option.label)}</option>`).join(''));
+    if (options.some(option => option.value === currentValue)) select.val(currentValue);
+}
+
+function normalizeFinalFormField(field) {
+    if (typeof field === 'string') {
+        return { id: `${field}-${Date.now()}`, type: field, label: finalFieldLabels[field] || field, required: true };
+    }
+    if (!field) {
+        return { id: `custom-${Date.now()}`, type: 'text', label: 'Trường mới', required: true };
+    }
+
+    return {
+        id: field.id || `${field.type || 'text'}-${Date.now()}`,
+        type: field.type || 'text',
+        label: field.label || finalFieldLabels[field.type] || 'Trường mới',
+        required: field.required !== false,
+        qrImageUrl: field.qrImageUrl || '',
+        messageTemplate: field.messageTemplate || '',
+        condition: normalizeFinalFormFieldCondition(field.condition)
+    };
+}
+
+function normalizeFinalFormFieldCondition(condition) {
+    return {
+        intent: condition?.intent || 'always',
+        missingData: condition?.missingData || '',
+        keywords: condition?.keywords || '',
+        advancedPrompt: condition?.advancedPrompt || ''
+    };
+}
+
+function openAddFinalFormFieldModal() {
+    editingFinalFormFieldId = null;
+    $('#final-form-field-modal-title').text('Thêm trường form');
+    $('#final-form-field-label').val('');
+    $('#final-form-field-type').val('text');
+    $('#final-form-field-qr-url').val('');
+    $('#final-form-field-payment-message').val('');
+    $('#final-form-field-qr-file').val('');
+    toggleFinalPaymentQrSettings();
+    $('#final-form-field-required').prop('checked', true);
+    $('#final-form-field-intent').val('always');
+    $('#final-form-field-missing').val('');
+    $('#final-form-field-keywords').val('');
+    $('#final-form-field-advanced').val('');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('finalFormFieldModal')).show();
+}
+
+function openEditFinalFormFieldModal(id) {
+    const field = normalizeFinalFormField(finalFormFields.find(item => item.id === id));
+    editingFinalFormFieldId = id;
+    $('#final-form-field-modal-title').text('Sửa trường form');
+    $('#final-form-field-label').val(field.label);
+    $('#final-form-field-type').val(resolveEditableFieldType(field.type));
+    $('#final-form-field-qr-url').val(field.qrImageUrl || '');
+    $('#final-form-field-payment-message').val(field.messageTemplate || '');
+    $('#final-form-field-qr-file').val('');
+    toggleFinalPaymentQrSettings();
+    $('#final-form-field-required').prop('checked', field.required);
+    $('#final-form-field-intent').val(field.condition.intent);
+    $('#final-form-field-missing').val(field.condition.missingData);
+    $('#final-form-field-keywords').val(field.condition.keywords);
+    $('#final-form-field-advanced').val(field.condition.advancedPrompt);
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('finalFormFieldModal')).show();
+}
+
+function saveFinalFormFieldFromModal() {
+    const label = $('#final-form-field-label').val().trim();
+    if (!label) return alert('Vui lòng nhập tên hiển thị cho trường.');
+
+    const field = {
+        id: editingFinalFormFieldId || `custom-${Date.now()}`,
+        type: $('#final-form-field-type').val(),
+        label,
+        required: $('#final-form-field-required').is(':checked'),
+        qrImageUrl: $('#final-form-field-qr-url').val().trim(),
+        messageTemplate: $('#final-form-field-payment-message').val().trim(),
+        condition: normalizeFinalFormFieldCondition({
+            intent: $('#final-form-field-intent').val(),
+            missingData: $('#final-form-field-missing').val(),
+            keywords: $('#final-form-field-keywords').val().trim(),
+            advancedPrompt: $('#final-form-field-advanced').val().trim()
+        })
+    };
+
+    if (editingFinalFormFieldId) {
+        finalFormFields = finalFormFields.map(item => item.id === editingFinalFormFieldId ? field : normalizeFinalFormField(item));
+    } else {
+        finalFormFields.push(field);
+    }
+
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('finalFormFieldModal')).hide();
+    renderFinalFormDesigner();
+}
+
+$(document).on('change', '#final-form-field-type', toggleFinalPaymentQrSettings);
+
+function toggleFinalPaymentQrSettings() {
+    $('#final-payment-qr-settings').toggle($('#final-form-field-type').val() === 'paymentQr');
+}
+
+async function uploadFinalPaymentQrImage() {
+    const file = document.getElementById('final-form-field-qr-file')?.files?.[0];
+    if (!file) return alert('Vui lòng chọn ảnh QR trước.');
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch('/admin/ai/upload-payment-qr', { method: 'POST', body: formData });
+    if (!response.ok) return alert(`Không upload được ảnh QR: ${await response.text()}`);
+    const result = await response.json();
+    $('#final-form-field-qr-url').val(result.url || '');
+    alert('Đã upload ảnh QR.');
+}
+
+function resolveEditableFieldType(type) {
+    if (type === 'note') return 'textarea';
+    if (type === 'datetime') return 'datetime-local';
+    if (type === 'guestCount') return 'number';
+    return ['text', 'number', 'datetime-local', 'textarea', 'image', 'paymentQr'].includes(type) ? type : 'text';
+}
+
 function removeFinalFormField(id) {
     finalFormFields = finalFormFields.filter(field => field.id !== id);
     renderFinalFormDesigner();
@@ -593,6 +771,7 @@ function clearFinalFormDesigner() {
 function renderFinalFormDesigner() {
     const dropzone = $('#final-form-dropzone');
     const preview = $('#final-chat-form-preview');
+    finalFormFields = finalFormFields.map(normalizeFinalFormField);
     if (!finalFormFields.length) {
         dropzone.html('<div class="empty-state">Kéo trường vào đây để tạo form preview.</div>');
         preview.html('');
@@ -601,8 +780,14 @@ function renderFinalFormDesigner() {
 
     dropzone.html(finalFormFields.map(field => `
         <div class="designer-field">
-            <span>${escapeBrainHtml(field.label)}</span>
-            <button onclick="removeFinalFormField('${field.id}')"><i class="fas fa-times"></i></button>
+            <span>
+                ${escapeBrainHtml(field.label)}${field.required ? ' <strong class="text-danger">*</strong>' : ''}
+                <small class="designer-field-condition">${escapeBrainHtml(describeFinalFormFieldCondition(field.condition))}</small>
+            </span>
+            <div class="d-flex gap-1">
+                <button class="designer-field-edit" onclick="openEditFinalFormFieldModal('${field.id}')" title="Sửa trường"><i class="fas fa-pen"></i></button>
+                <button class="designer-field-remove" onclick="removeFinalFormField('${field.id}')" title="Xóa trường"><i class="fas fa-times"></i></button>
+            </div>
         </div>
     `).join(''));
 
@@ -614,10 +799,144 @@ function renderFinalFormDesigner() {
     `);
 }
 
+function openFinalConditionOptionManager(kind) {
+    $('#final-condition-option-kind').val(kind);
+    $('#final-condition-option-title').text(kind === 'intent' ? 'Quản lý Intent khách' : 'Quản lý Dữ liệu đang thiếu');
+    resetFinalConditionOptionForm();
+    renderFinalConditionOptionList();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('finalConditionOptionModal')).show();
+}
+
+function resetFinalConditionOptionForm() {
+    $('#final-condition-option-editing').val('');
+    $('#final-condition-option-label').val('');
+    $('#final-condition-option-value').val('');
+    $('#final-condition-option-value').prop('disabled', false);
+    $('#final-condition-option-keywords').val('');
+    $('#final-condition-option-rule').val('');
+}
+
+function saveFinalConditionOption() {
+    const kind = $('#final-condition-option-kind').val();
+    const options = getFinalConditionOptionsByKind(kind);
+    const label = $('#final-condition-option-label').val().trim();
+    const editingValue = $('#final-condition-option-editing').val();
+    const value = ($('#final-condition-option-value').val().trim() || slugifyFinalConditionValue(label));
+    if (!label || (!value && kind === 'intent')) return alert('Vui lòng nhập tên hiển thị và mã value.');
+
+    const option = {
+        value,
+        label,
+        keywords: $('#final-condition-option-keywords').val().trim(),
+        promptRule: $('#final-condition-option-rule').val().trim(),
+        locked: options.find(item => item.value === editingValue)?.locked || false
+    };
+
+    const nextOptions = options.filter(item => item.value !== (editingValue || value));
+    nextOptions.push(option);
+    setFinalConditionOptionsByKind(kind, nextOptions);
+    renderFinalConditionSelects();
+    renderFinalConditionOptionList();
+    renderFinalFormDesigner();
+    resetFinalConditionOptionForm();
+}
+
+function editFinalConditionOption(value) {
+    const kind = $('#final-condition-option-kind').val();
+    const option = getFinalConditionOptionsByKind(kind).find(item => item.value === value);
+    if (!option) return;
+    $('#final-condition-option-editing').val(option.value);
+    $('#final-condition-option-label').val(option.label);
+    $('#final-condition-option-value').val(option.value);
+    $('#final-condition-option-value').prop('disabled', option.locked);
+    $('#final-condition-option-keywords').val(option.keywords || '');
+    $('#final-condition-option-rule').val(option.promptRule || '');
+}
+
+function deleteFinalConditionOption(value) {
+    const kind = $('#final-condition-option-kind').val();
+    const options = getFinalConditionOptionsByKind(kind);
+    const option = options.find(item => item.value === value);
+    if (!option || option.locked) return alert('Option mặc định không nên xóa. Bạn có thể sửa nhãn/từ khóa nếu cần.');
+    const isUsed = finalFormFields.some(field => {
+        const condition = normalizeFinalFormFieldCondition(field.condition);
+        return kind === 'intent' ? condition.intent === value : condition.missingData === value;
+    });
+    if (isUsed && !confirm('Option này đang được field sử dụng. Xóa sẽ đưa field về mặc định. Tiếp tục?')) return;
+    setFinalConditionOptionsByKind(kind, options.filter(item => item.value !== value));
+    finalFormFields = finalFormFields.map(field => {
+        field = normalizeFinalFormField(field);
+        if (kind === 'intent' && field.condition.intent === value) field.condition.intent = 'always';
+        if (kind === 'missingData' && field.condition.missingData === value) field.condition.missingData = '';
+        return field;
+    });
+    renderFinalConditionSelects();
+    renderFinalConditionOptionList();
+    renderFinalFormDesigner();
+}
+
+function renderFinalConditionOptionList() {
+    const kind = $('#final-condition-option-kind').val();
+    const options = getFinalConditionOptionsByKind(kind);
+    $('#final-condition-option-list').html(options.map(option => `
+        <div class="list-group-item d-flex justify-content-between align-items-start gap-3">
+            <div>
+                <div class="fw-bold">${escapeBrainHtml(option.label)} <code>${escapeBrainHtml(option.value || '(empty)')}</code></div>
+                <div class="small text-muted">${escapeBrainHtml(option.keywords || 'Chưa có từ khóa')}</div>
+                ${option.promptRule ? `<div class="small text-primary mt-1">${escapeBrainHtml(option.promptRule)}</div>` : ''}
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" onclick="editFinalConditionOption('${escapeBrainHtml(option.value)}')">Sửa</button>
+                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill" onclick="deleteFinalConditionOption('${escapeBrainHtml(option.value)}')">Xóa</button>
+            </div>
+        </div>
+    `).join(''));
+}
+
+function getFinalConditionOptionsByKind(kind) {
+    return kind === 'intent' ? finalIntentOptions : finalMissingDataOptions;
+}
+
+function setFinalConditionOptionsByKind(kind, options) {
+    if (kind === 'intent') finalIntentOptions = options;
+    else finalMissingDataOptions = options;
+}
+
+function slugifyFinalConditionValue(label) {
+    return label.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+}
+
+function describeFinalFormFieldCondition(condition) {
+    condition = normalizeFinalFormFieldCondition(condition);
+    const parts = [];
+    const intentOption = finalIntentOptions.find(option => option.value === condition.intent);
+    const missingOption = finalMissingDataOptions.find(option => option.value === condition.missingData);
+    parts.push(intentOption?.label || 'điều kiện tùy chỉnh');
+    if (condition.missingData) parts.push(`thiếu ${missingOption?.label || condition.missingData}`);
+    if (condition.keywords) parts.push(`từ khóa: ${condition.keywords}`);
+    if (condition.advancedPrompt) parts.push('có rule nâng cao');
+    return parts.join(' • ');
+}
+
 function renderPreviewField(field) {
+    field = normalizeFinalFormField(field);
     const label = escapeBrainHtml(field.label);
-    if (field.type === 'note') return `<label>${label}<textarea placeholder="Nhập ghi chú..." rows="2"></textarea></label>`;
-    if (field.type === 'guestCount') return `<label>${label}<input type="number" min="1" placeholder="2" /></label>`;
-    if (field.type === 'datetime') return `<label>${label}<input type="datetime-local" /></label>`;
-    return `<label>${label}<input type="text" placeholder="Nhập ${label.toLowerCase()}" /></label>`;
+    const required = field.required ? ' required' : '';
+    const requiredMark = field.required ? ' <span class="text-danger">*</span>' : '';
+    if (field.type === 'textarea' || field.type === 'note') return `<label>${label}${requiredMark}<textarea placeholder="Nhập ${label.toLowerCase()}..." rows="2"${required}></textarea></label>`;
+    if (field.type === 'number' || field.type === 'guestCount') return `<label>${label}${requiredMark}<input type="number" min="1" placeholder="2"${required} /></label>`;
+    if (field.type === 'datetime-local' || field.type === 'datetime') return `<label>${label}${requiredMark}<input type="datetime-local"${required} /></label>`;
+    if (field.type === 'image') return `<label>${label}${requiredMark}<input type="file" accept="image/*"${required} /></label>`;
+    if (field.type === 'paymentQr') return renderPaymentQrPreviewField(field, label, requiredMark);
+    return `<label>${label}${requiredMark}<input type="text" placeholder="Nhập ${label.toLowerCase()}"${required} /></label>`;
+}
+
+function renderPaymentQrPreviewField(field, label, requiredMark) {
+    const message = escapeBrainHtml(field.messageTemplate || 'Bạn vui lòng chuyển khoản theo mã QR bên dưới.');
+    const image = field.qrImageUrl ? `<img src="${escapeBrainHtml(field.qrImageUrl)}" alt="${label}" class="payment-qr-preview-image" />` : '<div class="payment-qr-placeholder">Chưa cấu hình ảnh QR</div>';
+    return `<div class="payment-qr-preview"><strong>${label}${requiredMark}</strong><p>${message}</p>${image}</div>`;
 }

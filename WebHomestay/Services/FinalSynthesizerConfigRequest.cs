@@ -4,5 +4,6 @@ namespace WebHomestay.Services
     {
         public string? Style { get; set; }
         public string? FormSchema { get; set; }
+        public string? ConditionOptions { get; set; }
     }
 }

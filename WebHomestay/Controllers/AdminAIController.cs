@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.RegularExpressions;
 using WebHomestay.Data;
 using WebHomestay.Models;
 using WebHomestay.Services;
@@ -28,11 +29,13 @@ namespace WebHomestay.Controllers
         {
             var style = await _context.SystemSettings.FirstOrDefaultAsync(s => s.SettingKey == "AIFinalSynthesizerStyle");
             var form = await _context.SystemSettings.FirstOrDefaultAsync(s => s.SettingKey == "AIFinalSynthesizerFormSchema");
+            var conditionOptions = await _context.SystemSettings.FirstOrDefaultAsync(s => s.SettingKey == "AIFinalConditionOptions");
 
             return Ok(new
             {
                 style = style?.SettingValue ?? "Giọng thân thiện, rõ ràng, tư vấn như lễ tân chuyên nghiệp. Trả lời ngắn gọn nhưng đủ ý. Nếu thiếu thông tin thì hỏi lại bằng các câu hỏi cụ thể.",
-                formSchema = form?.SettingValue ?? "[]"
+                formSchema = form?.SettingValue ?? "[]",
+                conditionOptions = conditionOptions?.SettingValue ?? string.Empty
             });
         }
 
@@ -41,6 +44,7 @@ namespace WebHomestay.Controllers
         {
             await UpsertAISetting("AIFinalSynthesizerStyle", request.Style ?? string.Empty, "Phong cách trả lời của Final Response Synthesizer");
             await UpsertAISetting("AIFinalSynthesizerFormSchema", request.FormSchema ?? "[]", "Schema form gợi ý cho chatbot preview/user input");
+            await UpsertAISetting("AIFinalConditionOptions", request.ConditionOptions ?? string.Empty, "Option điều kiện hiển thị field của Final Response Synthesizer");
             await _context.SaveChangesAsync();
             return Ok(new { success = true });
         }
@@ -65,6 +69,27 @@ namespace WebHomestay.Controllers
             setting.Description = description;
             setting.GroupName = "AI";
             setting.LastUpdated = DateTime.Now;
+        }
+
+        [HttpPost("upload-payment-qr")]
+        public async Task<IActionResult> UploadPaymentQr(IFormFile file)
+        {
+            if (file == null || file.Length == 0) return BadRequest("Chưa chọn ảnh QR.");
+            if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return BadRequest("File phải là ảnh.");
+
+            var uploadFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "ai-payment");
+            Directory.CreateDirectory(uploadFolder);
+
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(extension) || extension.Length > 10) extension = ".png";
+            extension = Regex.Replace(extension, "[^a-z0-9.]", string.Empty);
+            var fileName = $"qr-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}{extension}";
+            var path = Path.Combine(uploadFolder, fileName);
+
+            await using var stream = System.IO.File.Create(path);
+            await file.CopyToAsync(stream);
+
+            return Ok(new { url = $"/uploads/ai-payment/{fileName}" });
         }
 
         [HttpPost("test-agent")]

@@ -1975,11 +1975,30 @@
 
 .designer-field button {
     border: 0;
-    background: #fee2e2;
-    color: #dc2626;
     border-radius: 999px;
     width: 28px;
     height: 28px;
+}
+
+.designer-field span {
+    display: grid;
+    gap: .25rem;
+}
+
+.designer-field-condition {
+    color: #64748b;
+    font-weight: 600;
+    font-size: .75rem;
+}
+
+.designer-field-edit {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.designer-field-remove {
+    background: #fee2e2;
+    color: #dc2626;
 }
 
 .chatbot-preview-window {
@@ -2016,6 +2035,39 @@
     color: #334155;
     font-weight: 800;
     font-size: .85rem;
+}
+
+.payment-qr-preview {
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 1rem;
+    background: #f8fafc;
+    display: grid;
+    gap: .75rem;
+}
+
+.payment-qr-preview p {
+    margin: 0;
+    color: #475569;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.payment-qr-preview-image {
+    width: min(220px, 100%);
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    padding: .5rem;
+}
+
+.payment-qr-placeholder {
+    border: 1px dashed #cbd5e1;
+    border-radius: 16px;
+    padding: 1.5rem;
+    color: #64748b;
+    text-align: center;
+    background: white;
 }
 
 .chat-form-card input,

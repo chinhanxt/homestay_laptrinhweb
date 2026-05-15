@@ -492,11 +492,21 @@ function renderChatbotConfiguredForm(formSchema) {
     `;
 }
 
+function renderRuntimePaymentQrField(field, label, requiredMark) {
+    const message = escapeHtml(field.messageTemplate || 'Bạn vui lòng chuyển khoản theo mã QR bên dưới.');
+    const image = field.qrImageUrl ? `<img src="${escapeHtml(field.qrImageUrl)}" alt="${label}" class="payment-qr-preview-image" />` : '<div class="payment-qr-placeholder">Chưa cấu hình ảnh QR</div>';
+    return `<div class="payment-qr-preview"><strong>${label}${requiredMark}</strong><p>${message}</p>${image}</div>`;
+}
+
 function renderRuntimeFormField(field) {
     const label = escapeHtml(field.label || field.type || 'Thông tin');
-    if (field.type === 'note') return `<label>${label}<textarea rows="2" placeholder="Nhập ghi chú..."></textarea></label>`;
-    if (field.type === 'guestCount') return `<label>${label}<input type="number" min="1" placeholder="2" /></label>`;
-    if (field.type === 'datetime') return `<label>${label}<input type="datetime-local" /></label>`;
-    if (field.type === 'budget') return `<label>${label}<input type="text" placeholder="VD: 800.000đ - 1.200.000đ" /></label>`;
-    return `<label>${label}<input type="text" placeholder="Nhập ${label.toLowerCase()}" /></label>`;
+    const required = field.required === false ? '' : ' required';
+    const requiredMark = field.required === false ? '' : ' <span class="text-danger">*</span>';
+    if (field.type === 'note' || field.type === 'textarea') return `<label>${label}${requiredMark}<textarea rows="2" placeholder="Nhập ghi chú..."${required}></textarea></label>`;
+    if (field.type === 'guestCount' || field.type === 'number') return `<label>${label}${requiredMark}<input type="number" min="1" placeholder="2"${required} /></label>`;
+    if (field.type === 'datetime' || field.type === 'datetime-local') return `<label>${label}${requiredMark}<input type="datetime-local"${required} /></label>`;
+    if (field.type === 'image') return `<label>${label}${requiredMark}<input type="file" accept="image/*"${required} /></label>`;
+    if (field.type === 'paymentQr') return renderRuntimePaymentQrField(field, label, requiredMark);
+    if (field.type === 'budget') return `<label>${label}${requiredMark}<input type="text" placeholder="VD: 800.000đ - 1.200.000đ"${required} /></label>`;
+    return `<label>${label}${requiredMark}<input type="text" placeholder="Nhập ${label.toLowerCase()}"${required} /></label>`;
 }
