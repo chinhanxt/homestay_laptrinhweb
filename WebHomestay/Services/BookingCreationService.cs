@@ -19,6 +19,11 @@ public class BookingCreationService : IBookingCreationService
         _pricingService = pricingService;
     }
 
+    public BookingCreationService(ApplicationDbContext context, IAvailabilityService availabilityService)
+        : this(context, availabilityService, new PricingService(context))
+    {
+    }
+
     public async Task<Booking> CreateHourlyBookingAsync(CreateBookingRequest request)
     {
         var inventory = await _context.RoomSlotInventories

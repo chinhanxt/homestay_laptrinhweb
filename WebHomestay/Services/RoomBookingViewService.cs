@@ -21,6 +21,11 @@ public class RoomBookingViewService : IRoomBookingViewService
         _pricingService = pricingService;
     }
 
+    public RoomBookingViewService(ApplicationDbContext context, IAvailabilityService availabilityService)
+        : this(context, availabilityService, new SettingService(context, new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions())), new PricingService(context))
+    {
+    }
+
     public async Task<RoomDetailsViewModel> BuildAsync(Room room, DateOnly selectedHourlyDate)
     {
         var allSlots = await _context.RoomSlotInventories
@@ -98,6 +103,11 @@ public class RoomBookingViewService : IRoomBookingViewService
             HourlyGroups = BuildHourlyGroupsSync(hourlySlots),
             DailyCalendar = calendar
         };
+    }
+
+    public List<HourlySlotGroupViewModel> BuildHourlyGroups(IEnumerable<RoomSlotInventory> slots)
+    {
+        return BuildHourlyGroupsSync(slots);
     }
 
     private List<HourlySlotGroupViewModel> BuildHourlyGroupsSync(IEnumerable<RoomSlotInventory> slots)

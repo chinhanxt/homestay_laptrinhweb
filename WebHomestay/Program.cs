@@ -40,6 +40,7 @@ builder.Services.AddScoped<WebHomestay.Services.IStatisticsService, WebHomestay.
 builder.Services.AddScoped<WebHomestay.Services.IImageMaskingService, WebHomestay.Services.ImageMaskingService>();
 builder.Services.AddHttpClient<WebHomestay.Services.IAIModelClient, WebHomestay.Services.AIModelClient>();
 builder.Services.AddScoped<WebHomestay.Services.IAIBrainOrchestrator, WebHomestay.Services.AIBrainOrchestrator>();
+builder.Services.AddScoped<WebHomestay.Services.IAIBookingFlowOrchestrator, WebHomestay.Services.AIBookingFlowOrchestrator>();
 builder.Services.AddScoped<WebHomestay.Services.PricingService>();
 builder.Services.AddHostedService<WebHomestay.Services.BookingCleanupService>();
 
