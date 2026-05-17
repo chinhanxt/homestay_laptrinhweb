@@ -30,6 +30,9 @@ public class BookingCreationService : IBookingCreationService
             .Include(i => i.Room)
             .SingleAsync(i => i.Id == request.SlotInventoryId);
             
+        if (inventory.Status != "Available")
+            throw new InvalidOperationException("Khung giờ này vừa được người khác đặt.");
+
         if (!await _availabilityService.IsRoomAvailable(request.RoomId, inventory.StartTime, inventory.EndTime))
             throw new InvalidOperationException("Khung giờ này vừa được người khác đặt.");
 

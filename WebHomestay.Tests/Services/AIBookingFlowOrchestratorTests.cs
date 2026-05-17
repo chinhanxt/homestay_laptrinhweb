@@ -128,6 +128,44 @@ public class AIBookingFlowOrchestratorTests
         Assert.Contains(response.UiBlocks, block => block.Type == "paymentQr");
     }
 
+    [Fact]
+    public async Task SelectSlotAsync_WhenSlotIsBooked_DoesNotReturnBookingForm()
+    {
+        await using var context = CreateContext(nameof(SelectSlotAsync_WhenSlotIsBooked_DoesNotReturnBookingForm));
+        SeedBranchesRoomsAndSlots(context);
+        await context.SaveChangesAsync();
+        var inventory = await context.RoomSlotInventories.SingleAsync(slot => slot.Id == 100);
+        inventory.Status = "Booked";
+        await context.SaveChangesAsync();
+
+        var service = CreateService(context);
+
+        var response = await service.SelectSlotAsync(new AIBookingActionRequest
+        {
+            SessionId = "s1",
+            Action = "select-slot",
+            State = new AIBookingSessionState
+            {
+                BranchId = 1,
+                BranchName = "StayEasy Sài Gòn",
+                BookingMode = "hourly",
+                HourlyDate = new DateOnly(2026, 5, 20),
+                GuestCount = 2,
+                SelectedRoomId = 10,
+                SelectedRoomName = "Sài Gòn Couple",
+                SelectedSlotId = 100,
+                SelectedSlotLabel = "09:00-11:00"
+            }
+        });
+
+        Assert.Equal("select-slot", response.CurrentStep);
+        Assert.DoesNotContain(response.UiBlocks, block => block.Type == "bookingForm");
+        Assert.DoesNotContain(response.UiBlocks, block => block.Type == "bookingSummary");
+        Assert.Null(response.State.SelectedSlotId);
+        Assert.Null(response.State.SelectedSlotLabel);
+        Assert.Empty(context.Bookings);
+    }
+
     private static ApplicationDbContext CreateContext(string name)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

@@ -109,10 +109,23 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
     public async Task<AIBookingFlowResponse> SelectSlotAsync(AIBookingActionRequest request)
     {
         var state = MergeState(request);
+        var selectedRoomId = state.SelectedRoomId;
+        var selectedDate = state.HourlyDate;
         var slot = await _context.RoomSlotInventories
             .AsNoTracking()
             .Include(slot => slot.Room)
-            .SingleAsync(slot => slot.Id == state.SelectedSlotId);
+            .SingleOrDefaultAsync(slot => slot.Id == state.SelectedSlotId);
+
+        if (slot == null
+            || slot.Status != "Available"
+            || (selectedRoomId.HasValue && slot.RoomId != selectedRoomId.Value)
+            || (selectedDate.HasValue && slot.SlotDate != selectedDate.Value)
+            || !await _availabilityService.IsRoomAvailable(slot.RoomId, slot.StartTime, slot.EndTime))
+        {
+            state.SelectedSlotId = null;
+            state.SelectedSlotLabel = null;
+            return BuildResponse(request, "select-slot", "Khung giờ này không còn phù hợp hoặc vừa được người khác đặt. Bạn vui lòng chọn khung giờ khác nhé.", state);
+        }
 
         state.SelectedRoomId = slot.RoomId;
         state.SelectedRoomName = slot.Room.Name;
@@ -346,6 +359,14 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
 
     private static AIBookingSessionState MergeStates(AIBookingSessionState cached, AIBookingSessionState incoming)
     {
+        var branchChanged = incoming.BranchId.HasValue && incoming.BranchId != cached.BranchId;
+        var modeChanged = !string.IsNullOrWhiteSpace(incoming.BookingMode) && incoming.BookingMode != "unknown" && incoming.BookingMode != cached.BookingMode;
+        var hourlyDateChanged = incoming.HourlyDate.HasValue && incoming.HourlyDate != cached.HourlyDate;
+        var checkInChanged = incoming.CheckInDate.HasValue && incoming.CheckInDate != cached.CheckInDate;
+        var checkOutChanged = incoming.CheckOutDate.HasValue && incoming.CheckOutDate != cached.CheckOutDate;
+        var guestCountChanged = incoming.GuestCount > 0 && incoming.GuestCount != cached.GuestCount;
+        var upstreamChanged = branchChanged || modeChanged || hourlyDateChanged || checkInChanged || checkOutChanged || guestCountChanged;
+
         return new AIBookingSessionState
         {
             CustomerName = incoming.CustomerName ?? cached.CustomerName,
@@ -357,10 +378,10 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
             CheckInDate = incoming.CheckInDate ?? cached.CheckInDate,
             CheckOutDate = incoming.CheckOutDate ?? cached.CheckOutDate,
             GuestCount = incoming.GuestCount > 0 ? incoming.GuestCount : cached.GuestCount,
-            SelectedRoomId = incoming.SelectedRoomId ?? cached.SelectedRoomId,
-            SelectedRoomName = incoming.SelectedRoomName ?? cached.SelectedRoomName,
-            SelectedSlotId = incoming.SelectedSlotId ?? cached.SelectedSlotId,
-            SelectedSlotLabel = incoming.SelectedSlotLabel ?? cached.SelectedSlotLabel,
+            SelectedRoomId = upstreamChanged ? incoming.SelectedRoomId : incoming.SelectedRoomId ?? cached.SelectedRoomId,
+            SelectedRoomName = upstreamChanged ? incoming.SelectedRoomName : incoming.SelectedRoomName ?? cached.SelectedRoomName,
+            SelectedSlotId = upstreamChanged ? incoming.SelectedSlotId : incoming.SelectedSlotId ?? cached.SelectedSlotId,
+            SelectedSlotLabel = upstreamChanged ? incoming.SelectedSlotLabel : incoming.SelectedSlotLabel ?? cached.SelectedSlotLabel,
             BookingId = incoming.BookingId ?? cached.BookingId,
             PaymentStatus = string.IsNullOrWhiteSpace(incoming.PaymentStatus) ? cached.PaymentStatus : incoming.PaymentStatus
         };
