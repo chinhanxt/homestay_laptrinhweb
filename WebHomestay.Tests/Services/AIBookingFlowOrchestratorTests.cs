@@ -32,6 +32,8 @@ public class AIBookingFlowOrchestratorTests
         var rooms = GetRooms(block.Data);
         Assert.Single(rooms);
         Assert.Equal("Sài Gòn Couple", rooms[0].Name);
+        Assert.DoesNotContain(rooms, room => room.Name == "Sài Gòn Solo");
+        Assert.DoesNotContain(rooms, room => room.Name == "Đà Lạt View");
     }
 
     [Fact]
@@ -59,7 +61,17 @@ public class AIBookingFlowOrchestratorTests
         });
 
         Assert.Empty(context.Bookings);
-        Assert.Contains(response.UiBlocks, block => block.Type == "hourlySlots");
+        var slotBlock = Assert.Single(response.UiBlocks, block => block.Type == "hourlySlots");
+        var slots = GetSlots(slotBlock.Data);
+        var slot = Assert.Single(slots);
+        Assert.Equal(100, slot.SlotId);
+        Assert.Equal(10, slot.RoomId);
+        Assert.Equal("Sài Gòn Couple", slot.RoomName);
+        Assert.Equal("09:00-11:00", slot.Label);
+        Assert.Equal(new DateTime(2026, 5, 20, 9, 0, 0), slot.StartTime);
+        Assert.Equal(new DateTime(2026, 5, 20, 11, 0, 0), slot.EndTime);
+        Assert.DoesNotContain(slots, slot => slot.RoomId != 10);
+        Assert.DoesNotContain(slots, slot => slot.Label != "09:00-11:00");
     }
 
     [Fact]
@@ -97,8 +109,22 @@ public class AIBookingFlowOrchestratorTests
         });
 
         var booking = Assert.Single(context.Bookings);
+        Assert.Equal(10, booking.RoomId);
+        Assert.Equal(100, booking.RoomSlotInventoryId);
+        Assert.Equal("09:00-11:00", booking.SlotLabel);
+        Assert.Equal("Nguyễn An", booking.CustomerName);
+        Assert.Equal("0900000000", booking.CustomerPhone);
+        Assert.Equal("an@example.com", booking.CustomerEmail);
+        Assert.Equal("Đến đúng giờ", booking.CustomerNote);
+        Assert.Equal(2, booking.GuestCount);
+        Assert.Equal(BookingMode.Hourly, booking.BookingMode);
+        Assert.Equal(new DateTime(2026, 5, 20, 9, 0, 0), booking.StartTime);
+        Assert.Equal(new DateTime(2026, 5, 20, 11, 0, 0), booking.EndTime);
+        Assert.True(booking.TotalPrice > 0);
         Assert.Equal("AwaitingPayment", booking.Status);
         Assert.Equal("Unpaid", booking.PaymentStatus);
+        var inventory = await context.RoomSlotInventories.SingleAsync(slot => slot.Id == 100);
+        Assert.Equal("Booked", inventory.Status);
         Assert.Contains(response.UiBlocks, block => block.Type == "paymentQr");
     }
 
@@ -165,5 +191,12 @@ public class AIBookingFlowOrchestratorTests
         var property = data.GetType().GetProperty("rooms") ?? data.GetType().GetProperty("Rooms");
         Assert.NotNull(property);
         return Assert.IsAssignableFrom<List<AIRoomCard>>(property.GetValue(data));
+    }
+
+    private static List<AISlotOption> GetSlots(object data)
+    {
+        var property = data.GetType().GetProperty("slots") ?? data.GetType().GetProperty("Slots");
+        Assert.NotNull(property);
+        return Assert.IsAssignableFrom<List<AISlotOption>>(property.GetValue(data));
     }
 }
