@@ -38,7 +38,9 @@ namespace WebHomestay.Services
     {
         public string SessionId { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
+        public string? CustomerName { get; set; }
         public int? BranchId { get; set; }
+        public string BookingMode { get; set; } = "hourly";
         public DateTime? StartTime { get; set; }
         public DateTime? EndTime { get; set; }
         public int GuestCount { get; set; } = 1;

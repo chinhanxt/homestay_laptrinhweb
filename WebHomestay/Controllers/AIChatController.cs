@@ -11,11 +11,13 @@ namespace WebHomestay.Controllers
     {
         private readonly IAIBrainOrchestrator _aiBrainOrchestrator;
         private readonly ApplicationDbContext _context;
+        private readonly IAIBookingFlowOrchestrator _bookingFlowOrchestrator;
 
-        public AIChatController(IAIBrainOrchestrator aiBrainOrchestrator, ApplicationDbContext context)
+        public AIChatController(IAIBrainOrchestrator aiBrainOrchestrator, ApplicationDbContext context, IAIBookingFlowOrchestrator bookingFlowOrchestrator)
         {
             _aiBrainOrchestrator = aiBrainOrchestrator;
             _context = context;
+            _bookingFlowOrchestrator = bookingFlowOrchestrator;
         }
 
         [HttpPost("chat")]
@@ -53,26 +55,30 @@ namespace WebHomestay.Controllers
                     GuestCount = guestCount
                 }, cancellationToken);
 
-                var uiBlocks = new List<AIUiBlock>();
-                if (branchId.HasValue && hasDate)
+                var bookingMode = string.Equals(request.BookingMode, "daily", StringComparison.OrdinalIgnoreCase) ? "daily" : "hourly";
+                var state = new AIBookingSessionState
                 {
-                    var rooms = await BuildRoomCardsAsync(branchId.Value, parsedDate, guestCount, cancellationToken);
-                    if (rooms.Any()) uiBlocks.Add(new AIUiBlock { Type = "roomCards", Data = new { rooms } });
-                }
+                    CustomerName = request.CustomerName?.Trim() ?? string.Empty,
+                    BranchId = branchId,
+                    BookingMode = bookingMode,
+                    HourlyDate = bookingMode == "hourly" && hasDate ? parsedDate : null,
+                    CheckInDate = bookingMode == "daily" && hasDate ? parsedDate : null,
+                    CheckOutDate = bookingMode == "daily" && hasDate ? parsedDate.AddDays(1) : null,
+                    GuestCount = guestCount
+                };
+
+                var flowResponse = branchId.HasValue && hasDate
+                    ? await _bookingFlowOrchestrator.BuildRoomCardsAsync(state)
+                    : new AIBookingFlowResponse { CurrentStep = "chat", Message = response.Answer, State = state };
 
                 return Ok(new
                 {
                     answer = response.Answer,
                     message = response.Answer,
                     sessionId,
-                    currentStep = "chat",
-                    state = new AIBookingSessionState
-                    {
-                        BranchId = branchId,
-                        HourlyDate = hasDate ? parsedDate : null,
-                        GuestCount = guestCount
-                    },
-                    uiBlocks,
+                    currentStep = flowResponse.CurrentStep,
+                    state = flowResponse.State,
+                    uiBlocks = flowResponse.UiBlocks,
                     formSchema = response.FormSchema
                 });
             }
@@ -89,6 +95,48 @@ namespace WebHomestay.Controllers
                     formSchema = "[]"
                 });
             }
+        }
+
+        [HttpPost("booking-action")]
+        public async Task<IActionResult> BookingAction([FromBody] AIBookingActionRequest request, CancellationToken cancellationToken)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Action))
+            {
+                return BadRequest(new AIBookingFlowResponse
+                {
+                    CurrentStep = "error",
+                    Message = "Thao tác không hợp lệ.",
+                    State = new AIBookingSessionState()
+                });
+            }
+
+            try
+            {
+                var response = await _bookingFlowOrchestrator.HandleActionAsync(request);
+                response.SessionId = request.SessionId;
+                return Ok(response);
+            }
+            catch
+            {
+                return StatusCode(503, new AIBookingFlowResponse
+                {
+                    SessionId = request.SessionId,
+                    CurrentStep = "error",
+                    Message = "Xin lỗi, thao tác đặt phòng đang tạm thời bận. Bạn thử lại sau ít phút nhé.",
+                    State = request.State,
+                    UiBlocks = new List<AIUiBlock>()
+                });
+            }
+        }
+
+        [HttpGet("branches")]
+        public async Task<IActionResult> Branches(CancellationToken cancellationToken)
+        {
+            var branches = await _context.Branches
+                .OrderBy(b => b.Id)
+                .Select(b => new { b.Id, b.Name })
+                .ToListAsync(cancellationToken);
+            return Ok(branches);
         }
 
         private async Task<int?> ResolveBranchIdAsync(string text, CancellationToken cancellationToken)
@@ -140,28 +188,5 @@ namespace WebHomestay.Controllers
 
             date = default;
             return false;
-        }
-
-        private async Task<List<AIRoomCard>> BuildRoomCardsAsync(int branchId, DateOnly date, int guestCount, CancellationToken cancellationToken)
-        {
-            return await _context.Rooms
-                .Where(r => r.BranchId == branchId && r.Status == "Available" && r.MaxGuests >= Math.Max(guestCount, 1))
-                .Include(r => r.Amenities)
-                .OrderBy(r => r.PricePerHour)
-                .Select(r => new AIRoomCard
-                {
-                    RoomId = r.Id,
-                    Name = r.Name,
-                    Description = r.Description,
-                    PricePerHour = r.PricePerHour,
-                    PricePerDay = r.PricePerDay,
-                    Capacity = r.Capacity,
-                    MaxGuests = r.MaxGuests,
-                    ExtraGuestFee = r.ExtraGuestFee,
-                    ImageUrl = r.ImageUrl,
-                    Amenities = r.Amenities.Select(a => a.Name).ToList(),
-                    DetailsUrl = $"/Rooms/Details/{r.Id}?hourlyDate={date:yyyy-MM-dd}"
-                })
-                .ToListAsync(cancellationToken);
         }
     }}
