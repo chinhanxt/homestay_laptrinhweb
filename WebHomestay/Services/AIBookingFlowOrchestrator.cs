@@ -167,6 +167,7 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
                     PaymentStatus = booking.PaymentStatus,
                     Amount = booking.TotalPrice,
                     PaymentUrl = $"/Bookings/Payment/{booking.Id}",
+                    SuccessUrl = $"/Bookings/Success/{booking.Id}",
                     Instructions = "Vui lòng thanh toán để hoàn tất giữ phòng."
                 }
             });
@@ -305,7 +306,7 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
 
     private AIBookingFlowResponse BuildResponse(AIBookingSessionState originalState, string currentStep, string message, AIBookingSessionState state, params AIUiBlock[] blocks)
     {
-        return BuildResponse(string.Empty, currentStep, message, state, blocks);
+        return BuildResponse(string.Empty, currentStep, message, MergeStates(CloneState(originalState), state), blocks);
     }
 
     private AIBookingFlowResponse BuildResponse(string sessionId, string currentStep, string message, AIBookingSessionState state, params AIUiBlock[] blocks)

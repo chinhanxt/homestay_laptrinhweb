@@ -122,6 +122,7 @@ namespace WebHomestay.Services
         public decimal Amount { get; set; }
         public string Currency { get; set; } = "VND";
         public string? PaymentUrl { get; set; }
+        public string? SuccessUrl { get; set; }
         public string? Instructions { get; set; }
     }
 }
