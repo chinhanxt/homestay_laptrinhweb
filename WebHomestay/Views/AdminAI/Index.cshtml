@@ -103,7 +103,7 @@
                                 </div>
                             </div>
                         </div>
-                    </div></div>
+                    </div>
             <div class="tab-pane fade" id="tab-test-trace"><div class="brain-manager-toolbar"><div><h3>Test public booking flow</h3><p>Test như khách thật: nhập context, nhắn câu hỏi, xem answer và UI blocks.</p></div></div><div class="compact-test-grid"><section class="compact-panel"><input id="public-ai-test-name" class="form-control mb-2" placeholder="Tên khách" /><select id="public-ai-test-branch" class="form-select mb-2"></select><select id="public-ai-test-mode" class="form-select mb-2"><option value="hourly">Theo giờ</option><option value="daily">Theo ngày</option></select><input id="public-ai-test-guests" class="form-control mb-2" type="number" min="1" value="1" /><textarea id="public-ai-test-message" class="form-control mb-2" rows="3" placeholder="VD: ngày mai còn phòng không?"></textarea><button class="btn btn-primary rounded-pill fw-bold" onclick="runPublicAIFlowTest()">Chạy test</button><pre id="public-ai-test-output" class="agent-preview mt-3"></pre></section><section class="compact-panel"><div class="brain-manager-toolbar"><div><h3>Conversation Trace</h3><p>Xem AI đã lưu gì sau mỗi phiên: persona, live snapshot, knowledge, graph reasoning, guard và final answer.</p></div><button class="btn btn-outline-primary rounded-pill fw-bold" onclick="loadBrainConversationTraces()"><i class="fas fa-rotate me-2"></i>Tải trace</button></div><div class="trace-manager-layout">
                     <div class="trace-list-panel">
                         <div id="conversation-trace-list" class="trace-list-items">
