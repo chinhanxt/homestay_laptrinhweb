@@ -110,9 +110,9 @@ document.addEventListener('DOMContentLoaded', () => {
             handleActionResponse(data);
         } catch {
             appendMessage('Xin lỗi, chưa gửi được thông tin đặt phòng. Bạn thử lại giúp mình nhé.', 'bot');
+            if (submit) submit.disabled = false;
         } finally {
             setBusy(false);
-            if (submit) submit.disabled = false;
         }
     });
 
