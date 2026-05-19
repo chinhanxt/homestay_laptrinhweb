@@ -18,6 +18,19 @@ public class BookingCreationServiceTests
             .Options;
         await using var context = new ApplicationDbContext(options);
 
+        context.Branches.Add(new Branch
+        {
+            Id = 1,
+            Name = "Test Branch",
+            Address = "123 Test Street"
+        });
+        context.Rooms.Add(new Room
+        {
+            Id = 5,
+            Name = "Test Room",
+            BranchId = 1,
+            Status = "Available"
+        });
         context.RoomSlotInventories.Add(new RoomSlotInventory
         {
             Id = 77,
