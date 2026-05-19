@@ -78,20 +78,23 @@
                                         <p class="text-muted mb-0">Form này chỉ hiện sau khi khách đã chọn phòng và timeline.</p>
                                     </div>
                                     <div class="d-flex gap-2 flex-wrap justify-content-end">
-                                        <button class="btn btn-outline-primary btn-sm rounded-pill fw-bold" onclick="openAddFinalFormFieldModal()"><i class="fas fa-plus me-1"></i>Thêm trường</button>
+                                        <button class="btn btn-outline-primary btn-sm rounded-pill fw-bold" onclick="openAddBookingFormFieldModal()"><i class="fas fa-plus me-1"></i>Thêm trường</button>
                                         <button class="btn btn-outline-success btn-sm rounded-pill fw-bold" onclick="saveBookingFormConfig()"><i class="fas fa-save me-1"></i>Lưu Booking Form</button>
-                                        <button class="btn btn-outline-danger btn-sm rounded-pill" onclick="clearFinalFormDesigner()">Xóa form</button>
+                                        <button class="btn btn-outline-danger btn-sm rounded-pill" onclick="clearBookingFormDesigner()">Xóa form</button>
                                     </div>
                                 </div>
                                 <div class="designer-layout">
-                                    <div class="field-palette">
-                                        <button draggable="true" data-field="branch">Chi nhánh</button>
-                                        <button draggable="true" data-field="datetime">Ngày giờ</button>
-                                        <button draggable="true" data-field="guestCount">Số khách</button>
-                                        <button draggable="true" data-field="note">Ghi chú</button>
+                                    <div class="booking-field-palette">
+                                        <button draggable="true" data-booking-field="customerName">Tên khách</button>
+                                        <button draggable="true" data-booking-field="customerPhone">Số điện thoại</button>
+                                        <button draggable="true" data-booking-field="customerEmail">Email</button>
+                                        <button draggable="true" data-booking-field="guestCount">Số khách</button>
+                                        <button draggable="true" data-booking-field="idCardFront">CCCD mặt trước</button>
+                                        <button draggable="true" data-booking-field="idCardBack">CCCD mặt sau</button>
+                                        <button draggable="true" data-booking-field="customerNote">Ghi chú</button>
                                     </div>
-                                    <div id="final-form-dropzone" class="form-dropzone">
-                                        <div class="empty-state">Kéo trường vào đây để tạo form preview.</div>
+                                    <div id="booking-form-dropzone" class="form-dropzone">
+                                        <div class="empty-state">Kéo trường vào đây để tạo booking form preview.</div>
                                     </div>
                                 </div>
                             </div>
@@ -100,7 +103,7 @@
                                 <h3 class="fw-800 mb-3">Chatbot Preview</h3>
                                 <div class="chatbot-preview-window">
                                     <div class="preview-bubble ai">Xin chào, mình có thể tư vấn phòng phù hợp cho bạn. Bạn cho mình thêm vài thông tin nhé.</div>
-                                    <div id="final-chat-form-preview" class="chat-form-preview"></div>
+                                    <div id="booking-chat-form-preview" class="chat-form-preview"></div>
                                 </div>
                             </div>
                         </div>
@@ -129,14 +132,15 @@
             <div class="modal-body">
                 <label class="form-label fw-bold">Tên hiển thị</label>
                 <input id="final-form-field-label" class="form-control mb-3" placeholder="VD: Số điện thoại" />
-                <label class="form-label fw-bold">Loại trường</label>
+                <label class="form-label fw-bold">Trường dữ liệu</label>
                 <select id="final-form-field-type" class="form-select mb-3">
-                    <option value="text">Text</option>
-                    <option value="number">Number</option>
-                    <option value="datetime-local">Ngày giờ</option>
-                    <option value="textarea">Textarea</option>
-                    <option value="image">Upload ảnh</option>
-                    <option value="paymentQr">AI gửi QR chuyển khoản</option>
+                    <option value="customerName">Tên khách</option>
+                    <option value="customerPhone">Số điện thoại</option>
+                    <option value="customerEmail">Email</option>
+                    <option value="guestCount">Số khách</option>
+                    <option value="idCardFront">CCCD mặt trước</option>
+                    <option value="idCardBack">CCCD mặt sau</option>
+                    <option value="customerNote">Ghi chú</option>
                 </select>
                 <div class="form-check mb-4">
                     <input id="final-form-field-required" class="form-check-input" type="checkbox" checked />
@@ -174,7 +178,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="saveFinalFormFieldFromModal()">Lưu trường</button>
+                <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="saveBookingFormFieldFromModal()">Lưu trường</button>
             </div>
         </div>
     </div>

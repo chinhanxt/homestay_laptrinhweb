@@ -528,6 +528,24 @@ let finalFormFields = [];
 let editingFinalFormFieldId = null;
 let finalIntentOptions = [];
 let finalMissingDataOptions = [];
+const bookingFieldLabels = {
+    customerName: 'Tên khách',
+    customerPhone: 'Số điện thoại',
+    customerEmail: 'Email',
+    guestCount: 'Số khách',
+    idCardFront: 'CCCD mặt trước',
+    idCardBack: 'CCCD mặt sau',
+    customerNote: 'Ghi chú'
+};
+const bookingFieldTypes = {
+    customerName: 'text',
+    customerPhone: 'text',
+    customerEmail: 'email',
+    guestCount: 'number',
+    idCardFront: 'image',
+    idCardBack: 'image',
+    customerNote: 'textarea'
+};
 const finalFieldLabels = {
     branch: 'Chi nhánh mong muốn',
     datetime: 'Ngày giờ nhận/trả phòng',
@@ -581,14 +599,14 @@ async function saveBookingFormConfig() {
 }
 
 function renderBookingFormDesigner() {
-    const dropzone = $('#final-form-dropzone');
-    const preview = $('#final-chat-form-preview');
+    const dropzone = $('#booking-form-dropzone');
+    const preview = $('#booking-chat-form-preview');
     if (!dropzone.length || !preview.length) return;
 
     bookingFormFields = Array.isArray(bookingFormFields) ? bookingFormFields.map(normalizeBookingFormField) : [];
     const fields = [...bookingFormFields].sort((a, b) => a.order - b.order);
     if (!fields.length) {
-        dropzone.html('<div class="empty-state">Kéo trường vào đây để tạo form preview.</div>');
+        dropzone.html('<div class="empty-state">Kéo trường vào đây để tạo booking form preview.</div>');
         preview.html('');
         return;
     }
@@ -616,13 +634,15 @@ function renderBookingFormDesigner() {
 
 function normalizeBookingFormField(field) {
     if (typeof field === 'string') {
-        return { id: `${field}-${Date.now()}`, type: field, label: finalFieldLabels[field] || field, required: true, helpText: '', order: 999 };
+        return { id: `${field}-${Date.now()}`, name: field, type: bookingFieldTypes[field] || 'text', label: bookingFieldLabels[field] || field, required: true, helpText: '', order: 999 };
     }
 
+    const name = field?.name || field?.id || 'customerName';
     return {
-        id: field?.id || field?.name || `booking-${Date.now()}`,
-        type: field?.type || 'text',
-        label: field?.label || finalFieldLabels[field?.type] || field?.id || 'Thông tin',
+        id: field?.id || name || `booking-${Date.now()}`,
+        name,
+        type: bookingFieldTypes[name] || field?.type || 'text',
+        label: field?.label || bookingFieldLabels[name] || name || 'Thông tin',
         required: field?.required === true,
         helpText: field?.helpText || '',
         order: Number.isFinite(Number(field?.order)) ? Number(field.order) : 999
@@ -630,8 +650,18 @@ function normalizeBookingFormField(field) {
 }
 
 function renderBookingPreviewField(field) {
+    field = normalizeBookingFormField(field);
+    const label = escapeBrainHtml(field.label);
+    const required = field.required ? ' required' : '';
+    const requiredMark = field.required ? ' <span class="text-danger">*</span>' : '';
     const helpText = field.helpText ? `<small class="text-muted">${escapeBrainHtml(field.helpText)}</small>` : '';
-    return `${renderPreviewField(field)}${helpText}`;
+    let control;
+    if (field.type === 'textarea') control = `<textarea placeholder="Nhập ${label.toLowerCase()}..." rows="2"${required}></textarea>`;
+    else if (field.type === 'number') control = `<input type="number" min="1" placeholder="2"${required} />`;
+    else if (field.type === 'email') control = `<input type="email" placeholder="email@example.com"${required} />`;
+    else if (field.type === 'image') control = `<input type="file" accept="image/*"${required} />`;
+    else control = `<input type="text" placeholder="Nhập ${label.toLowerCase()}"${required} />`;
+    return `<label>${label}${requiredMark}${control}</label>${helpText}`;
 }
 
 async function runPublicAIFlowTest() {
@@ -724,25 +754,25 @@ async function saveFinalSynthesizerConfig() {
     alert('Đã lưu Final Response Synthesizer.');
 }
 
-$(document).on('dragstart', '.field-palette button', function (event) {
-    event.originalEvent.dataTransfer.setData('field', $(this).data('field'));
+$(document).on('dragstart', '.booking-field-palette button', function (event) {
+    event.originalEvent.dataTransfer.setData('bookingField', $(this).data('booking-field'));
 });
 
-$(document).on('dragover', '#final-form-dropzone', function (event) {
+$(document).on('dragover', '#booking-form-dropzone', function (event) {
     event.preventDefault();
     $(this).addClass('drag-over');
 });
 
-$(document).on('dragleave', '#final-form-dropzone', function () {
+$(document).on('dragleave', '#booking-form-dropzone', function () {
     $(this).removeClass('drag-over');
 });
 
-$(document).on('drop', '#final-form-dropzone', function (event) {
+$(document).on('drop', '#booking-form-dropzone', function (event) {
     event.preventDefault();
     $(this).removeClass('drag-over');
-    const field = event.originalEvent.dataTransfer.getData('field');
+    const field = event.originalEvent.dataTransfer.getData('bookingField');
     if (!field) return;
-    bookingFormFields.push({ id: `${field}-${Date.now()}`, type: field, label: finalFieldLabels[field] || field, required: true, helpText: '', order: bookingFormFields.length + 1 });
+    bookingFormFields.push(normalizeBookingFormField({ id: `${field}-${Date.now()}`, name: field, required: true, order: bookingFormFields.length + 1 }));
     renderBookingFormDesigner();
 });
 
@@ -812,15 +842,13 @@ function normalizeFinalFormFieldCondition(condition) {
     };
 }
 
-function openAddFinalFormFieldModal() {
-    openAddBookingFormFieldModal();
-}
+let editingBookingFormFieldId = null;
 
 function openAddBookingFormFieldModal() {
-    editingFinalFormFieldId = null;
+    editingBookingFormFieldId = null;
     $('#final-form-field-modal-title').text('Thêm trường Booking Form');
     $('#final-form-field-label').val('');
-    $('#final-form-field-type').val('text');
+    $('#final-form-field-type').val('customerName');
     $('#final-form-field-qr-url').val('');
     $('#final-form-field-payment-message').val('');
     $('#final-form-field-qr-file').val('');
@@ -833,16 +861,12 @@ function openAddBookingFormFieldModal() {
     bootstrap.Modal.getOrCreateInstance(document.getElementById('finalFormFieldModal')).show();
 }
 
-function openEditFinalFormFieldModal(id) {
-    openEditBookingFormFieldModal(id);
-}
-
 function openEditBookingFormFieldModal(id) {
     const field = normalizeBookingFormField(bookingFormFields.find(item => item.id === id));
-    editingFinalFormFieldId = id;
+    editingBookingFormFieldId = id;
     $('#final-form-field-modal-title').text('Sửa trường Booking Form');
     $('#final-form-field-label').val(field.label);
-    $('#final-form-field-type').val(resolveEditableFieldType(field.type));
+    $('#final-form-field-type').val(field.name || 'customerName');
     $('#final-form-field-qr-url').val('');
     $('#final-form-field-payment-message').val('');
     $('#final-form-field-qr-file').val('');
@@ -855,25 +879,23 @@ function openEditBookingFormFieldModal(id) {
     bootstrap.Modal.getOrCreateInstance(document.getElementById('finalFormFieldModal')).show();
 }
 
-function saveFinalFormFieldFromModal() {
-    saveBookingFormFieldFromModal();
-}
-
 function saveBookingFormFieldFromModal() {
     const label = $('#final-form-field-label').val().trim();
     if (!label) return alert('Vui lòng nhập tên hiển thị cho trường.');
 
+    const fieldName = $('#final-form-field-type').val() || 'customerName';
     const field = normalizeBookingFormField({
-        id: editingFinalFormFieldId || `custom-${Date.now()}`,
-        type: $('#final-form-field-type').val(),
+        id: editingBookingFormFieldId || `${fieldName}-${Date.now()}`,
+        name: fieldName,
+        type: bookingFieldTypes[fieldName] || 'text',
         label,
         required: $('#final-form-field-required').is(':checked'),
         helpText: $('#final-form-field-advanced').val().trim(),
-        order: editingFinalFormFieldId ? bookingFormFields.find(item => item.id === editingFinalFormFieldId)?.order : bookingFormFields.length + 1
+        order: editingBookingFormFieldId ? bookingFormFields.find(item => item.id === editingBookingFormFieldId)?.order : bookingFormFields.length + 1
     });
 
-    if (editingFinalFormFieldId) {
-        bookingFormFields = bookingFormFields.map(item => item.id === editingFinalFormFieldId ? field : normalizeBookingFormField(item));
+    if (editingBookingFormFieldId) {
+        bookingFormFields = bookingFormFields.map(item => item.id === editingBookingFormFieldId ? field : normalizeBookingFormField(item));
     } else {
         bookingFormFields.push(field);
     }
@@ -885,7 +907,7 @@ function saveBookingFormFieldFromModal() {
 $(document).on('change', '#final-form-field-type', toggleFinalPaymentQrSettings);
 
 function toggleFinalPaymentQrSettings() {
-    $('#final-payment-qr-settings').toggle($('#final-form-field-type').val() === 'paymentQr');
+    $('#final-payment-qr-settings').toggle(false);
 }
 
 async function uploadFinalPaymentQrImage() {
@@ -907,17 +929,9 @@ function resolveEditableFieldType(type) {
     return ['text', 'number', 'datetime-local', 'textarea', 'image', 'paymentQr'].includes(type) ? type : 'text';
 }
 
-function removeFinalFormField(id) {
-    removeBookingFormField(id);
-}
-
 function removeBookingFormField(id) {
     bookingFormFields = bookingFormFields.filter(field => field.id !== id);
     renderBookingFormDesigner();
-}
-
-function clearFinalFormDesigner() {
-    clearBookingFormDesigner();
 }
 
 function clearBookingFormDesigner() {
@@ -926,34 +940,7 @@ function clearBookingFormDesigner() {
 }
 
 function renderFinalFormDesigner() {
-    const dropzone = $('#final-form-dropzone');
-    const preview = $('#final-chat-form-preview');
-    finalFormFields = finalFormFields.map(normalizeFinalFormField);
-    if (!finalFormFields.length) {
-        dropzone.html('<div class="empty-state">Kéo trường vào đây để tạo form preview.</div>');
-        preview.html('');
-        return;
-    }
-
-    dropzone.html(finalFormFields.map(field => `
-        <div class="designer-field">
-            <span>
-                ${escapeBrainHtml(field.label)}${field.required ? ' <strong class="text-danger">*</strong>' : ''}
-                <small class="designer-field-condition">${escapeBrainHtml(describeFinalFormFieldCondition(field.condition))}</small>
-            </span>
-            <div class="d-flex gap-1">
-                <button class="designer-field-edit" onclick="openEditFinalFormFieldModal('${field.id}')" title="Sửa trường"><i class="fas fa-pen"></i></button>
-                <button class="designer-field-remove" onclick="removeFinalFormField('${field.id}')" title="Xóa trường"><i class="fas fa-times"></i></button>
-            </div>
-        </div>
-    `).join(''));
-
-    preview.html(`
-        <div class="chat-form-card">
-            ${finalFormFields.map(field => renderPreviewField(field)).join('')}
-            <button class="btn btn-dark rounded-pill w-100 mt-2">Gửi thông tin</button>
-        </div>
-    `);
+    finalFormFields = Array.isArray(finalFormFields) ? finalFormFields.map(normalizeFinalFormField) : [];
 }
 
 function openFinalConditionOptionManager(kind) {

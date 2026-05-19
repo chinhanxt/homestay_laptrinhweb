@@ -136,6 +136,11 @@ namespace WebHomestay.Controllers
         [HttpPost("booking-form-config")]
         public async Task<IActionResult> SaveBookingFormConfig([FromBody] BookingFormConfigRequest request)
         {
+            if (request == null)
+            {
+                return BadRequest("Booking form config request is required.");
+            }
+
             var formSchema = request.FormSchema ?? DefaultBookingFormSchema;
             JsonDocument parsedSchema;
             try
