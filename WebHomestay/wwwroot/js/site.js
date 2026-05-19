@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || 'AI chat request failed.');
             if (data.sessionId) sessionId = data.sessionId;
             updateBookingState(data.state);
 
@@ -77,12 +78,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(payload)
             });
             const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || 'AI booking action request failed.');
             handleActionResponse(data);
         } catch {
             appendMessage('Xin lỗi, thao tác đặt phòng đang tạm thời bận. Bạn thử lại sau ít phút nhé.', 'bot');
+            actionButton.disabled = false;
         } finally {
             setBusy(false);
-            actionButton.disabled = false;
         }
     });
 
@@ -104,6 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(payload)
             });
             const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || 'AI booking action request failed.');
             handleActionResponse(data);
         } catch {
             appendMessage('Xin lỗi, chưa gửi được thông tin đặt phòng. Bạn thử lại giúp mình nhé.', 'bot');
@@ -315,7 +318,10 @@ document.addEventListener('DOMContentLoaded', () => {
             label.appendChild(caption);
 
             const control = field.type === 'textarea' ? document.createElement('textarea') : document.createElement('input');
-            if (field.type !== 'textarea') control.type = toSafeInputType(field.type);
+            const inputType = toSafeInputType(field.type);
+            if (field.type !== 'textarea') control.type = inputType;
+            if (field.type === 'textarea') control.maxLength = 500;
+            if (['text', 'tel', 'email'].includes(inputType)) control.maxLength = 120;
             control.name = field.name;
             control.required = !!field.required;
             control.placeholder = field.placeholder || '';
@@ -419,7 +425,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getGuestCount() {
         const count = guestsInput ? Number.parseInt(guestsInput.value, 10) : 1;
-        return Number.isNaN(count) || count < 1 ? 1 : count;
+        if (Number.isNaN(count)) return 1;
+        return Math.min(Math.max(count, 1), 20);
     }
 
     function formatMoney(value) {
