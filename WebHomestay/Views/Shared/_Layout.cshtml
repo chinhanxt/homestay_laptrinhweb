@@ -93,10 +93,66 @@
         </div>
     </footer>
 
-    <!-- AI Assistant Widget -->
-    <div class="ai-widget">
-        <i class="fas fa-robot text-white fs-4"></i>
-    </div>
+    @{
+        var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+        var showPublicChatbot = !currentController.StartsWith("Admin", StringComparison.OrdinalIgnoreCase);
+    }
+    @if (showPublicChatbot)
+    {
+        <div class="ai-widget" id="public-ai-chatbot">
+            <button class="ai-chat-toggle" type="button" aria-label="Mở trợ lý AI" aria-expanded="false">
+                <span class="ai-chat-pulse"></span>
+                <i class="fas fa-robot"></i>
+            </button>
+            <section class="ai-chat-panel" aria-label="Nhân viên tư vấn AI">
+                <div class="ai-chat-header">
+                    <div>
+                        <span class="ai-chat-kicker">StayLuxe Assistant</span>
+                        <h3>Nhân viên tư vấn AI</h3>
+                    </div>
+                    <button class="ai-chat-close" type="button" aria-label="Đóng trợ lý AI">
+                        <i class="fas fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="ai-chat-context" aria-label="Thông tin tư vấn ban đầu">
+                    <label>
+                        <span>Tên khách</span>
+                        <input class="ai-context-name" type="text" maxlength="120" autocomplete="name" placeholder="Tên của bạn" />
+                    </label>
+                    <label>
+                        <span>Chi nhánh</span>
+                        <select class="ai-context-branch">
+                            <option value="">Đang tải chi nhánh...</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Hình thức</span>
+                        <select class="ai-context-mode">
+                            <option value="hourly">Theo giờ</option>
+                            <option value="daily">Theo ngày</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Số khách</span>
+                        <input class="ai-context-guests" type="number" min="1" max="20" value="1" inputmode="numeric" />
+                    </label>
+                </div>
+                <div class="ai-chat-messages" role="log" aria-live="polite">
+                    <div class="ai-message ai-message-bot">
+                        Chào bạn, mình có thể tư vấn phòng StayEasy Sài Gòn hoặc Đà Lạt. Bạn muốn đi chi nhánh nào, mấy người và thời gian nào?
+                    </div>
+                </div>
+                <div class="ai-chat-status" aria-live="polite"></div>
+                <form class="ai-chat-form">
+                    <input class="ai-chat-input" type="text" maxlength="500" autocomplete="off" placeholder="Nhập nhu cầu của bạn..." />
+                    <button class="ai-chat-send" type="submit" aria-label="Gửi tin nhắn">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </form>
+                <p class="ai-chat-note">AI chỉ tư vấn tham khảo; đặt phòng chính thức cần hoàn tất trên website.</p>
+            </section>
+        </div>
+    }
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

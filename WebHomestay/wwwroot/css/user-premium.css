@@ -793,3 +793,284 @@ h1, h2, h3, h4, h5, h6 {
 
 .lux-scroll-btn.left { left: -10px; }
 .lux-scroll-btn.right { right: -10px; }
+
+
+/* --- Public AI Chatbot --- */
+.ai-widget {
+    position: fixed;
+    right: 28px;
+    bottom: 28px;
+    z-index: 9998;
+    font-family: var(--luxury-font-body);
+}
+
+.ai-chat-toggle {
+    width: 64px;
+    height: 64px;
+    border: 0;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--luxury-primary), #334155);
+    color: #fff;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+    display: grid;
+    place-items: center;
+    position: relative;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.ai-chat-toggle:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 22px 46px rgba(15, 23, 42, 0.34);
+}
+
+.ai-chat-toggle i {
+    font-size: 1.5rem;
+    position: relative;
+    z-index: 2;
+}
+
+.ai-chat-pulse {
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 1px solid rgba(194, 155, 97, 0.55);
+    animation: aiPulse 1.8s infinite;
+}
+
+.ai-chat-panel {
+    position: absolute;
+    right: 0;
+    bottom: 82px;
+    width: min(640px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    height: min(760px, calc(100vh - 110px));
+    max-height: calc(100vh - 110px);
+    background: rgba(255, 255, 255, 0.97);
+    border: 1px solid var(--luxury-border);
+    box-shadow: 0 26px 70px rgba(15, 23, 42, 0.18);
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(16px) scale(0.98);
+    transition: all 0.25s ease;
+    overflow: hidden;
+    backdrop-filter: blur(16px);
+}
+
+.ai-widget.is-open .ai-chat-panel {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+}
+
+.ai-widget.is-open .ai-chat-toggle {
+    transform: scale(0.92);
+}
+
+.ai-chat-header {
+    padding: 18px 20px;
+    background: var(--luxury-primary);
+    color: #fff;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.ai-chat-kicker {
+    color: var(--luxury-accent);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.ai-chat-header h3 {
+    color: #fff;
+    font-size: 1.05rem;
+    margin: 4px 0 0;
+}
+
+.ai-chat-close {
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.ai-chat-context {
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    border-bottom: 1px solid var(--luxury-border);
+    background: #fff;
+}
+
+.ai-chat-context label,
+.ai-booking-form label {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    color: var(--luxury-text-muted);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.ai-chat-context input,
+.ai-chat-context select {
+    width: 100%;
+    border: 1px solid var(--luxury-border);
+    padding: 8px 10px;
+    color: var(--luxury-text);
+    background: #fff;
+    font-size: 0.9rem;
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 500;
+}
+
+.ai-chat-messages {
+    flex: 1;
+    padding: 18px;
+    overflow-y: auto;
+    background: linear-gradient(180deg, #f8fafc, #fff);
+}
+
+.ai-message {
+    width: fit-content;
+    max-width: 88%;
+    padding: 11px 14px;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    border-radius: 18px;
+    white-space: pre-wrap;
+}
+
+.ai-message-bot {
+    background: #fff;
+    border: 1px solid var(--luxury-border);
+    color: var(--luxury-text);
+    border-bottom-left-radius: 4px;
+}
+
+.ai-message-user {
+    margin-left: auto;
+    background: var(--luxury-primary);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+}
+
+.ai-chat-status {
+    min-height: 24px;
+    padding: 0 18px;
+    font-size: 0.82rem;
+    color: var(--luxury-text-muted);
+    background: #fff;
+}
+
+.ai-chat-form {
+    padding: 14px;
+    display: flex;
+    gap: 10px;
+    border-top: 1px solid var(--luxury-border);
+    background: #fff;
+}
+
+.ai-chat-input {
+    flex: 1;
+    border: 1px solid var(--luxury-border);
+    border-radius: 999px;
+    padding: 11px 14px;
+    outline: none;
+    color: var(--luxury-text);
+}
+
+.ai-chat-input:focus {
+    border-color: var(--luxury-accent);
+    box-shadow: 0 0 0 3px rgba(194, 155, 97, 0.15);
+}
+
+.ai-chat-send {
+    width: 46px;
+    height: 46px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--luxury-accent);
+    color: #fff;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.ai-chat-send:hover:not(:disabled) {
+    transform: translateY(-2px);
+}
+
+.ai-chat-send:disabled,
+.ai-chat-input:disabled {
+    opacity: 0.6;
+}
+
+.ai-chat-note {
+    margin: 0;
+    padding: 0 16px 14px;
+    color: var(--luxury-text-muted);
+    font-size: 0.76rem;
+    background: #fff;
+}
+
+@keyframes aiPulse {
+    0% { transform: scale(0.9); opacity: 0.75; }
+    100% { transform: scale(1.25); opacity: 0; }
+}
+
+.ai-booking-block { margin: 12px 0; }
+.ai-room-card,
+.ai-booking-summary,
+.ai-payment-block { border: 1px solid var(--luxury-border); background: #fff; padding: 14px; margin-bottom: 10px; }
+.ai-room-card h4,
+.ai-booking-summary h4 { font-size: 1rem; margin-bottom: 6px; }
+.ai-room-meta { color: var(--luxury-text-muted); font-size: .86rem; }
+.ai-room-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.ai-chip-btn,
+.ai-booking-submit { border: 1px solid var(--luxury-border); background: #fff; color: var(--luxury-primary); padding: 8px 12px; font-weight: 700; text-decoration: none; }
+.ai-chip-btn:hover,
+.ai-booking-submit:hover { border-color: var(--luxury-accent); color: var(--luxury-accent); }
+.ai-slot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.ai-booking-summary ul { margin: 8px 0; padding-left: 18px; color: var(--luxury-text-muted); font-size: .88rem; }
+.ai-booking-total { margin-top: 8px; font-weight: 800; color: var(--luxury-primary); }
+.ai-booking-form { display: grid; gap: 10px; }
+.ai-booking-form input, .ai-booking-form textarea { border: 1px solid var(--luxury-border); padding: 10px 12px; text-transform: none; letter-spacing: normal; font-weight: 500; }
+.ai-payment-block { display: grid; gap: 8px; color: var(--luxury-text); }
+.ai-payment-success-link { color: var(--luxury-text-muted); font-size: .84rem; }
+
+@media (max-width: 575.98px) {
+    .ai-widget {
+        right: 16px;
+        bottom: 16px;
+    }
+
+    .ai-chat-panel {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        max-height: none;
+        border-radius: 0;
+    }
+
+    .ai-chat-context {
+        grid-template-columns: 1fr;
+    }
+
+    .ai-chat-toggle {
+        width: 58px;
+        height: 58px;
+    }
+}
