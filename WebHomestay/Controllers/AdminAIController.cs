@@ -10,6 +10,77 @@ namespace WebHomestay.Controllers
     [Route("admin/ai")]
     public class AdminAIController : Controller
     {
+        private const string DefaultFinalStyle = "Giọng thân thiện, rõ ràng, tư vấn như lễ tân chuyên nghiệp. Trả lời ngắn gọn nhưng đủ ý. Nếu thiếu thông tin thì hỏi lại bằng các câu hỏi cụ thể.";
+        private const string DefaultBasePrompt = "Bạn là Final Response Synthesizer của AI Brain Center cho homestay self check-in/self check-out. Nhiệm vụ duy nhất: viết câu trả lời cuối cùng cho khách dựa trên dữ liệu các agent cung cấp.";
+        private const string DefaultLanguageRule = "Luôn trả lời bằng tiếng Việt, thân thiện, tự nhiên như nhân viên tư vấn homestay.";
+        private const string DefaultDataTruthRule = "Không bịa phòng trống, giá, chính sách hoặc thông tin chi nhánh. Chỉ dùng dữ liệu từ Live System, Knowledge, Graph và cấu hình được cung cấp.";
+        private const string DefaultMissingInfoRule = "Nếu thiếu ngày/giờ/chi nhánh/số khách theo cấu hình form đã lọc, hãy hỏi lại bằng đúng các trường cần điền. Không hỏi ngân sách vì giá phòng đã cố định trong hệ thống.";
+        private const string DefaultBookingRule = "Không xác nhận đặt phòng, không hứa giữ phòng, không tạo mã khóa/check-in code; chỉ hướng khách sang luồng đặt phòng chính thức.";
+        private const string DefaultFormRule = "Form Schema JSON đã được lọc theo điều kiện của từng field cho câu hỏi hiện tại. Nếu Form Schema còn trường, hãy hỏi khách điền đúng các trường đó, không thêm trường ngoài schema. Nếu Form Schema rỗng nhưng nhu cầu chưa rõ, hãy hỏi thêm một câu ngắn để xác định intent trước khi xin thông tin.";
+        private const string DefaultPaymentRule = "Nếu field type là paymentQr, được gửi đúng messageTemplate và qrImageUrl đã cấu hình như hướng dẫn chuyển khoản; không tự xác nhận booking sau khi gửi QR.";
+        private const string DefaultMemoryRule = "Phải ghi nhớ các thông tin khách đã nói trong lịch sử cùng session; không hỏi lại chi nhánh, ngày giờ, số khách nếu khách đã cung cấp rồi.";
+        private const string DefaultContextFormatRule = "Đọc Persona Agent, Safety Guard, Live System Agent JSON, Knowledge RAG Agent JSON và Graph Reasoning Agent JSON như dữ liệu nội bộ để tổng hợp câu trả lời cuối cùng; không hiển thị raw JSON cho khách.";
+        private const string DefaultBookingFormSchema = """
+[
+  {
+    "id": "customerName",
+    "type": "text",
+    "label": "Họ và tên",
+    "required": true,
+    "helpText": "Nhập đúng họ tên người đặt phòng.",
+    "order": 1
+  },
+  {
+    "id": "customerPhone",
+    "type": "tel",
+    "label": "Số điện thoại",
+    "required": true,
+    "helpText": "Số điện thoại/Zalo để homestay liên hệ xác nhận.",
+    "order": 2
+  },
+  {
+    "id": "customerEmail",
+    "type": "email",
+    "label": "Email",
+    "required": false,
+    "helpText": "Email nhận thông tin đặt phòng nếu có.",
+    "order": 3
+  },
+  {
+    "id": "guestCount",
+    "type": "number",
+    "label": "Số khách",
+    "required": true,
+    "helpText": "Tổng số khách lưu trú.",
+    "order": 4
+  },
+  {
+    "id": "idCardFront",
+    "type": "image",
+    "label": "Ảnh CCCD mặt trước",
+    "required": true,
+    "helpText": "Upload ảnh rõ nét mặt trước CCCD/CMND/Hộ chiếu.",
+    "order": 5
+  },
+  {
+    "id": "idCardBack",
+    "type": "image",
+    "label": "Ảnh CCCD mặt sau",
+    "required": true,
+    "helpText": "Upload ảnh rõ nét mặt sau CCCD/CMND nếu có.",
+    "order": 6
+  },
+  {
+    "id": "customerNote",
+    "type": "textarea",
+    "label": "Ghi chú thêm",
+    "required": false,
+    "helpText": "Yêu cầu đặc biệt, giờ đến dự kiến hoặc ghi chú khác.",
+    "order": 7
+  }
+]
+""";
+
         private readonly ApplicationDbContext _context;
         private readonly IAIModelClient _aiModelClient;
         private readonly IAIBrainOrchestrator _aiBrainOrchestrator;
@@ -27,16 +98,46 @@ namespace WebHomestay.Controllers
         [HttpGet("final-synthesizer-config")]
         public async Task<IActionResult> GetFinalSynthesizerConfig()
         {
-            var style = await _context.SystemSettings.FirstOrDefaultAsync(s => s.SettingKey == "AIFinalSynthesizerStyle");
-            var form = await _context.SystemSettings.FirstOrDefaultAsync(s => s.SettingKey == "AIFinalSynthesizerFormSchema");
-            var conditionOptions = await _context.SystemSettings.FirstOrDefaultAsync(s => s.SettingKey == "AIFinalConditionOptions");
+            var settings = await _context.SystemSettings
+                .Where(s => s.GroupName == "AI")
+                .ToDictionaryAsync(s => s.SettingKey, s => s.SettingValue);
 
             return Ok(new
             {
-                style = style?.SettingValue ?? "Giọng thân thiện, rõ ràng, tư vấn như lễ tân chuyên nghiệp. Trả lời ngắn gọn nhưng đủ ý. Nếu thiếu thông tin thì hỏi lại bằng các câu hỏi cụ thể.",
-                formSchema = form?.SettingValue ?? "[]",
-                conditionOptions = conditionOptions?.SettingValue ?? string.Empty
+                style = GetAISetting(settings, "AIFinalSynthesizerStyle", DefaultFinalStyle),
+                formSchema = GetAISetting(settings, "AIFinalSynthesizerFormSchema", "[]"),
+                conditionOptions = GetAISetting(settings, "AIFinalConditionOptions", string.Empty),
+                basePrompt = GetAISetting(settings, "AIFinalBasePrompt", DefaultBasePrompt),
+                languageRule = GetAISetting(settings, "AIFinalLanguageRule", DefaultLanguageRule),
+                dataTruthRule = GetAISetting(settings, "AIFinalDataTruthRule", DefaultDataTruthRule),
+                missingInfoRule = GetAISetting(settings, "AIFinalMissingInfoRule", DefaultMissingInfoRule),
+                bookingRule = GetAISetting(settings, "AIFinalBookingRule", DefaultBookingRule),
+                formRule = GetAISetting(settings, "AIFinalFormRule", DefaultFormRule),
+                paymentRule = GetAISetting(settings, "AIFinalPaymentRule", DefaultPaymentRule),
+                memoryRule = GetAISetting(settings, "AIFinalMemoryRule", DefaultMemoryRule),
+                contextFormatRule = GetAISetting(settings, "AIFinalContextFormatRule", DefaultContextFormatRule)
             });
+        }
+
+        [HttpGet("booking-form-config")]
+        public async Task<IActionResult> GetBookingFormConfig()
+        {
+            var settings = await _context.SystemSettings
+                .Where(s => s.GroupName == "AI")
+                .ToDictionaryAsync(s => s.SettingKey, s => s.SettingValue);
+
+            return Ok(new
+            {
+                formSchema = GetAISetting(settings, "AIBookingFormSchema", DefaultBookingFormSchema)
+            });
+        }
+
+        [HttpPost("booking-form-config")]
+        public async Task<IActionResult> SaveBookingFormConfig([FromBody] BookingFormConfigRequest request)
+        {
+            await UpsertAISetting("AIBookingFormSchema", request.FormSchema ?? DefaultBookingFormSchema, "Schema form đặt phòng dùng cho public AI booking flow");
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true });
         }
 
         [HttpPost("final-synthesizer-config")]
@@ -45,8 +146,22 @@ namespace WebHomestay.Controllers
             await UpsertAISetting("AIFinalSynthesizerStyle", request.Style ?? string.Empty, "Phong cách trả lời của Final Response Synthesizer");
             await UpsertAISetting("AIFinalSynthesizerFormSchema", request.FormSchema ?? "[]", "Schema form gợi ý cho chatbot preview/user input");
             await UpsertAISetting("AIFinalConditionOptions", request.ConditionOptions ?? string.Empty, "Option điều kiện hiển thị field của Final Response Synthesizer");
+            await UpsertAISetting("AIFinalBasePrompt", request.BasePrompt ?? string.Empty, "System prompt vai trò chính của Final Response Synthesizer");
+            await UpsertAISetting("AIFinalLanguageRule", request.LanguageRule ?? string.Empty, "Quy tắc ngôn ngữ và giọng nói của AI");
+            await UpsertAISetting("AIFinalDataTruthRule", request.DataTruthRule ?? string.Empty, "Quy tắc chống bịa dữ liệu của AI");
+            await UpsertAISetting("AIFinalMissingInfoRule", request.MissingInfoRule ?? string.Empty, "Quy tắc hỏi thông tin thiếu của AI");
+            await UpsertAISetting("AIFinalBookingRule", request.BookingRule ?? string.Empty, "Quy tắc chốt phòng và booking của AI");
+            await UpsertAISetting("AIFinalFormRule", request.FormRule ?? string.Empty, "Quy tắc dùng form schema của AI");
+            await UpsertAISetting("AIFinalPaymentRule", request.PaymentRule ?? string.Empty, "Quy tắc thanh toán và QR của AI");
+            await UpsertAISetting("AIFinalMemoryRule", request.MemoryRule ?? string.Empty, "Quy tắc ghi nhớ hội thoại của AI");
+            await UpsertAISetting("AIFinalContextFormatRule", request.ContextFormatRule ?? string.Empty, "Quy tắc đọc context agent của AI");
             await _context.SaveChangesAsync();
             return Ok(new { success = true });
+        }
+
+        private string GetAISetting(Dictionary<string, string> settings, string key, string fallback)
+        {
+            return settings.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : fallback;
         }
 
         private async Task UpsertAISetting(string key, string value, string description)

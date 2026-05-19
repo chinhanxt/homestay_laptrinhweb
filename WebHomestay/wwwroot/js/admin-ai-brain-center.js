@@ -1,9 +1,11 @@
 let brainKnowledgeScopes = [];
 let brainGraph = { nodes: [], edges: [] };
+let bookingFormFields = [];
 
 $(document).ready(function () {
     loadBrainKnowledge();
     loadBrainGraph();
+    loadPublicAIFlowTestBranches();
 });
 
 async function loadBrainKnowledge() {
@@ -546,10 +548,101 @@ const defaultFinalMissingDataOptions = [
     { value: 'branch', label: 'Chi nhánh', keywords: 'chi nhánh,khu vực,quận,địa chỉ', promptRule: 'Thiếu khi chưa biết khách muốn ở chi nhánh/khu vực nào.', locked: true },
     { value: 'datetime', label: 'Ngày giờ', keywords: 'ngày,giờ,khi nào,hôm nay,tối nay,checkin,checkout', promptRule: 'Thiếu khi chưa biết thời gian nhận/trả phòng.', locked: true },
     { value: 'guestCount', label: 'Số khách', keywords: 'người,khách,số lượng,đi mấy người', promptRule: 'Thiếu khi chưa biết số khách.', locked: true },
-    { value: 'budget', label: 'Ngân sách', keywords: 'giá,rẻ,budget,ngân sách,k,triệu', promptRule: 'Thiếu khi khách cần tư vấn theo giá nhưng chưa nói ngân sách.', locked: true },
     { value: 'phone', label: 'Số điện thoại', keywords: 'số điện thoại,sđt,phone,zalo,liên hệ', promptRule: 'Thiếu khi khách chưa cung cấp số điện thoại liên hệ.', locked: true },
     { value: 'note', label: 'Ghi chú', keywords: 'ghi chú,yêu cầu,lưu ý,đặc biệt', promptRule: 'Thiếu khi cần khách nói yêu cầu đặc biệt.', locked: true }
 ];
+
+async function loadBookingFormConfig() {
+    try {
+        const response = await fetch('/admin/ai/booking-form-config');
+        if (!response.ok) throw new Error(await response.text());
+        const config = await response.json();
+        try { bookingFormFields = JSON.parse(config.formSchema || '[]'); } catch { bookingFormFields = []; }
+        renderBookingFormConfigPreview();
+    } catch (err) {
+        alert(`Không tải được Booking Form config: ${err.message}`);
+    }
+}
+
+async function saveBookingFormConfig() {
+    const response = await fetch('/admin/ai/booking-form-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formSchema: JSON.stringify(bookingFormFields) })
+    });
+    if (!response.ok) return alert(`Không lưu được Booking Form config: ${await response.text()}`);
+    alert('Đã lưu Booking Form config.');
+}
+
+function renderBookingFormConfigPreview() {
+    const preview = $('#final-chat-form-preview');
+    if (!preview.length) return;
+    const fields = (bookingFormFields || []).map(normalizeBookingFormField).sort((a, b) => a.order - b.order);
+    if (!fields.length) return;
+
+    preview.html(`
+        <div class="chat-form-card">
+            ${fields.map(field => renderBookingPreviewField(field)).join('')}
+            <button class="btn btn-dark rounded-pill w-100 mt-2">Gửi thông tin đặt phòng</button>
+        </div>
+    `);
+}
+
+function normalizeBookingFormField(field) {
+    return {
+        id: field?.id || field?.name || `booking-${Date.now()}`,
+        type: field?.type || 'text',
+        label: field?.label || field?.id || 'Thông tin',
+        required: field?.required === true,
+        helpText: field?.helpText || '',
+        order: Number.isFinite(Number(field?.order)) ? Number(field.order) : 999
+    };
+}
+
+function renderBookingPreviewField(field) {
+    const helpText = field.helpText ? `<small class="text-muted">${escapeBrainHtml(field.helpText)}</small>` : '';
+    return `${renderPreviewField(field)}${helpText}`;
+}
+
+async function runPublicAIFlowTest() {
+    const output = $('#public-ai-test-output');
+    output.text('Đang chạy public AI flow test...');
+    const payload = {
+        customerName: $('#public-ai-test-name').val() || '',
+        branchId: parseAgentOptionalInt($('#public-ai-test-branch').val()),
+        bookingMode: $('#public-ai-test-mode').val() || 'hourly',
+        guestCount: parseInt($('#public-ai-test-guests').val() || '1', 10),
+        message: $('#public-ai-test-message').val() || ''
+    };
+
+    try {
+        const response = await fetch('/ai/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const text = await response.text();
+        if (!response.ok) throw new Error(text);
+        try { output.text(JSON.stringify(JSON.parse(text), null, 2)); }
+        catch { output.text(text); }
+    } catch (err) {
+        output.text(`Public AI flow test failed:\n${err.message}`);
+    }
+}
+
+async function loadPublicAIFlowTestBranches() {
+    const branchSelect = $('#public-ai-test-branch');
+    if (!branchSelect.length) return;
+    branchSelect.html('<option value="">Đang tải chi nhánh...</option>');
+    try {
+        const response = await fetch('/ai/branches');
+        if (!response.ok) throw new Error(await response.text());
+        const branches = await response.json();
+        branchSelect.html('<option value="">Tự nhận diện từ tin nhắn</option>' + branches.map(branch => `<option value="${branch.id}">${escapeBrainHtml(branch.name)}</option>`).join(''));
+    } catch (err) {
+        branchSelect.html(`<option value="">Không tải được chi nhánh</option>`);
+    }
+}
 
 async function loadFinalSynthesizerConfig() {
     try {
@@ -557,6 +650,15 @@ async function loadFinalSynthesizerConfig() {
         if (!response.ok) throw new Error(await response.text());
         const config = await response.json();
         $('#final-style-config').val(config.style || '');
+        $('#final-base-prompt').val(config.basePrompt || '');
+        $('#final-language-rule').val(config.languageRule || '');
+        $('#final-data-truth-rule').val(config.dataTruthRule || '');
+        $('#final-missing-info-rule').val(config.missingInfoRule || '');
+        $('#final-booking-rule').val(config.bookingRule || '');
+        $('#final-form-rule').val(config.formRule || '');
+        $('#final-payment-rule').val(config.paymentRule || '');
+        $('#final-memory-rule').val(config.memoryRule || '');
+        $('#final-context-format-rule').val(config.contextFormatRule || '');
         try { finalFormFields = JSON.parse(config.formSchema || '[]'); } catch { finalFormFields = []; }
         loadFinalConditionOptions(config.conditionOptions);
         renderFinalConditionSelects();
@@ -570,7 +672,16 @@ async function saveFinalSynthesizerConfig() {
     const payload = {
         style: $('#final-style-config').val(),
         formSchema: JSON.stringify(finalFormFields),
-        conditionOptions: JSON.stringify(getFinalConditionOptionsPayload())
+        conditionOptions: JSON.stringify(getFinalConditionOptionsPayload()),
+        basePrompt: $('#final-base-prompt').val(),
+        languageRule: $('#final-language-rule').val(),
+        dataTruthRule: $('#final-data-truth-rule').val(),
+        missingInfoRule: $('#final-missing-info-rule').val(),
+        bookingRule: $('#final-booking-rule').val(),
+        formRule: $('#final-form-rule').val(),
+        paymentRule: $('#final-payment-rule').val(),
+        memoryRule: $('#final-memory-rule').val(),
+        contextFormatRule: $('#final-context-format-rule').val()
     };
     const response = await fetch('/admin/ai/final-synthesizer-config', {
         method: 'POST',
@@ -930,6 +1041,8 @@ function renderPreviewField(field) {
     if (field.type === 'textarea' || field.type === 'note') return `<label>${label}${requiredMark}<textarea placeholder="Nhập ${label.toLowerCase()}..." rows="2"${required}></textarea></label>`;
     if (field.type === 'number' || field.type === 'guestCount') return `<label>${label}${requiredMark}<input type="number" min="1" placeholder="2"${required} /></label>`;
     if (field.type === 'datetime-local' || field.type === 'datetime') return `<label>${label}${requiredMark}<input type="datetime-local"${required} /></label>`;
+    if (field.type === 'email') return `<label>${label}${requiredMark}<input type="email" placeholder="email@example.com"${required} /></label>`;
+    if (field.type === 'tel' || field.type === 'phone') return `<label>${label}${requiredMark}<input type="tel" placeholder="Số điện thoại"${required} /></label>`;
     if (field.type === 'image') return `<label>${label}${requiredMark}<input type="file" accept="image/*"${required} /></label>`;
     if (field.type === 'paymentQr') return renderPaymentQrPreviewField(field, label, requiredMark);
     return `<label>${label}${requiredMark}<input type="text" placeholder="Nhập ${label.toLowerCase()}"${required} /></label>`;
