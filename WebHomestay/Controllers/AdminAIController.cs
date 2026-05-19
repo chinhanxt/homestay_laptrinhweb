@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using WebHomestay.Data;
 using WebHomestay.Models;
@@ -135,7 +136,26 @@ namespace WebHomestay.Controllers
         [HttpPost("booking-form-config")]
         public async Task<IActionResult> SaveBookingFormConfig([FromBody] BookingFormConfigRequest request)
         {
-            await UpsertAISetting("AIBookingFormSchema", request.FormSchema ?? DefaultBookingFormSchema, "Schema form đặt phòng dùng cho public AI booking flow");
+            var formSchema = request.FormSchema ?? DefaultBookingFormSchema;
+            JsonDocument parsedSchema;
+            try
+            {
+                parsedSchema = JsonDocument.Parse(formSchema);
+            }
+            catch (JsonException)
+            {
+                return BadRequest("Booking form schema must be valid JSON.");
+            }
+
+            using (parsedSchema)
+            {
+                if (parsedSchema.RootElement.ValueKind != JsonValueKind.Array)
+                {
+                    return BadRequest("Booking form schema root must be an array.");
+                }
+            }
+
+            await UpsertAISetting("AIBookingFormSchema", formSchema, "Schema form đặt phòng dùng cho public AI booking flow");
             await _context.SaveChangesAsync();
             return Ok(new { success = true });
         }
