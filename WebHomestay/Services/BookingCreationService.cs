@@ -30,11 +30,8 @@ public class BookingCreationService : IBookingCreationService
             .Include(i => i.Room)
             .SingleAsync(i => i.Id == request.SlotInventoryId);
             
-        if (inventory.Status != "Available")
-            throw new InvalidOperationException("Khung giờ này vừa được người khác đặt.");
-
-        if (!await _availabilityService.IsRoomAvailable(request.RoomId, inventory.StartTime, inventory.EndTime))
-            throw new InvalidOperationException("Khung giờ này vừa được người khác đặt.");
+        if (!await _availabilityService.IsHourlySlotAvailableForRoomAsync(inventory.Id, request.RoomId, request.GuestCount))
+            throw new InvalidOperationException("Khung giờ đặt phòng không hợp lệ hoặc vừa được người khác đặt.");
 
         var booking = new Booking
         {

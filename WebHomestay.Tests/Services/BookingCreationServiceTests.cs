@@ -58,4 +58,47 @@ public class BookingCreationServiceTests
         Assert.Equal(BookingMode.Hourly, booking.BookingMode);
         Assert.Equal("Booked", context.RoomSlotInventories.Single().Status);
     }
+
+    [Fact]
+    public async Task CreateHourlyBookingAsync_WhenSlotBelongsToDifferentRoom_ThrowsAndDoesNotBookSlot()
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(nameof(CreateHourlyBookingAsync_WhenSlotBelongsToDifferentRoom_ThrowsAndDoesNotBookSlot))
+            .Options;
+        await using var context = new ApplicationDbContext(options);
+
+        context.Branches.Add(new Branch { Id = 1, Name = "Test Branch", Address = "123 Test Street" });
+        context.Rooms.AddRange(
+            new Room { Id = 5, Name = "Slot Room", BranchId = 1, Status = "Available", Capacity = 2, MaxGuests = 2, PricePerHour = 100000, PricePerDay = 500000 },
+            new Room { Id = 6, Name = "Requested Room", BranchId = 1, Status = "Available", Capacity = 2, MaxGuests = 2, PricePerHour = 120000, PricePerDay = 600000 });
+        context.RoomSlotInventories.Add(new RoomSlotInventory
+        {
+            Id = 77,
+            RoomId = 5,
+            TemplateId = 1,
+            SlotDate = new DateOnly(2026, 5, 10),
+            SlotLabel = "09:30-11:30",
+            StartTime = new DateTime(2026, 5, 10, 9, 30, 0),
+            EndTime = new DateTime(2026, 5, 10, 11, 30, 0),
+            Status = "Available"
+        });
+        await context.SaveChangesAsync();
+
+        var service = new BookingCreationService(context, new AvailabilityService(context));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateHourlyBookingAsync(new CreateBookingRequest
+        {
+            RoomId = 6,
+            BookingMode = BookingMode.Hourly,
+            SlotInventoryId = 77,
+            CustomerName = "Nhân",
+            CustomerPhone = "0900000000",
+            GuestCount = 2
+        }));
+
+        Assert.Contains("không hợp lệ", ex.Message, StringComparison.OrdinalIgnoreCase);
+        var slot = await context.RoomSlotInventories.SingleAsync(item => item.Id == 77);
+        Assert.Equal("Available", slot.Status);
+        Assert.Empty(context.Bookings);
+    }
 }

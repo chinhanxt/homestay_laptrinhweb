@@ -74,6 +74,22 @@ public class AvailabilityService : IAvailabilityService
         return availableRoomIds.Except(blockedRoomIds).ToList();
     }
 
+    public async Task<bool> IsHourlySlotAvailableForRoomAsync(int slotInventoryId, int roomId, int guestCount, CancellationToken cancellationToken = default)
+    {
+        var slot = await _context.RoomSlotInventories
+            .AsNoTracking()
+            .Include(item => item.Room)
+            .SingleOrDefaultAsync(item => item.Id == slotInventoryId, cancellationToken);
+
+        if (slot == null) return false;
+        if (slot.RoomId != roomId) return false;
+        if (slot.Status != "Available") return false;
+        if (slot.Room.Status != "Available") return false;
+        if (slot.Room.MaxGuests < guestCount) return false;
+
+        return await IsRoomAvailable(roomId, slot.StartTime, slot.EndTime);
+    }
+
     public async Task<List<DateOnly>> GetBlockedDatesAsync(int roomId, DateOnly visibleFrom, int visibleDays)
     {
         var visibleTo = visibleFrom.AddDays(visibleDays);
