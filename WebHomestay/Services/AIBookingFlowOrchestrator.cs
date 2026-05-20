@@ -53,17 +53,22 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         {
             state.CheckInDate = requestedDate;
             state.CheckOutDate = request.EndTime.HasValue ? DateOnly.FromDateTime(request.EndTime.Value) : requestedDate.AddDays(1);
+            if (state.CheckOutDate <= state.CheckInDate)
+            {
+                return BuildResponse(sessionId, "invalid-date-range", "Ngày trả phải sau ngày nhận. Bạn chọn lại ngày trả giúp mình nhé.", state);
+            }
             return await BuildAvailableDailyRoomsForDateAsync(sessionId, state, requestedDate, cancellationToken);
         }
 
         state.HourlyDate = requestedDate;
 
-        if (TryExtractHourlyRange(message, requestedDate, out var rangeStart, out var rangeEnd))
+        if (TryExtractHourlyRange(message, requestedDate, out var rangeStart, out var rangeEnd)
+            || TryGetHourlyRangeFromRequest(request, out rangeStart, out rangeEnd))
         {
             return await BuildExactOrNearbyHourlySlotsAsync(sessionId, state, rangeStart, rangeEnd, cancellationToken);
         }
 
-        return await BuildAvailableHourlySlotsForDateAsync(sessionId, state, requestedDate, "Mình kiểm tra theo thông tin bạn đã chọn. Các khung giờ còn trống hôm nay là:", cancellationToken);
+        return await BuildAvailableHourlySlotsForDateAsync(sessionId, state, requestedDate, "Mình kiểm tra theo thông tin bạn đã chọn. Các khung giờ còn trống trong ngày là:", cancellationToken);
     }
 
     public async Task<AIBookingFlowResponse> BuildRoomCardsAsync(AIBookingSessionState state)
@@ -105,6 +110,11 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         var room = await LoadSelectedRoomAsync(state.SelectedRoomId);
         state.SelectedRoomName = room.Name;
         state.BookingMode = NormalizeMode(state.BookingMode);
+
+        if (!ValidateGuestCountForRoom(room, state.GuestCount, out var guestMessage))
+        {
+            return BuildResponse(request, "invalid-guest-count", guestMessage, state);
+        }
 
         if (state.BookingMode == "daily")
         {
@@ -165,13 +175,18 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
             return BuildResponse(request, "select-slot", "Khung giờ này không còn phù hợp hoặc vừa được người khác đặt. Bạn vui lòng chọn khung giờ khác nhé.", state);
         }
 
+        if (!ValidateGuestCountForRoom(slot.Room, state.GuestCount, out var guestMessage))
+        {
+            return BuildResponse(request, "invalid-guest-count", guestMessage, state);
+        }
+
         state.SelectedRoomId = slot.RoomId;
         state.SelectedRoomName = slot.Room.Name;
         state.SelectedSlotLabel = slot.SlotLabel;
         state.HourlyDate = slot.SlotDate;
         state.BookingMode = "hourly";
         var total = await CalculateTotalPriceAsync(slot.Room, slot.StartTime, slot.EndTime, true, state.GuestCount);
-        return BuildSummaryAndFormResponse(request, state, total, BuildHourlySummaryLines(state, slot.StartTime, slot.EndTime), "submit-booking-form");
+        return BuildSummaryAndFormResponse(request, state, total, BuildHourlySummaryLines(state, slot.Room, slot.StartTime, slot.EndTime), "submit-booking-form");
     }
 
     public async Task<AIBookingFlowResponse> SelectDailyRoomAsync(AIBookingActionRequest request)
@@ -186,9 +201,20 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         var form = request.FormSubmission ?? throw new InvalidOperationException("Thiếu thông tin khách đặt phòng.");
         var mode = NormalizeMode(state.BookingMode);
 
+        var room = await LoadSelectedRoomAsync(state.SelectedRoomId);
+        var guestCount = ResolveGuestCountFromForm(form, state.GuestCount);
+        if (!ValidateGuestCountForRoom(room, guestCount, out var guestMessage))
+        {
+            throw new InvalidOperationException(guestMessage);
+        }
+        if (mode == "daily" && (!state.CheckInDate.HasValue || !state.CheckOutDate.HasValue || state.CheckOutDate <= state.CheckInDate))
+        {
+            throw new InvalidOperationException("Ngày trả phải sau ngày nhận. Bạn chọn lại ngày trả giúp mình nhé.");
+        }
+
         var createRequest = new CreateBookingRequest
         {
-            RoomId = state.SelectedRoomId ?? throw new InvalidOperationException("Chưa chọn phòng."),
+            RoomId = room.Id,
             BookingMode = mode == "daily" ? BookingMode.Daily : BookingMode.Hourly,
             SlotInventoryId = state.SelectedSlotId,
             CheckInDate = state.CheckInDate,
@@ -197,7 +223,7 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
             CustomerPhone = ResolveFormValue(form, "customerPhone", form.PhoneNumber),
             CustomerEmail = ResolveFormValue(form, "customerEmail", form.Email),
             CustomerNote = ResolveFormValue(form, "customerNote", form.Notes),
-            GuestCount = ResolveGuestCountFromForm(form, state.GuestCount)
+            GuestCount = guestCount
         };
 
         var booking = mode == "daily"
@@ -217,7 +243,7 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
                     BookingId = booking.Id,
                     PaymentStatus = booking.PaymentStatus,
                     Amount = booking.TotalPrice,
-                    PaymentUrl = $"/Bookings/Payment/{booking.Id}",
+                    PaymentUrl = $"/Bookings/Success/{booking.Id}",
                     SuccessUrl = $"/Bookings/Success/{booking.Id}",
                     Instructions = "Vui lòng thanh toán để hoàn tất giữ phòng."
                 }
@@ -241,6 +267,10 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         var checkOut = ExtractCheckOutDateFromRequest(state, checkIn);
         state.CheckInDate = checkIn;
         state.CheckOutDate = checkOut;
+        if (checkOut <= checkIn)
+        {
+            return BuildResponse(sessionId, "invalid-date-range", "Ngày trả phải sau ngày nhận. Bạn chọn lại ngày trả giúp mình nhé.", state);
+        }
         var interval = BookingTimeRules.BuildDailyStay(checkIn, checkOut);
         var rooms = await _context.Rooms
             .AsNoTracking()
@@ -290,34 +320,23 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
     private async Task<AIBookingFlowResponse> BuildExactOrNearbyHourlySlotsAsync(string sessionId, AIBookingSessionState state, DateTime rangeStart, DateTime rangeEnd, CancellationToken cancellationToken)
     {
         state.HourlyDate = DateOnly.FromDateTime(rangeStart);
-        var exactSlots = await BuildHourlySlotOptionsAsync(state, state.HourlyDate.Value, rangeStart, rangeEnd, cancellationToken);
-        exactSlots = exactSlots
-            .Where(slot => slot.StartTime == rangeStart && slot.EndTime == rangeEnd)
-            .ToList();
-
-        if (exactSlots.Count > 0)
-        {
-            return BuildResponse(sessionId, "select-slot", "Đúng khung giờ bạn hỏi hiện còn phòng. Bạn chọn phòng/slot bên dưới nhé.", state,
-                new AIUiBlock { Type = "hourlySlots", Data = new { slots = exactSlots } });
-        }
-
-        var nearbyStart = rangeStart.AddHours(-2);
-        var nearbyEnd = rangeEnd.AddHours(2);
-        var nearbySlots = await BuildHourlySlotOptionsAsync(state, state.HourlyDate.Value, nearbyStart, nearbyEnd, cancellationToken);
-        nearbySlots = nearbySlots
-            .Where(slot => slot.StartTime >= nearbyStart && slot.EndTime <= nearbyEnd)
-            .OrderBy(slot => Math.Abs((slot.StartTime - rangeStart).TotalMinutes))
+        var matchingSlots = await BuildHourlySlotOptionsAsync(state, state.HourlyDate.Value, rangeStart, rangeEnd, cancellationToken);
+        matchingSlots = matchingSlots
+            .Where(slot => slot.StartTime <= rangeStart && slot.EndTime >= rangeEnd)
+            .OrderBy(slot => slot.StartTime == rangeStart && slot.EndTime == rangeEnd ? 0 : 1)
+            .ThenBy(slot => slot.StartTime)
+            .ThenBy(slot => slot.EndTime)
             .ThenBy(slot => slot.TotalPrice)
             .ToList();
 
-        if (nearbySlots.Count == 0)
+        if (matchingSlots.Count == 0)
         {
-            return BuildResponse(sessionId, "no-availability", "Khung giờ bạn hỏi hiện không còn phòng, và trong vòng gần 2 giờ cũng chưa có slot phù hợp. Bạn thử đổi giờ hoặc ngày giúp mình nhé.", state,
-                new AIUiBlock { Type = "hourlySlots", Data = new { slots = nearbySlots } });
+            return BuildResponse(sessionId, "no-availability", $"Không có khung giờ phù hợp với {rangeStart:HH:mm}-{rangeEnd:HH:mm}. Bạn đổi giờ khác giúp mình nhé.", state,
+                new AIUiBlock { Type = "hourlySlots", Data = new { slots = matchingSlots } });
         }
 
-        return BuildResponse(sessionId, "select-slot", "Khung giờ bạn hỏi đã hết. Mình gợi ý các giờ còn trống gần đó trong vòng 2 giờ cùng ngày nhé.", state,
-            new AIUiBlock { Type = "hourlySlots", Data = new { slots = nearbySlots } });
+        return BuildResponse(sessionId, "select-slot", $"Các khung giờ bên dưới phù hợp với thời gian bạn chọn ({rangeStart:HH:mm}-{rangeEnd:HH:mm}).", state,
+            new AIUiBlock { Type = "hourlySlots", Data = new { slots = matchingSlots } });
     }
 
     private async Task<List<AISlotOption>> BuildHourlySlotOptionsAsync(AIBookingSessionState state, DateOnly date, DateTime? windowStart, DateTime? windowEnd, CancellationToken cancellationToken)
@@ -334,6 +353,12 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         if (windowStart.HasValue && windowEnd.HasValue)
         {
             query = query.Where(slot => slot.StartTime < windowEnd.Value && slot.EndTime > windowStart.Value);
+        }
+
+        var now = DateTime.Now;
+        if (date == DateOnly.FromDateTime(now))
+        {
+            query = query.Where(slot => slot.StartTime > now);
         }
 
         var inventorySlots = await query
@@ -366,12 +391,7 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
 
     private static DateOnly ExtractCheckOutDateFromRequest(AIBookingSessionState state, DateOnly checkIn)
     {
-        if (state.CheckOutDate.HasValue && state.CheckOutDate.Value > checkIn)
-        {
-            return state.CheckOutDate.Value;
-        }
-
-        return checkIn.AddDays(1);
+        return state.CheckOutDate ?? checkIn.AddDays(1);
     }
 
     private static DateOnly ExtractDateOrDefaultToday(string message, DateTime? requestStartTime)
@@ -412,6 +432,13 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         return end > start;
     }
 
+    private static bool TryGetHourlyRangeFromRequest(PublicAIChatRequest request, out DateTime start, out DateTime end)
+    {
+        start = request.StartTime ?? default;
+        end = request.EndTime ?? default;
+        return request.StartTime.HasValue && request.EndTime.HasValue && end > start;
+    }
+
     private async Task<AIBookingFlowResponse> BuildDailyRoomResponseAsync(string sessionId, AIBookingSessionState state, string blockPurpose, string message)
     {
         var room = await LoadSelectedRoomAsync(state.SelectedRoomId);
@@ -419,6 +446,14 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         state.BookingMode = "daily";
         var checkIn = state.CheckInDate ?? DateOnly.FromDateTime(DateTime.Today);
         var checkOut = state.CheckOutDate ?? checkIn.AddDays(1);
+        if (checkOut <= checkIn)
+        {
+            throw new InvalidOperationException("Ngày trả phải sau ngày nhận. Bạn chọn lại ngày trả giúp mình nhé.");
+        }
+        if (!ValidateGuestCountForRoom(room, state.GuestCount, out var guestMessage))
+        {
+            throw new InvalidOperationException(guestMessage);
+        }
         var interval = BookingTimeRules.BuildDailyStay(checkIn, checkOut);
 
         if (!await _availabilityService.IsRoomAvailable(room.Id, interval.Start, interval.End))
@@ -445,7 +480,7 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
                 new AIUiBlock { Type = "dailyRooms", Data = new { rooms = dailyRooms } });
         }
 
-        return BuildSummaryAndFormResponse(sessionId, state, total, BuildDailySummaryLines(state, interval.Start, interval.End), "submit-booking-form");
+        return BuildSummaryAndFormResponse(sessionId, state, total, BuildDailySummaryLines(state, room, interval.Start, interval.End), "submit-booking-form");
     }
 
     private AIBookingFlowResponse BuildSummaryAndFormResponse(AIBookingActionRequest request, AIBookingSessionState state, decimal total, List<string> lines, string nextStep)
@@ -474,19 +509,48 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         return basePrice + Math.Max(0, guestCount - room.Capacity) * room.ExtraGuestFee;
     }
 
-    private static List<string> BuildHourlySummaryLines(AIBookingSessionState state, DateTime start, DateTime end) => new()
+    private static List<string> BuildHourlySummaryLines(AIBookingSessionState state, Room room, DateTime start, DateTime end)
     {
-        $"Phòng: {state.SelectedRoomName}",
-        $"Thời gian: {start:HH:mm} - {end:HH:mm}, {start:dd/MM/yyyy}",
-        $"Số khách: {state.GuestCount}"
-    };
+        var lines = new List<string>
+        {
+            $"Phòng: {state.SelectedRoomName}",
+            $"Thời gian: {start:HH:mm} - {end:HH:mm}, {start:dd/MM/yyyy}",
+            $"Số khách: {state.GuestCount}"
+        };
+        AddExtraGuestSummaryLine(lines, room, state.GuestCount);
+        return lines;
+    }
 
-    private static List<string> BuildDailySummaryLines(AIBookingSessionState state, DateTime start, DateTime end) => new()
+    private static List<string> BuildDailySummaryLines(AIBookingSessionState state, Room room, DateTime start, DateTime end)
     {
-        $"Phòng: {state.SelectedRoomName}",
-        $"Lưu trú: {start:dd/MM/yyyy} - {end:dd/MM/yyyy}",
-        $"Số khách: {state.GuestCount}"
-    };
+        var lines = new List<string>
+        {
+            $"Phòng: {state.SelectedRoomName}",
+            $"Lưu trú: {start:dd/MM/yyyy} - {end:dd/MM/yyyy}",
+            $"Số khách: {state.GuestCount}"
+        };
+        AddExtraGuestSummaryLine(lines, room, state.GuestCount);
+        return lines;
+    }
+
+    private static void AddExtraGuestSummaryLine(List<string> lines, Room room, int guestCount)
+    {
+        var extraGuests = Math.Max(0, guestCount - room.Capacity);
+        if (extraGuests <= 0 || room.ExtraGuestFee <= 0) return;
+        lines.Add($"Phụ thu khách thêm: {extraGuests} khách × {room.ExtraGuestFee:N0}đ = {extraGuests * room.ExtraGuestFee:N0}đ");
+    }
+
+    private static bool ValidateGuestCountForRoom(Room room, int guestCount, out string message)
+    {
+        if (guestCount > room.MaxGuests)
+        {
+            message = $"Phòng {room.Name} tối đa {room.MaxGuests} khách. Bạn giảm số khách hoặc chọn phòng lớn hơn nhé.";
+            return false;
+        }
+
+        message = string.Empty;
+        return true;
+    }
 
     private async Task<List<AIBookingFormField>> BuildBookingFormFieldsAsync(AIBookingSessionState state)
     {
@@ -502,10 +566,13 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
 
     private static List<AIBookingFormField> BuildDefaultBookingFormFields(AIBookingSessionState state) => new()
     {
-        new() { Name = "customerName", Label = "Họ tên", Required = true, Value = state.CustomerName },
-        new() { Name = "phoneNumber", Label = "Số điện thoại", Required = true, Type = "tel" },
-        new() { Name = "email", Label = "Email", Type = "email" },
-        new() { Name = "notes", Label = "Ghi chú", Type = "textarea" }
+        new() { Name = "customerName", Label = "Họ và tên", Required = true, Value = state.CustomerName, Placeholder = "Nhập đúng họ tên người đặt phòng." },
+        new() { Name = "customerPhone", Label = "Số điện thoại", Required = true, Type = "tel", Placeholder = "Số điện thoại/Zalo để homestay liên hệ xác nhận." },
+        new() { Name = "customerEmail", Label = "Email", Type = "email", Placeholder = "Email nhận thông tin đặt phòng nếu có." },
+        new() { Name = "guestCount", Label = "Số khách", Required = true, Type = "number", Value = state.GuestCount.ToString(), Placeholder = "Tổng số khách lưu trú." },
+        new() { Name = "idCardFront", Label = "Ảnh CCCD mặt trước", Required = true, Type = "file", Placeholder = "Upload ảnh rõ nét mặt trước CCCD/CMND/Hộ chiếu." },
+        new() { Name = "idCardBack", Label = "Ảnh CCCD mặt sau", Required = true, Type = "file", Placeholder = "Upload ảnh rõ nét mặt sau CCCD/CMND nếu có." },
+        new() { Name = "customerNote", Label = "Ghi chú thêm", Type = "textarea", Placeholder = "Yêu cầu đặc biệt, giờ đến dự kiến hoặc ghi chú khác." }
     };
 
     private static List<AIBookingFormField> ParseBookingFormSchema(string? schema, AIBookingSessionState state)
@@ -518,14 +585,18 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
             if (document.RootElement.ValueKind != JsonValueKind.Array) return new List<AIBookingFormField>();
 
             return document.RootElement.EnumerateArray()
-                .Select(field => new AIBookingFormField
+                .Select(field =>
                 {
-                    Name = ReadString(field, "id") ?? ReadString(field, "name") ?? string.Empty,
-                    Label = ReadString(field, "label") ?? ReadString(field, "id") ?? string.Empty,
-                    Type = NormalizeFormFieldType(ReadString(field, "type")),
-                    Required = ReadBool(field, "required"),
-                    Placeholder = ReadString(field, "helpText") ?? ReadString(field, "placeholder"),
-                    Value = ReadString(field, "id") is "customerName" ? state.CustomerName : null
+                    var name = ReadString(field, "name") ?? ReadString(field, "id") ?? string.Empty;
+                    return new AIBookingFormField
+                    {
+                        Name = name,
+                        Label = ReadString(field, "label") ?? ReadString(field, "name") ?? ReadString(field, "id") ?? string.Empty,
+                        Type = NormalizeFormFieldType(ReadString(field, "type")),
+                        Required = ReadBool(field, "required"),
+                        Placeholder = ReadString(field, "helpText") ?? ReadString(field, "placeholder"),
+                        Value = ResolveInitialFieldValue(name, state)
+                    };
                 })
                 .Where(field => !string.IsNullOrWhiteSpace(field.Name))
                 .OrderBy(field => ReadOrder(document.RootElement, field.Name))
@@ -544,7 +615,15 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         "number" => "number",
         "textarea" => "textarea",
         "image" => "file",
+        "file" => "file",
         _ => "text"
+    };
+
+    private static string? ResolveInitialFieldValue(string name, AIBookingSessionState state) => name switch
+    {
+        "customerName" => state.CustomerName,
+        "guestCount" => state.GuestCount.ToString(),
+        _ => null
     };
 
     private static string? ReadString(JsonElement element, string propertyName)

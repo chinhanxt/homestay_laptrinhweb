@@ -8,7 +8,10 @@
       "Bash(cat)",
       "Bash(dotnet run *)",
       "Bash(git check-ignore *)",
-      "Bash(node --check \"WebHomestay/wwwroot/js/admin-ai-brain-center.js\")"
+      "Bash(node --check \"WebHomestay/wwwroot/js/admin-ai-brain-center.js\")",
+      "Bash(psql \"Host=localhost;Port=5432;Database=web_homestay;Username=postgres;Password=1510\" -c \"select b.id as branch_id,b.name as branch,b.address,b.hotline,b.booking_lead_time_hours,r.id as room_id,r.name as room,r.description,r.price_per_hour,r.price_per_day,r.price_weekend_per_hour,r.price_weekend_per_day,r.price_holiday_per_hour,r.price_holiday_per_day,r.extra_guest_fee,r.capacity,r.max_guests,r.status from branches b left join rooms r on r.branch_id=b.id order by b.id,r.id;\")",
+      "Bash(dotnet --info)",
+      "Bash(node --check WebHomestay/wwwroot/js/site.js)"
     ],
     "additionalDirectories": [
       "c:\\Users\\admin\\.claude\\projects\\c--Users-admin-Documents-VS-T-m-web-homestay-web-homestay\\memory",

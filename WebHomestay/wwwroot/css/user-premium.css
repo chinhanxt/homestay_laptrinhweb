@@ -935,6 +935,7 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 500;
 }
 
+
 .ai-chat-messages {
     flex: 1;
     padding: 18px;
@@ -1038,11 +1039,21 @@ h1, h2, h3, h4, h5, h6 {
 .ai-booking-summary h4 { font-size: 1rem; margin-bottom: 6px; }
 .ai-room-meta { color: var(--luxury-text-muted); font-size: .86rem; }
 .ai-room-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.ai-room-actions-compact { margin-top: 0; }
 .ai-chip-btn,
 .ai-booking-submit { border: 1px solid var(--luxury-border); background: #fff; color: var(--luxury-primary); padding: 8px 12px; font-weight: 700; text-decoration: none; }
 .ai-chip-btn:hover,
 .ai-booking-submit:hover { border-color: var(--luxury-accent); color: var(--luxury-accent); }
 .ai-slot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.ai-slot-room-group { border: 1px solid rgba(203, 213, 225, 0.9); background: #fff; padding: 10px; margin-bottom: 8px; }
+.ai-slot-room-header { font-size: .86rem; font-weight: 800; color: var(--luxury-primary); margin-bottom: 8px; line-height: 1.25; }
+.ai-slot-chip-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 6px; }
+.ai-slot-chip { border: 1px solid rgba(203, 213, 225, 0.9); background: #f8fafc; color: var(--luxury-text); padding: 7px 8px; font-size: .78rem; font-weight: 800; line-height: 1.25; text-align: center; }
+.ai-slot-chip:hover { border-color: var(--luxury-accent); color: var(--luxury-accent); background: #fff; }
+.ai-daily-room-compact { display: grid; gap: 8px; padding: 10px 12px; }
+.ai-daily-room-main { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ai-daily-room-main strong { font-size: .92rem; color: var(--luxury-primary); }
+.ai-daily-room-main span { flex-shrink: 0; font-weight: 900; color: var(--luxury-accent); font-size: .88rem; }
 .ai-booking-summary ul { margin: 8px 0; padding-left: 18px; color: var(--luxury-text-muted); font-size: .88rem; }
 .ai-booking-total { margin-top: 8px; font-weight: 800; color: var(--luxury-primary); }
 .ai-booking-form { display: grid; gap: 10px; }

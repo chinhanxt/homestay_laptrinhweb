@@ -49,7 +49,9 @@ namespace WebHomestay.Services
         {
             if (isHourly)
             {
-                return await GetRoomPriceForDate(roomId, start, true);
+                var hourlyPrice = await GetRoomPriceForDate(roomId, start, true);
+                var hours = (decimal)Math.Max(0, (end - start).TotalHours);
+                return hourlyPrice * hours;
             }
 
             decimal total = 0;

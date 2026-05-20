@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
 using WebHomestay.Models;
@@ -22,17 +23,22 @@ namespace WebHomestay.Services
         public async Task<AIBrainChatResponse> ChatAsync(AIBrainChatRequest request, CancellationToken cancellationToken = default)
         {
             var sessionId = string.IsNullOrWhiteSpace(request.SessionId) ? Guid.NewGuid().ToString("N") : request.SessionId;
-            var personaSummary = BuildPersonaSummary(request.Message, request.GuestCount);
-            var liveSnapshot = await BuildLiveSnapshotAsync(request, cancellationToken);
-            var knowledge = await RetrieveKnowledgeAsync(request.Message, cancellationToken);
-            var graphReasoning = await BuildGraphReasoningAsync(request.Message, cancellationToken);
-            var guardResult = BuildGuardResult(request);
+            var conversationHistory = await BuildConversationHistoryAsync(sessionId, cancellationToken);
+            var conversationAwareMessage = string.IsNullOrWhiteSpace(conversationHistory)
+                ? request.Message
+                : $"{conversationHistory}\nKhách vừa nhắn: {request.Message}";
+            var enrichedRequest = await EnrichRequestFromConversationAsync(request, conversationAwareMessage, cancellationToken);
+            var personaSummary = BuildPersonaSummary(conversationAwareMessage, enrichedRequest.GuestCount);
+            var liveSnapshot = await BuildLiveSnapshotAsync(enrichedRequest, cancellationToken);
+            var knowledge = await RetrieveKnowledgeAsync(conversationAwareMessage, cancellationToken);
+            var graphReasoning = await BuildGraphReasoningAsync(conversationAwareMessage, cancellationToken);
+            var guardResult = BuildGuardResult(enrichedRequest);
 
             var finalConfig = await GetFinalSynthesizerConfigAsync(cancellationToken);
-            var filteredFormSchema = FilterFormSchema(finalConfig.FormSchema, request);
+            var filteredFormSchema = FilterFormSchema(finalConfig.FormSchema, enrichedRequest);
             var modelResponse = await _aiModelClient.CompleteAsync(new AIModelRequest
             {
-                SystemPrompt = BuildSystemPrompt(personaSummary, liveSnapshot, knowledge, graphReasoning, guardResult, finalConfig.Style, filteredFormSchema),
+                SystemPrompt = BuildSystemPrompt(personaSummary, liveSnapshot, knowledge, graphReasoning, guardResult, finalConfig, filteredFormSchema, conversationHistory),
                 UserMessage = request.Message,
                 Temperature = 0.35m,
                 MaxTokens = 900
@@ -66,6 +72,78 @@ namespace WebHomestay.Services
             };
         }
 
+        private async Task<AIBrainChatRequest> EnrichRequestFromConversationAsync(AIBrainChatRequest request, string conversationAwareMessage, CancellationToken cancellationToken)
+        {
+            var enriched = new AIBrainChatRequest
+            {
+                SessionId = request.SessionId,
+                Message = request.Message,
+                BranchId = request.BranchId,
+                StartTime = request.StartTime,
+                EndTime = request.EndTime,
+                GuestCount = request.GuestCount
+            };
+
+            if (!enriched.BranchId.HasValue)
+            {
+                var lowered = conversationAwareMessage.ToLowerInvariant();
+                var branches = await _context.Branches.Select(b => new { b.Id, b.Name }).ToListAsync(cancellationToken);
+                var matchedBranch = branches.FirstOrDefault(b => lowered.Contains(b.Name.ToLowerInvariant()))
+                    ?? branches.FirstOrDefault(b => b.Name.Contains("Sài Gòn") && ContainsAny(lowered, "sài gòn", "sai gon", "saigon", "sg", "hcm", "tphcm", "q1", "quận 1"))
+                    ?? branches.FirstOrDefault(b => b.Name.Contains("Đà Lạt") && ContainsAny(lowered, "đà lạt", "da lat", "dalat", "dl", "đl"));
+                if (matchedBranch != null) enriched.BranchId = matchedBranch.Id;
+            }
+
+            if (enriched.GuestCount <= 1)
+            {
+                var match = Regex.Match(conversationAwareMessage, @"(\d+)\s*(ng|người|nguoi|khách|khach)", RegexOptions.IgnoreCase);
+                if (match.Success && int.TryParse(match.Groups[1].Value, out var parsedGuests)) enriched.GuestCount = parsedGuests;
+            }
+
+            if (!enriched.StartTime.HasValue && TryExtractDate(conversationAwareMessage, out var requestedDate))
+            {
+                enriched.StartTime = requestedDate.ToDateTime(TimeOnly.MinValue);
+                enriched.EndTime = requestedDate.ToDateTime(TimeOnly.MaxValue);
+            }
+
+            return enriched;
+        }
+
+        private bool TryExtractDate(string message, out DateOnly date)
+        {
+            var lowered = message.ToLowerInvariant();
+            if (lowered.Contains("hôm nay") || lowered.Contains("hom nay"))
+            {
+                date = DateOnly.FromDateTime(DateTime.Today);
+                return true;
+            }
+            if (lowered.Contains("ngày mai") || lowered.Contains("ngay mai"))
+            {
+                date = DateOnly.FromDateTime(DateTime.Today.AddDays(1));
+                return true;
+            }
+
+            var match = Regex.Match(lowered, @"(?:ngày\s*)?(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?");
+            if (match.Success)
+            {
+                var day = int.Parse(match.Groups[1].Value);
+                var month = int.Parse(match.Groups[2].Value);
+                var year = match.Groups[3].Success ? int.Parse(match.Groups[3].Value) : DateTime.Today.Year;
+                if (year < 100) year += 2000;
+                return DateOnly.TryParse($"{year:D4}-{month:D2}-{day:D2}", out date);
+            }
+
+            var dayOnlyMatch = Regex.Match(lowered, @"ngày\s+(\d{1,2})(?!\s*[/-])");
+            if (dayOnlyMatch.Success)
+            {
+                var day = int.Parse(dayOnlyMatch.Groups[1].Value);
+                return DateOnly.TryParse($"{DateTime.Today.Year:D4}-{DateTime.Today.Month:D2}-{day:D2}", out date);
+            }
+
+            date = default;
+            return false;
+        }
+
         private string BuildPersonaSummary(string message, int guestCount)
         {
             var lowered = message.ToLowerInvariant();
@@ -76,7 +154,7 @@ namespace WebHomestay.Services
 
         private async Task<string> BuildLiveSnapshotAsync(AIBrainChatRequest request, CancellationToken cancellationToken)
         {
-            if (!request.BranchId.HasValue || !request.StartTime.HasValue || !request.EndTime.HasValue)
+            if (!request.BranchId.HasValue)
             {
                 var branches = await _context.Branches
                     .OrderBy(b => b.Id)
@@ -86,47 +164,100 @@ namespace WebHomestay.Services
                 return JsonSerializer.Serialize(new
                 {
                     SnapshotAt = DateTime.Now,
-                    MissingAvailabilityInputs = true,
+                    MissingBranchForSlotOptions = true,
                     Branches = branches
                 });
             }
 
-            var availableRoomIds = await _availabilityService.GetAvailableRoomIds(request.BranchId.Value, request.StartTime.Value, request.EndTime.Value);
-            var rooms = await _context.Rooms
-                .Where(r => availableRoomIds.Contains(r.Id) && r.MaxGuests >= Math.Max(request.GuestCount, 1))
+            if (!request.StartTime.HasValue)
+            {
+                var branch = await _context.Branches
+                    .Where(b => b.Id == request.BranchId.Value)
+                    .Select(b => new { b.Id, b.Name, b.Address, b.Hotline, b.BookingLeadTimeHours })
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                return JsonSerializer.Serialize(new
+                {
+                    SnapshotAt = DateTime.Now,
+                    request.BranchId,
+                    MissingDateForSlotOptions = true,
+                    Branch = branch
+                });
+            }
+
+            var slotDate = DateOnly.FromDateTime(request.StartTime.Value);
+            var branchRooms = await _context.Rooms
+                .Where(r => r.BranchId == request.BranchId.Value && r.MaxGuests >= Math.Max(request.GuestCount, 1) && r.Status == "Available")
                 .Include(r => r.Branch)
                 .Include(r => r.Amenities)
-                .Select(r => new
-                {
-                    r.Id,
-                    r.Name,
-                    r.Description,
-                    r.PricePerHour,
-                    r.PricePerDay,
-                    r.ExtraGuestFee,
-                    r.Capacity,
-                    r.MaxGuests,
-                    r.Status,
-                    Branch = new
-                    {
-                        r.Branch!.Id,
-                        r.Branch.Name,
-                        r.Branch.Address,
-                        r.Branch.Hotline,
-                        r.Branch.BookingLeadTimeHours
-                    },
-                    Amenities = r.Amenities.Select(a => a.Name).ToList()
-                })
+                .OrderBy(r => r.PricePerHour)
                 .ToListAsync(cancellationToken);
+
+            var availableSlotOptions = new List<object>();
+            var cutoffTime = DateTime.UtcNow.AddHours(branchRooms.FirstOrDefault()?.Branch?.BookingLeadTimeHours ?? 0);
+            foreach (var room in branchRooms)
+            {
+                var slots = await _context.RoomSlotInventories
+                    .Where(slot => slot.RoomId == room.Id && slot.SlotDate == slotDate && slot.Status == "Available" && slot.StartTime >= cutoffTime)
+                    .OrderBy(slot => slot.StartTime)
+                    .ToListAsync(cancellationToken);
+
+                var availableLabels = new List<string>();
+                foreach (var slot in slots)
+                {
+                    if (await _availabilityService.IsRoomAvailable(room.Id, slot.StartTime, slot.EndTime)) availableLabels.Add(slot.SlotLabel);
+                }
+
+                if (availableLabels.Any())
+                {
+                    availableSlotOptions.Add(new
+                    {
+                        RoomId = room.Id,
+                        RoomName = room.Name,
+                        room.Description,
+                        room.PricePerHour,
+                        room.PricePerDay,
+                        room.Capacity,
+                        room.MaxGuests,
+                        Amenities = room.Amenities.Select(a => a.Name).ToList(),
+                        Slots = availableLabels.Take(8).ToList()
+                    });
+                }
+            }
+
+            var dailyStart = slotDate.ToDateTime(new TimeOnly(14, 0));
+            var dailyEnd = slotDate.AddDays(1).ToDateTime(new TimeOnly(12, 0));
+            var availableDailyRooms = new List<object>();
+            foreach (var room in branchRooms)
+            {
+                if (await _availabilityService.IsRoomAvailable(room.Id, dailyStart, dailyEnd))
+                {
+                    availableDailyRooms.Add(new
+                    {
+                        RoomId = room.Id,
+                        RoomName = room.Name,
+                        room.Description,
+                        room.PricePerDay,
+                        room.PricePerHour,
+                        room.Capacity,
+                        room.MaxGuests,
+                        CheckIn = dailyStart,
+                        CheckOut = dailyEnd,
+                        Amenities = room.Amenities.Select(a => a.Name).ToList()
+                    });
+                }
+            }
 
             return JsonSerializer.Serialize(new
             {
                 SnapshotAt = DateTime.Now,
                 request.BranchId,
-                request.StartTime,
-                request.EndTime,
+                SlotDate = slotDate,
                 GuestCount = Math.Max(request.GuestCount, 1),
-                AvailableRooms = rooms
+                AvailableSlotOptions = availableSlotOptions,
+                HasAvailableSlotOptions = availableSlotOptions.Any(),
+                AvailableDailyRooms = availableDailyRooms,
+                HasAvailableDailyRooms = availableDailyRooms.Any()
             });
         }
 
@@ -261,7 +392,7 @@ namespace WebHomestay.Services
                 "branch" => !request.BranchId.HasValue,
                 "datetime" => !request.StartTime.HasValue || !request.EndTime.HasValue,
                 "guestCount" => request.GuestCount <= 1 && !ContainsAny(lowered, "1 người", "2 người", "3 người", "4 người", "một người", "hai người"),
-                "budget" => !ContainsAny(lowered, "giá", "rẻ", "budget", "ngân sách", "k", "triệu"),
+                "budget" => false,
                 "phone" => !lowered.Any(char.IsDigit) || lowered.Count(char.IsDigit) < 9,
                 "note" => string.IsNullOrWhiteSpace(request.Message),
                 _ => false
@@ -339,35 +470,72 @@ namespace WebHomestay.Services
             }
         }
 
-        private async Task<(string Style, string FormSchema)> GetFinalSynthesizerConfigAsync(CancellationToken cancellationToken)
+        private async Task<string> BuildConversationHistoryAsync(string sessionId, CancellationToken cancellationToken)
         {
-            var styleSetting = await _context.SystemSettings.FirstOrDefaultAsync(s => s.SettingKey == "AIFinalSynthesizerStyle", cancellationToken);
-            var formSetting = await _context.SystemSettings.FirstOrDefaultAsync(s => s.SettingKey == "AIFinalSynthesizerFormSchema", cancellationToken);
-            var optionSetting = await _context.SystemSettings.FirstOrDefaultAsync(s => s.SettingKey == "AIFinalConditionOptions", cancellationToken);
-            var style = string.IsNullOrWhiteSpace(styleSetting?.SettingValue)
-                ? "Giọng thân thiện, rõ ràng, tư vấn như lễ tân chuyên nghiệp. Trả lời ngắn gọn nhưng đủ ý. Nếu thiếu thông tin thì hỏi lại bằng các câu hỏi cụ thể."
-                : styleSetting.SettingValue;
-            var formSchema = string.IsNullOrWhiteSpace(formSetting?.SettingValue) ? "[]" : formSetting.SettingValue;
-            var optionKeywords = ExtractConditionOptionKeywords(optionSetting?.SettingValue);
-            return (style, ApplyConditionOptionKeywords(formSchema, optionKeywords));
+            var turns = await _context.AIConversationTraces
+                .Where(t => t.SessionId == sessionId)
+                .OrderByDescending(t => t.CreatedAt)
+                .Take(6)
+                .OrderBy(t => t.CreatedAt)
+                .Select(t => new { t.CustomerMessage, t.FinalAnswer })
+                .ToListAsync(cancellationToken);
+
+            if (!turns.Any()) return string.Empty;
+
+            var builder = new StringBuilder();
+            builder.AppendLine("Lịch sử hội thoại gần đây trong cùng session:");
+            foreach (var turn in turns)
+            {
+                builder.AppendLine($"Khách: {turn.CustomerMessage}");
+                builder.AppendLine($"AI: {turn.FinalAnswer}");
+            }
+
+            return builder.ToString();
         }
 
-        private string BuildSystemPrompt(string personaSummary, string liveSnapshot, List<object> knowledge, List<object> graphReasoning, string guardResult, string finalStyle, string formSchema)
+        private async Task<FinalSynthesizerPromptConfig> GetFinalSynthesizerConfigAsync(CancellationToken cancellationToken)
+        {
+            var settings = await _context.SystemSettings
+                .Where(s => s.GroupName == "AI")
+                .ToDictionaryAsync(s => s.SettingKey, s => s.SettingValue, cancellationToken);
+            var formSchema = GetAISetting(settings, "AIFinalSynthesizerFormSchema", "[]");
+            var optionKeywords = ExtractConditionOptionKeywords(GetAISetting(settings, "AIFinalConditionOptions", string.Empty));
+
+            return new FinalSynthesizerPromptConfig
+            {
+                Style = GetAISetting(settings, "AIFinalSynthesizerStyle", "Giọng thân thiện, rõ ràng, tư vấn như lễ tân chuyên nghiệp. Trả lời ngắn gọn nhưng đủ ý. Nếu thiếu thông tin thì hỏi lại bằng các câu hỏi cụ thể."),
+                FormSchema = ApplyConditionOptionKeywords(formSchema, optionKeywords),
+                BasePrompt = GetAISetting(settings, "AIFinalBasePrompt", "Bạn là Final Response Synthesizer của AI Brain Center cho homestay self check-in/self check-out. Nhiệm vụ duy nhất: viết câu trả lời cuối cùng cho khách dựa trên dữ liệu các agent cung cấp."),
+                LanguageRule = GetAISetting(settings, "AIFinalLanguageRule", "Luôn trả lời bằng tiếng Việt, thân thiện, tự nhiên như nhân viên tư vấn homestay."),
+                DataTruthRule = GetAISetting(settings, "AIFinalDataTruthRule", "Không bịa phòng trống, giá, chính sách hoặc thông tin chi nhánh. Chỉ dùng dữ liệu từ Live System, Knowledge, Graph và cấu hình được cung cấp."),
+                MissingInfoRule = GetAISetting(settings, "AIFinalMissingInfoRule", "Nếu thiếu ngày/giờ/chi nhánh/số khách theo cấu hình form đã lọc, hãy hỏi lại bằng đúng các trường cần điền. Không hỏi ngân sách vì giá phòng đã cố định trong hệ thống."),
+                BookingRule = GetAISetting(settings, "AIFinalBookingRule", "Không xác nhận đặt phòng, không hứa giữ phòng, không tạo mã khóa/check-in code; chỉ hướng khách sang luồng đặt phòng chính thức."),
+                FormRule = GetAISetting(settings, "AIFinalFormRule", "Form Schema JSON đã được lọc theo điều kiện của từng field cho câu hỏi hiện tại. Nếu Form Schema còn trường, hãy hỏi khách điền đúng các trường đó, không thêm trường ngoài schema. Nếu Form Schema rỗng nhưng nhu cầu chưa rõ, hãy hỏi thêm một câu ngắn để xác định intent trước khi xin thông tin."),
+                PaymentRule = GetAISetting(settings, "AIFinalPaymentRule", "Nếu field type là paymentQr, được gửi đúng messageTemplate và qrImageUrl đã cấu hình như hướng dẫn chuyển khoản; không tự xác nhận booking sau khi gửi QR."),
+                MemoryRule = GetAISetting(settings, "AIFinalMemoryRule", "Phải ghi nhớ các thông tin khách đã nói trong lịch sử cùng session; không hỏi lại chi nhánh, ngày giờ, số khách nếu khách đã cung cấp rồi."),
+                ContextFormatRule = GetAISetting(settings, "AIFinalContextFormatRule", "Đọc Persona Agent, Safety Guard, Live System Agent JSON, Knowledge RAG Agent JSON và Graph Reasoning Agent JSON như dữ liệu nội bộ để tổng hợp câu trả lời cuối cùng; không hiển thị raw JSON cho khách.")
+            };
+        }
+
+        private string GetAISetting(Dictionary<string, string> settings, string key, string fallback)
+        {
+            return settings.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : fallback;
+        }
+
+        private string BuildSystemPrompt(string personaSummary, string liveSnapshot, List<object> knowledge, List<object> graphReasoning, string guardResult, FinalSynthesizerPromptConfig finalConfig, string formSchema, string conversationHistory)
         {
             var builder = new StringBuilder();
-            builder.AppendLine("Bạn là Final Response Synthesizer của AI Brain Center cho homestay self check-in/self check-out.");
-            builder.AppendLine("Nhiệm vụ duy nhất: viết câu trả lời cuối cùng cho khách dựa trên dữ liệu các agent cung cấp.");
-            builder.AppendLine("Luôn trả lời bằng tiếng Việt, không bịa phòng trống hoặc giá.");
-            builder.AppendLine("Nếu thiếu ngày/giờ/chi nhánh/số khách/ngân sách theo cấu hình form đã lọc, hãy hỏi lại bằng đúng các trường cần điền.");
-            builder.AppendLine("Không xác nhận đặt phòng; chỉ hướng khách sang luồng đặt phòng chính thức.");
-            builder.AppendLine("QUY TẮC BẮT BUỘC CỦA FINAL RESPONSE SYNTHESIZER:");
-            builder.AppendLine("- Phải ưu tiên làm theo cấu hình phong cách trả lời bên dưới hơn mọi thói quen trả lời chung.");
-            builder.AppendLine("- Form Schema JSON bên dưới đã được lọc theo điều kiện của từng field cho câu hỏi hiện tại.");
-            builder.AppendLine("- Nếu Form Schema còn trường, hãy hỏi khách điền đúng các trường đó, không thêm trường ngoài schema.");
-            builder.AppendLine("- Nếu Form Schema rỗng nhưng nhu cầu chưa rõ, hãy hỏi thêm một câu ngắn để xác định intent trước khi xin thông tin.");
-            builder.AppendLine("- Không được hiển thị toàn bộ form cấu hình nếu điều kiện field chưa phù hợp.");
-            builder.AppendLine("- Nếu field type là paymentQr, được gửi đúng messageTemplate và qrImageUrl đã cấu hình như hướng dẫn chuyển khoản; không tự xác nhận booking sau khi gửi QR.");
-            builder.AppendLine($"Final Response Synthesizer Style: {finalStyle}");
+            AppendPromptSection(builder, "Base Prompt", finalConfig.BasePrompt);
+            AppendPromptSection(builder, "Language Rule", finalConfig.LanguageRule);
+            AppendPromptSection(builder, "Data Truth Rule", finalConfig.DataTruthRule);
+            AppendPromptSection(builder, "Missing Info Rule", finalConfig.MissingInfoRule);
+            AppendPromptSection(builder, "Booking Rule", finalConfig.BookingRule);
+            AppendPromptSection(builder, "Form Rule", finalConfig.FormRule);
+            AppendPromptSection(builder, "Payment Rule", finalConfig.PaymentRule);
+            AppendPromptSection(builder, "Memory Rule", finalConfig.MemoryRule);
+            AppendPromptSection(builder, "Context Format Rule", finalConfig.ContextFormatRule);
+            if (!string.IsNullOrWhiteSpace(conversationHistory)) builder.AppendLine(conversationHistory);
+            builder.AppendLine($"Final Response Synthesizer Style: {finalConfig.Style}");
             builder.AppendLine($"Final Response Form Schema JSON: {formSchema}");
             builder.AppendLine($"Persona Agent: {personaSummary}");
             builder.AppendLine($"Safety Guard: {guardResult}");
@@ -376,5 +544,26 @@ namespace WebHomestay.Services
             builder.AppendLine($"Graph Reasoning Agent JSON: {JsonSerializer.Serialize(graphReasoning)}");
             return builder.ToString();
         }
+
+        private void AppendPromptSection(StringBuilder builder, string title, string content)
+        {
+            if (string.IsNullOrWhiteSpace(content)) return;
+            builder.AppendLine($"{title}: {content}");
+        }
+    }
+
+    public class FinalSynthesizerPromptConfig
+    {
+        public string Style { get; set; } = string.Empty;
+        public string FormSchema { get; set; } = "[]";
+        public string BasePrompt { get; set; } = string.Empty;
+        public string LanguageRule { get; set; } = string.Empty;
+        public string DataTruthRule { get; set; } = string.Empty;
+        public string MissingInfoRule { get; set; } = string.Empty;
+        public string BookingRule { get; set; } = string.Empty;
+        public string FormRule { get; set; } = string.Empty;
+        public string PaymentRule { get; set; } = string.Empty;
+        public string MemoryRule { get; set; } = string.Empty;
+        public string ContextFormatRule { get; set; } = string.Empty;
     }
 }

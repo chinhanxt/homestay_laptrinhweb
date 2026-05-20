@@ -10,11 +10,19 @@ namespace WebHomestay.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IAIBookingFlowOrchestrator _bookingFlowOrchestrator;
+        private readonly IWebHostEnvironment _environment;
+        private readonly IImageMaskingService _maskingService;
 
-        public AIChatController(ApplicationDbContext context, IAIBookingFlowOrchestrator bookingFlowOrchestrator)
+        public AIChatController(
+            ApplicationDbContext context,
+            IAIBookingFlowOrchestrator bookingFlowOrchestrator,
+            IWebHostEnvironment environment,
+            IImageMaskingService maskingService)
         {
             _context = context;
             _bookingFlowOrchestrator = bookingFlowOrchestrator;
+            _environment = environment;
+            _maskingService = maskingService;
         }
 
         [HttpPost("chat")]
@@ -80,6 +88,17 @@ namespace WebHomestay.Controllers
                 response.SessionId = request.SessionId;
                 return Ok(response);
             }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new AIBookingFlowResponse
+                {
+                    SessionId = request.SessionId,
+                    CurrentStep = "error",
+                    Message = ex.Message,
+                    State = request.State,
+                    UiBlocks = new List<AIUiBlock>()
+                });
+            }
             catch
             {
                 return StatusCode(503, new AIBookingFlowResponse
@@ -93,6 +112,28 @@ namespace WebHomestay.Controllers
             }
         }
 
+        [HttpPost("booking-id-card")]
+        public async Task<IActionResult> UploadBookingIdCard(int bookingId, IFormFile? idCardFront, IFormFile? idCardBack)
+        {
+            var booking = await _context.Bookings.FindAsync(bookingId);
+            if (booking == null) return NotFound(new { message = "Không tìm thấy đơn đặt phòng." });
+
+            if (idCardFront != null && idCardFront.Length > 0)
+            {
+                booking.IdCardFrontPath = await SaveSecureFile(idCardFront);
+                booking.IdCardFrontMaskedPath = await _maskingService.MaskIdCardAsync(booking.IdCardFrontPath!, true);
+            }
+
+            if (idCardBack != null && idCardBack.Length > 0)
+            {
+                booking.IdCardBackPath = await SaveSecureFile(idCardBack);
+                booking.IdCardBackMaskedPath = await _maskingService.MaskIdCardAsync(booking.IdCardBackPath!, false);
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true });
+        }
+
         [HttpGet("branches")]
         public async Task<IActionResult> Branches(CancellationToken cancellationToken)
         {
@@ -101,6 +142,23 @@ namespace WebHomestay.Controllers
                 .Select(b => new { b.Id, b.Name })
                 .ToListAsync(cancellationToken);
             return Ok(branches);
+        }
+
+        private async Task<string?> SaveSecureFile(IFormFile? file)
+        {
+            if (file == null || file.Length == 0) return null;
+
+            string secureDir = Path.Combine(_environment.ContentRootPath, "App_Data", "SecureUploads", "IDCards");
+            if (!Directory.Exists(secureDir)) Directory.CreateDirectory(secureDir);
+
+            string fileName = Guid.NewGuid() + Path.GetExtension(file.FileName);
+            string filePath = Path.Combine(secureDir, fileName);
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            return fileName;
         }
 
     }}

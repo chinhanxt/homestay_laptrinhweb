@@ -15,14 +15,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const guestsInput = widget.querySelector('.ai-context-guests');
     const checkInInput = widget.querySelector('.ai-context-checkin');
     const checkOutInput = widget.querySelector('.ai-context-checkout');
+    const timeFields = Array.from(widget.querySelectorAll('.ai-hourly-time-field'));
+    const checkOutField = checkOutInput ? checkOutInput.closest('label') : null;
 
     let sessionId = createSessionId();
     let bookingState = {};
 
     loadBranches();
+    updateContextDateTimeControls();
 
     toggle.addEventListener('click', () => setOpen(!widget.classList.contains('is-open')));
     close.addEventListener('click', () => setOpen(false));
+    if (modeSelect) modeSelect.addEventListener('change', updateContextDateTimeControls);
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -104,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const payload = buildActionPayload('submit-booking-form', bookingForm);
             payload.formSubmission = collectBookingForm(bookingForm);
+            const idCardFiles = collectIdCardFiles(bookingForm);
             const response = await fetch('/ai/booking-action', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -111,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.message || 'AI booking action request failed.');
+            await uploadIdCardFiles(data.state?.bookingId, idCardFiles);
             handleActionResponse(data);
         } catch {
             appendMessage('Xin lỗi, chưa gửi được thông tin đặt phòng. Bạn thử lại giúp mình nhé.', 'bot');
@@ -240,10 +246,26 @@ document.addEventListener('DOMContentLoaded', () => {
         scrollMessages();
     }
 
+    function groupSlotsByRoom(slots) {
+        const groups = new Map();
+        slots.forEach(slot => {
+            if (!slot || typeof slot !== 'object') return;
+            const roomId = toSafeNumber(slot.roomId);
+            const roomName = slot.roomName || 'Phòng';
+            const key = `${roomId}:${roomName}`;
+            if (!groups.has(key)) groups.set(key, { roomId, roomName, slots: [] });
+            groups.get(key).slots.push(slot);
+        });
+        return Array.from(groups.values());
+    }
+
+    function formatSlotChipLabel(slot) {
+        const label = slot.label || 'Khung giờ';
+        return `${label} · ${formatMoney(slot.totalPrice)}`;
+    }
+
     function renderHourlySlots(data) {
         const wrapper = appendBlock('ai-hourly-slots');
-        const grid = document.createElement('div');
-        grid.className = 'ai-slot-grid';
         const slots = Array.isArray(data.slots) ? data.slots : [];
         if (!slots.length) {
             const empty = document.createElement('div');
@@ -254,18 +276,31 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        slots.forEach(slot => {
-            if (!slot || typeof slot !== 'object') return;
-            const button = document.createElement('button');
-            button.className = 'ai-chip-btn';
-            button.type = 'button';
-            button.dataset.aiAction = 'select-slot';
-            button.dataset.roomId = toSafeNumber(slot.roomId).toString();
-            button.dataset.slotId = toSafeNumber(slot.slotId).toString();
-            button.textContent = `${slot.roomName || 'Phòng'}: ${slot.label || 'Khung giờ'} · ${formatMoney(slot.totalPrice)}`;
-            grid.appendChild(button);
+        groupSlotsByRoom(slots).forEach(group => {
+            const roomBlock = document.createElement('div');
+            roomBlock.className = 'ai-slot-room-group';
+
+            const header = document.createElement('div');
+            header.className = 'ai-slot-room-header';
+            header.textContent = group.roomName;
+            roomBlock.appendChild(header);
+
+            const grid = document.createElement('div');
+            grid.className = 'ai-slot-chip-grid';
+            group.slots.forEach(slot => {
+                const button = document.createElement('button');
+                button.className = 'ai-slot-chip';
+                button.type = 'button';
+                button.dataset.aiAction = 'select-slot';
+                button.dataset.roomId = toSafeNumber(slot.roomId).toString();
+                button.dataset.slotId = toSafeNumber(slot.slotId).toString();
+                button.textContent = formatSlotChipLabel(slot);
+                grid.appendChild(button);
+            });
+
+            roomBlock.appendChild(grid);
+            wrapper.appendChild(roomBlock);
         });
-        wrapper.appendChild(grid);
         scrollMessages();
     }
 
@@ -275,14 +310,22 @@ document.addEventListener('DOMContentLoaded', () => {
         rooms.forEach(room => {
             if (!room || typeof room !== 'object') return;
             const item = document.createElement('div');
-            item.className = 'ai-daily-room-option';
+            item.className = 'ai-daily-room-option ai-daily-room-compact';
+
+            const main = document.createElement('div');
+            main.className = 'ai-daily-room-main';
 
             const title = document.createElement('strong');
-            title.textContent = `${room.roomName || 'Phòng'}: ${formatMoney(room.totalPrice || room.pricePerDay)}/ngày`;
-            item.appendChild(title);
+            title.textContent = room.roomName || 'Phòng';
+            main.appendChild(title);
+
+            const price = document.createElement('span');
+            price.textContent = formatMoney(room.totalPrice || room.pricePerDay);
+            main.appendChild(price);
+            item.appendChild(main);
 
             const actions = document.createElement('div');
-            actions.className = 'ai-room-actions';
+            actions.className = 'ai-room-actions ai-room-actions-compact';
 
             const detailsUrl = toSafeRelativeUrl(room.detailsUrl);
             if (detailsUrl) {
@@ -337,7 +380,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const wrapper = appendBlock('ai-booking-form-block');
         const formElement = document.createElement('form');
         formElement.className = 'ai-booking-form';
-        formElement.dataset.aiAction = 'submit-booking-form';
 
         const fields = Array.isArray(data.fields) ? data.fields : [];
         const normalizedFields = fields.length ? fields : [
@@ -354,16 +396,24 @@ document.addEventListener('DOMContentLoaded', () => {
             caption.textContent = field.label || field.name;
             label.appendChild(caption);
 
-            const control = field.type === 'textarea' ? document.createElement('textarea') : document.createElement('input');
-            const inputType = toSafeInputType(field.type);
-            if (field.type !== 'textarea') control.type = inputType;
-            if (field.type === 'textarea') control.maxLength = 500;
+            const normalizedType = String(field.type || 'text').toLowerCase();
+            const control = normalizedType === 'textarea' ? document.createElement('textarea') : document.createElement('input');
+            const inputType = toSafeInputType(normalizedType);
+            if (normalizedType !== 'textarea') control.type = inputType;
+            if (inputType === 'file') control.accept = 'image/*';
+            if (normalizedType === 'textarea') control.maxLength = 500;
             if (['text', 'tel', 'email'].includes(inputType)) control.maxLength = 120;
             control.name = field.name;
             control.required = !!field.required;
-            control.placeholder = field.placeholder || '';
-            control.value = field.value || (field.name === 'customerName' ? getCustomerName() : '');
+            control.placeholder = getBookingFieldPlaceholder(field, inputType);
+            if (inputType !== 'file') control.value = field.value || (field.name === 'customerName' ? getCustomerName() : '');
             label.appendChild(control);
+            if (field.placeholder) {
+                const help = document.createElement('small');
+                help.className = 'ai-booking-field-help';
+                help.textContent = field.placeholder;
+                label.appendChild(help);
+            }
             formElement.appendChild(label);
         });
 
@@ -418,6 +468,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.bookingMode === 'daily') {
             state.checkInDate = state.checkInDate || getDateOnly(checkInInput);
             state.checkOutDate = state.checkOutDate || getDateOnly(checkOutInput);
+        } else {
+            state.hourlyDate = state.hourlyDate || getDateOnly(checkInInput);
         }
 
         const roomId = toSafeNumber(source.dataset.roomId);
@@ -431,14 +483,40 @@ document.addEventListener('DOMContentLoaded', () => {
     function collectBookingForm(bookingForm) {
         const formData = new FormData(bookingForm);
         const values = {};
-        formData.forEach((value, key) => { values[key] = String(value || '').trim(); });
+        formData.forEach((value, key) => {
+            if (value instanceof File) {
+                values[key] = value.name || '';
+                return;
+            }
+            values[key] = String(value || '').trim();
+        });
         return {
             customerName: values.customerName || getCustomerName(),
-            phoneNumber: values.phoneNumber || values.phone || values.customerPhone || '',
-            email: values.email || '',
-            notes: values.notes || values.note || '',
+            phoneNumber: values.customerPhone || values.phoneNumber || values.phone || '',
+            email: values.customerEmail || values.email || '',
+            notes: values.customerNote || values.notes || values.note || '',
             values
         };
+    }
+
+    function collectIdCardFiles(bookingForm) {
+        return {
+            front: bookingForm.querySelector('[name="idCardFront"]')?.files?.[0] || null,
+            back: bookingForm.querySelector('[name="idCardBack"]')?.files?.[0] || null
+        };
+    }
+
+    async function uploadIdCardFiles(bookingId, files) {
+        if (!bookingId || (!files.front && !files.back)) return;
+        const formData = new FormData();
+        formData.append('bookingId', bookingId);
+        if (files.front) formData.append('idCardFront', files.front);
+        if (files.back) formData.append('idCardBack', files.back);
+        const response = await fetch('/ai/booking-id-card', {
+            method: 'POST',
+            body: formData
+        });
+        if (!response.ok) throw new Error('Không upload được ảnh CCCD cho đơn đặt phòng.');
     }
 
     function updateBookingState(state) {
@@ -480,8 +558,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getCheckOutDateTime() {
+        if (getBookingMode() === 'hourly') return null;
         const value = getDateOnly(checkOutInput);
         return value ? `${value}T00:00:00` : null;
+    }
+
+    function updateContextDateTimeControls() {
+        if (!checkInInput || !checkOutInput) return;
+        const hourly = getBookingMode() === 'hourly';
+        checkInInput.type = 'date';
+        checkOutInput.type = 'date';
+        checkInInput.previousElementSibling.textContent = hourly ? 'Ngày đặt' : 'Ngày nhận';
+        checkOutInput.previousElementSibling.textContent = 'Ngày trả';
+        if (checkOutField) checkOutField.hidden = hourly;
+        timeFields.forEach(field => { field.hidden = true; });
+        if (checkInInput.value && checkInInput.value.length > 10) checkInInput.value = checkInInput.value.slice(0, 10);
+        if (checkOutInput.value && checkOutInput.value.length > 10) checkOutInput.value = checkOutInput.value.slice(0, 10);
     }
 
     function formatMoney(value) {
@@ -500,6 +592,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function toSafeInputType(value) {
         return ['text', 'tel', 'email', 'number', 'date', 'file'].includes(value) ? value : 'text';
+    }
+
+    function getBookingFieldPlaceholder(field, inputType) {
+        if (inputType === 'file') return '';
+        if (field.name === 'customerName') return 'Nhập họ và tên';
+        if (field.name === 'customerPhone') return 'Nhập số điện thoại';
+        if (field.name === 'customerEmail') return 'email@example.com';
+        if (field.name === 'guestCount') return '2';
+        return '';
     }
 
     function scrollMessages() {
