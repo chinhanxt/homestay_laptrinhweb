@@ -254,6 +254,80 @@ public class AIBookingFlowOrchestratorTests
         Assert.Contains("đúng khung", response.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task HandleChatAsync_WhenExactRangeUnavailable_ReturnsOnlyNearbySlotsWithinTwoHours()
+    {
+        await using var context = CreateContext(nameof(HandleChatAsync_WhenExactRangeUnavailable_ReturnsOnlyNearbySlotsWithinTwoHours));
+        SeedBranchesRoomsAndSlots(context);
+        await context.SaveChangesAsync();
+        var exact = await context.RoomSlotInventories.SingleAsync(slot => slot.Id == 100);
+        exact.Status = "Booked";
+        context.RoomSlotInventories.AddRange(
+            new RoomSlotInventory
+            {
+                Id = 102,
+                RoomId = 10,
+                TemplateId = 1,
+                SlotDate = new DateOnly(2026, 5, 20),
+                SlotLabel = "08:00-10:00",
+                StartTime = new DateTime(2026, 5, 20, 8, 0, 0),
+                EndTime = new DateTime(2026, 5, 20, 10, 0, 0),
+                Status = "Available"
+            },
+            new RoomSlotInventory
+            {
+                Id = 103,
+                RoomId = 10,
+                TemplateId = 1,
+                SlotDate = new DateOnly(2026, 5, 20),
+                SlotLabel = "14:00-16:00",
+                StartTime = new DateTime(2026, 5, 20, 14, 0, 0),
+                EndTime = new DateTime(2026, 5, 20, 16, 0, 0),
+                Status = "Available"
+            });
+        await context.SaveChangesAsync();
+        var service = CreateService(context);
+
+        var response = await service.HandleChatAsync(new PublicAIChatRequest
+        {
+            SessionId = "near1",
+            Message = "ngày 20/5 có phòng 9h-11h không?",
+            BranchId = 1,
+            BookingMode = "hourly",
+            GuestCount = 2
+        }, CancellationToken.None);
+
+        var block = Assert.Single(response.UiBlocks, block => block.Type == "hourlySlots");
+        var slots = GetSlots(block.Data);
+        Assert.Single(slots);
+        Assert.Equal(102, slots[0].SlotId);
+        Assert.DoesNotContain(slots, slot => slot.SlotId == 103);
+        Assert.Contains("gần", response.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task HandleChatAsync_WhenTomorrowHasNoSlots_DoesNotClaimAvailability()
+    {
+        await using var context = CreateContext(nameof(HandleChatAsync_WhenTomorrowHasNoSlots_DoesNotClaimAvailability));
+        SeedBranchesRoomsAndSlots(context);
+        await context.SaveChangesAsync();
+        var service = CreateService(context);
+
+        var response = await service.HandleChatAsync(new PublicAIChatRequest
+        {
+            SessionId = "tomorrow1",
+            Message = "ngày mai có phòng không?",
+            BranchId = 1,
+            BookingMode = "hourly",
+            GuestCount = 2
+        }, CancellationToken.None);
+
+        Assert.Equal("no-availability", response.CurrentStep);
+        Assert.Contains("không còn", response.Message, StringComparison.OrdinalIgnoreCase);
+        var block = Assert.Single(response.UiBlocks, block => block.Type == "hourlySlots");
+        Assert.Empty(GetSlots(block.Data));
+    }
+
     private static ApplicationDbContext CreateContext(string name)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
