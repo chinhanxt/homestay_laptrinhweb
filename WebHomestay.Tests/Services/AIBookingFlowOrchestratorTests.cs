@@ -166,6 +166,58 @@ public class AIBookingFlowOrchestratorTests
         Assert.Empty(context.Bookings);
     }
 
+    [Fact]
+    public async Task HandleChatAsync_WhenGuestAsksVagueAvailability_UsesFormContextAndToday()
+    {
+        await using var context = CreateContext(nameof(HandleChatAsync_WhenGuestAsksVagueAvailability_UsesFormContextAndToday));
+        SeedBranchesAndRooms(context);
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        context.RoomSlotTemplates.Add(new RoomSlotTemplate
+        {
+            Id = 2,
+            Name = "Trưa",
+            Code = "NOON",
+            DurationMinutes = 60,
+            CleanupMinutes = 0,
+            FixedStartTime = new TimeOnly(12, 0),
+            FixedEndTime = new TimeOnly(13, 0),
+            IsActive = true
+        });
+        context.RoomSlotInventories.Add(new RoomSlotInventory
+        {
+            Id = 200,
+            RoomId = 10,
+            TemplateId = 2,
+            SlotDate = today,
+            SlotLabel = "12:00-13:00",
+            StartTime = today.ToDateTime(new TimeOnly(12, 0)),
+            EndTime = today.ToDateTime(new TimeOnly(13, 0)),
+            Status = "Available"
+        });
+        await context.SaveChangesAsync();
+        var service = CreateService(context);
+
+        var response = await service.HandleChatAsync(new PublicAIChatRequest
+        {
+            SessionId = "ctx1",
+            Message = "còn phòng không?",
+            CustomerName = "Nhân",
+            BranchId = 1,
+            BookingMode = "hourly",
+            GuestCount = 2
+        }, CancellationToken.None);
+
+        Assert.Equal("select-slot", response.CurrentStep);
+        Assert.Equal(today, response.State.HourlyDate);
+        Assert.Equal(1, response.State.BranchId);
+        Assert.Equal(2, response.State.GuestCount);
+        var block = Assert.Single(response.UiBlocks, block => block.Type == "hourlySlots");
+        var slots = GetSlots(block.Data);
+        var slot = Assert.Single(slots);
+        Assert.Equal(200, slot.SlotId);
+        Assert.Contains("còn", response.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static ApplicationDbContext CreateContext(string name)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

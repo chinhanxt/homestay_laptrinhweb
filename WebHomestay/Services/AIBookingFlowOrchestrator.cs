@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using WebHomestay.Data;
@@ -26,6 +27,34 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         _bookingCreationService = bookingCreationService;
         _pricingService = pricingService;
         _cache = cache;
+    }
+
+    public async Task<AIBookingFlowResponse> HandleChatAsync(PublicAIChatRequest request, CancellationToken cancellationToken = default)
+    {
+        var sessionId = string.IsNullOrWhiteSpace(request.SessionId) ? Guid.NewGuid().ToString("N") : request.SessionId.Trim();
+        var message = request.Message?.Trim() ?? string.Empty;
+        var state = new AIBookingSessionState
+        {
+            CustomerName = string.IsNullOrWhiteSpace(request.CustomerName) ? null : request.CustomerName.Trim(),
+            BranchId = request.BranchId,
+            BookingMode = NormalizeMode(request.BookingMode),
+            GuestCount = request.GuestCount <= 0 ? 1 : request.GuestCount
+        };
+
+        if (!state.BranchId.HasValue)
+        {
+            return BuildResponse(sessionId, "need-branch", "Bạn chọn giúp mình chi nhánh trước để mình kiểm tra phòng trống nhé.", state);
+        }
+
+        var requestedDate = ExtractDateOrDefaultToday(message, request.StartTime);
+        state.HourlyDate = requestedDate;
+
+        if (TryExtractHourlyRange(message, requestedDate, out var rangeStart, out var rangeEnd))
+        {
+            return await BuildExactOrNearbyHourlySlotsAsync(sessionId, state, rangeStart, rangeEnd, cancellationToken);
+        }
+
+        return await BuildAvailableHourlySlotsForDateAsync(sessionId, state, requestedDate, "Mình kiểm tra theo thông tin bạn đã chọn. Các khung giờ còn trống hôm nay là:", cancellationToken);
     }
 
     public async Task<AIBookingFlowResponse> BuildRoomCardsAsync(AIBookingSessionState state)
@@ -196,6 +225,94 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
             "submit-booking-form" => SubmitBookingFormAsync(request),
             _ => throw new InvalidOperationException($"Không hỗ trợ hành động AI booking: {request.Action}")
         };
+    }
+
+    private async Task<AIBookingFlowResponse> BuildAvailableHourlySlotsForDateAsync(string sessionId, AIBookingSessionState state, DateOnly date, string message, CancellationToken cancellationToken)
+    {
+        var slots = await BuildHourlySlotOptionsAsync(state, date, null, null, cancellationToken);
+        var step = slots.Count == 0 ? "no-availability" : "select-slot";
+        var responseMessage = slots.Count == 0
+            ? "Hiện không còn khung giờ phù hợp theo thông tin bạn đã chọn. Bạn thử đổi giờ, ngày hoặc chi nhánh giúp mình nhé."
+            : message;
+        return BuildResponse(sessionId, step, responseMessage, state, new AIUiBlock { Type = "hourlySlots", Data = new { slots } });
+    }
+
+    private async Task<AIBookingFlowResponse> BuildExactOrNearbyHourlySlotsAsync(string sessionId, AIBookingSessionState state, DateTime rangeStart, DateTime rangeEnd, CancellationToken cancellationToken)
+    {
+        var slots = await BuildHourlySlotOptionsAsync(state, DateOnly.FromDateTime(rangeStart), rangeStart, rangeEnd, cancellationToken);
+        return BuildResponse(sessionId, slots.Count == 0 ? "no-availability" : "select-slot", slots.Count == 0 ? "Hiện không còn khung giờ phù hợp theo thông tin bạn đã chọn. Bạn thử đổi giờ, ngày hoặc chi nhánh giúp mình nhé." : "Đúng khung giờ bạn hỏi hiện còn phòng. Bạn chọn phòng/slot bên dưới nhé.", state,
+            new AIUiBlock { Type = "hourlySlots", Data = new { slots } });
+    }
+
+    private async Task<List<AISlotOption>> BuildHourlySlotOptionsAsync(AIBookingSessionState state, DateOnly date, DateTime? windowStart, DateTime? windowEnd, CancellationToken cancellationToken)
+    {
+        var query = _context.RoomSlotInventories
+            .AsNoTracking()
+            .Include(slot => slot.Room)
+            .Where(slot => slot.SlotDate == date
+                && slot.Status == "Available"
+                && slot.Room.BranchId == state.BranchId
+                && slot.Room.Status == "Available"
+                && slot.Room.MaxGuests >= state.GuestCount);
+
+        if (windowStart.HasValue && windowEnd.HasValue)
+        {
+            query = query.Where(slot => slot.StartTime < windowEnd.Value && slot.EndTime > windowStart.Value);
+        }
+
+        var inventorySlots = await query
+            .OrderBy(slot => slot.StartTime)
+            .ThenBy(slot => slot.Room.PricePerHour)
+            .ToListAsync(cancellationToken);
+
+        var options = new List<AISlotOption>();
+        foreach (var slot in inventorySlots)
+        {
+            if (!await _availabilityService.IsRoomAvailable(slot.RoomId, slot.StartTime, slot.EndTime))
+            {
+                continue;
+            }
+
+            options.Add(new AISlotOption
+            {
+                SlotId = slot.Id,
+                RoomId = slot.RoomId,
+                RoomName = slot.Room.Name,
+                Label = slot.SlotLabel,
+                StartTime = slot.StartTime,
+                EndTime = slot.EndTime,
+                TotalPrice = await CalculateTotalPriceAsync(slot.Room, slot.StartTime, slot.EndTime, true, state.GuestCount)
+            });
+        }
+
+        return options;
+    }
+
+    private static DateOnly ExtractDateOrDefaultToday(string message, DateTime? requestStartTime)
+    {
+        var lowered = message.ToLowerInvariant();
+        if (lowered.Contains("ngày mai") || lowered.Contains("ngay mai")) return DateOnly.FromDateTime(DateTime.Today.AddDays(1));
+        if (lowered.Contains("hôm nay") || lowered.Contains("hom nay")) return DateOnly.FromDateTime(DateTime.Today);
+        if (requestStartTime.HasValue) return DateOnly.FromDateTime(requestStartTime.Value);
+        return DateOnly.FromDateTime(DateTime.Today);
+    }
+
+    private static bool TryExtractHourlyRange(string message, DateOnly date, out DateTime start, out DateTime end)
+    {
+        start = default;
+        end = default;
+        var match = Regex.Match(message.ToLowerInvariant(), @"(\d{1,2})(?:h|:)(\d{2})?\s*[-–đến]+\s*(\d{1,2})(?:h|:)(\d{2})?");
+        if (!match.Success) return false;
+
+        var startHour = int.Parse(match.Groups[1].Value);
+        var startMinute = match.Groups[2].Success && !string.IsNullOrWhiteSpace(match.Groups[2].Value) ? int.Parse(match.Groups[2].Value) : 0;
+        var endHour = int.Parse(match.Groups[3].Value);
+        var endMinute = match.Groups[4].Success && !string.IsNullOrWhiteSpace(match.Groups[4].Value) ? int.Parse(match.Groups[4].Value) : 0;
+        if (startHour > 23 || endHour > 23 || startMinute > 59 || endMinute > 59) return false;
+
+        start = date.ToDateTime(new TimeOnly(startHour, startMinute));
+        end = date.ToDateTime(new TimeOnly(endHour, endMinute));
+        return end > start;
     }
 
     private async Task<AIBookingFlowResponse> BuildDailyRoomResponseAsync(string sessionId, AIBookingSessionState state, string blockPurpose, string message)
