@@ -239,9 +239,35 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
 
     private async Task<AIBookingFlowResponse> BuildExactOrNearbyHourlySlotsAsync(string sessionId, AIBookingSessionState state, DateTime rangeStart, DateTime rangeEnd, CancellationToken cancellationToken)
     {
-        var slots = await BuildHourlySlotOptionsAsync(state, DateOnly.FromDateTime(rangeStart), rangeStart, rangeEnd, cancellationToken);
-        return BuildResponse(sessionId, slots.Count == 0 ? "no-availability" : "select-slot", slots.Count == 0 ? "Hiện không còn khung giờ phù hợp theo thông tin bạn đã chọn. Bạn thử đổi giờ, ngày hoặc chi nhánh giúp mình nhé." : "Đúng khung giờ bạn hỏi hiện còn phòng. Bạn chọn phòng/slot bên dưới nhé.", state,
-            new AIUiBlock { Type = "hourlySlots", Data = new { slots } });
+        state.HourlyDate = DateOnly.FromDateTime(rangeStart);
+        var exactSlots = await BuildHourlySlotOptionsAsync(state, state.HourlyDate.Value, rangeStart, rangeEnd, cancellationToken);
+        exactSlots = exactSlots
+            .Where(slot => slot.StartTime == rangeStart && slot.EndTime == rangeEnd)
+            .ToList();
+
+        if (exactSlots.Count > 0)
+        {
+            return BuildResponse(sessionId, "select-slot", "Đúng khung giờ bạn hỏi hiện còn phòng. Bạn chọn phòng/slot bên dưới nhé.", state,
+                new AIUiBlock { Type = "hourlySlots", Data = new { slots = exactSlots } });
+        }
+
+        var nearbyStart = rangeStart.AddHours(-2);
+        var nearbyEnd = rangeEnd.AddHours(2);
+        var nearbySlots = await BuildHourlySlotOptionsAsync(state, state.HourlyDate.Value, nearbyStart, nearbyEnd, cancellationToken);
+        nearbySlots = nearbySlots
+            .Where(slot => slot.StartTime >= nearbyStart && slot.EndTime <= nearbyEnd)
+            .OrderBy(slot => Math.Abs((slot.StartTime - rangeStart).TotalMinutes))
+            .ThenBy(slot => slot.TotalPrice)
+            .ToList();
+
+        if (nearbySlots.Count == 0)
+        {
+            return BuildResponse(sessionId, "no-availability", "Khung giờ bạn hỏi hiện không còn phòng, và trong vòng gần 2 giờ cũng chưa có slot phù hợp. Bạn thử đổi giờ hoặc ngày giúp mình nhé.", state,
+                new AIUiBlock { Type = "hourlySlots", Data = new { slots = nearbySlots } });
+        }
+
+        return BuildResponse(sessionId, "select-slot", "Khung giờ bạn hỏi đã hết. Mình gợi ý các giờ còn trống gần đó trong vòng 2 giờ cùng ngày nhé.", state,
+            new AIUiBlock { Type = "hourlySlots", Data = new { slots = nearbySlots } });
     }
 
     private async Task<List<AISlotOption>> BuildHourlySlotOptionsAsync(AIBookingSessionState state, DateOnly date, DateTime? windowStart, DateTime? windowEnd, CancellationToken cancellationToken)
@@ -293,6 +319,17 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         var lowered = message.ToLowerInvariant();
         if (lowered.Contains("ngày mai") || lowered.Contains("ngay mai")) return DateOnly.FromDateTime(DateTime.Today.AddDays(1));
         if (lowered.Contains("hôm nay") || lowered.Contains("hom nay")) return DateOnly.FromDateTime(DateTime.Today);
+
+        var match = Regex.Match(lowered, @"(?:ngày\s*)?(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?");
+        if (match.Success)
+        {
+            var day = int.Parse(match.Groups[1].Value);
+            var month = int.Parse(match.Groups[2].Value);
+            var year = match.Groups[3].Success ? int.Parse(match.Groups[3].Value) : DateTime.Today.Year;
+            if (year < 100) year += 2000;
+            if (DateOnly.TryParse($"{year:D4}-{month:D2}-{day:D2}", out var parsed)) return parsed;
+        }
+
         if (requestStartTime.HasValue) return DateOnly.FromDateTime(requestStartTime.Value);
         return DateOnly.FromDateTime(DateTime.Today);
     }

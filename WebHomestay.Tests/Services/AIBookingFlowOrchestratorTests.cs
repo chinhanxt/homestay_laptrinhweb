@@ -218,6 +218,42 @@ public class AIBookingFlowOrchestratorTests
         Assert.Contains("còn", response.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task HandleChatAsync_WhenExactHourlyRangeAvailable_ReturnsExactSlotOnly()
+    {
+        await using var context = CreateContext(nameof(HandleChatAsync_WhenExactHourlyRangeAvailable_ReturnsExactSlotOnly));
+        SeedBranchesRoomsAndSlots(context);
+        context.RoomSlotInventories.Add(new RoomSlotInventory
+        {
+            Id = 101,
+            RoomId = 10,
+            TemplateId = 1,
+            SlotDate = new DateOnly(2026, 5, 20),
+            SlotLabel = "12:00-13:00",
+            StartTime = new DateTime(2026, 5, 20, 12, 0, 0),
+            EndTime = new DateTime(2026, 5, 20, 13, 0, 0),
+            Status = "Available"
+        });
+        await context.SaveChangesAsync();
+        var service = CreateService(context);
+
+        var response = await service.HandleChatAsync(new PublicAIChatRequest
+        {
+            SessionId = "exact1",
+            Message = "ngày 20/5 còn phòng 9h-11h không?",
+            BranchId = 1,
+            BookingMode = "hourly",
+            GuestCount = 2
+        }, CancellationToken.None);
+
+        Assert.Equal("select-slot", response.CurrentStep);
+        var block = Assert.Single(response.UiBlocks, block => block.Type == "hourlySlots");
+        var slots = GetSlots(block.Data);
+        var slot = Assert.Single(slots);
+        Assert.Equal(100, slot.SlotId);
+        Assert.Contains("đúng khung", response.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static ApplicationDbContext CreateContext(string name)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
