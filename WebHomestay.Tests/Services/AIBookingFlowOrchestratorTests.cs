@@ -328,6 +328,35 @@ public class AIBookingFlowOrchestratorTests
         Assert.Empty(GetSlots(block.Data));
     }
 
+    [Fact]
+    public async Task HandleChatAsync_WhenDailyModeUsesFormContext_ReturnsAvailableDailyRooms()
+    {
+        await using var context = CreateContext(nameof(HandleChatAsync_WhenDailyModeUsesFormContext_ReturnsAvailableDailyRooms));
+        SeedBranchesAndRooms(context);
+        await context.SaveChangesAsync();
+        var service = CreateService(context);
+
+        var response = await service.HandleChatAsync(new PublicAIChatRequest
+        {
+            SessionId = "daily1",
+            Message = "có phòng ngày không ạ",
+            CustomerName = "Nhân",
+            BranchId = 1,
+            BookingMode = "daily",
+            GuestCount = 1
+        }, CancellationToken.None);
+
+        Assert.Equal("select-daily-room", response.CurrentStep);
+        Assert.Equal("daily", response.State.BookingMode);
+        Assert.Equal(DateOnly.FromDateTime(DateTime.Today), response.State.CheckInDate);
+        Assert.Equal(DateOnly.FromDateTime(DateTime.Today).AddDays(1), response.State.CheckOutDate);
+        var block = Assert.Single(response.UiBlocks, block => block.Type == "dailyRooms");
+        var rooms = GetDailyRooms(block.Data);
+        Assert.NotEmpty(rooms);
+        Assert.Contains(rooms, room => room.RoomId == 10);
+        Assert.Contains("phòng theo ngày", response.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static ApplicationDbContext CreateContext(string name)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -398,5 +427,12 @@ public class AIBookingFlowOrchestratorTests
         var property = data.GetType().GetProperty("slots") ?? data.GetType().GetProperty("Slots");
         Assert.NotNull(property);
         return Assert.IsAssignableFrom<List<AISlotOption>>(property.GetValue(data));
+    }
+
+    private static List<AIDailyRoomOption> GetDailyRooms(object data)
+    {
+        var property = data.GetType().GetProperty("rooms") ?? data.GetType().GetProperty("Rooms");
+        Assert.NotNull(property);
+        return Assert.IsAssignableFrom<List<AIDailyRoomOption>>(property.GetValue(data));
     }
 }

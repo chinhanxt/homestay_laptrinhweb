@@ -47,6 +47,14 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         }
 
         var requestedDate = ExtractDateOrDefaultToday(message, request.StartTime);
+
+        if (state.BookingMode == "daily")
+        {
+            state.CheckInDate = requestedDate;
+            state.CheckOutDate = requestedDate.AddDays(1);
+            return await BuildAvailableDailyRoomsForDateAsync(sessionId, state, requestedDate, cancellationToken);
+        }
+
         state.HourlyDate = requestedDate;
 
         if (TryExtractHourlyRange(message, requestedDate, out var rangeStart, out var rangeEnd))
@@ -225,6 +233,44 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
             "submit-booking-form" => SubmitBookingFormAsync(request),
             _ => throw new InvalidOperationException($"Không hỗ trợ hành động AI booking: {request.Action}")
         };
+    }
+
+    private async Task<AIBookingFlowResponse> BuildAvailableDailyRoomsForDateAsync(string sessionId, AIBookingSessionState state, DateOnly checkIn, CancellationToken cancellationToken)
+    {
+        var checkOut = state.CheckOutDate ?? checkIn.AddDays(1);
+        var interval = BookingTimeRules.BuildDailyStay(checkIn, checkOut);
+        var rooms = await _context.Rooms
+            .AsNoTracking()
+            .Where(room => room.BranchId == state.BranchId
+                && room.Status == "Available"
+                && room.MaxGuests >= state.GuestCount)
+            .OrderBy(room => room.PricePerDay)
+            .ThenBy(room => room.Name)
+            .ToListAsync(cancellationToken);
+
+        var dailyRooms = new List<AIDailyRoomOption>();
+        foreach (var room in rooms)
+        {
+            if (!await _availabilityService.IsRoomAvailable(room.Id, interval.Start, interval.End))
+            {
+                continue;
+            }
+
+            dailyRooms.Add(new AIDailyRoomOption
+            {
+                RoomId = room.Id,
+                RoomName = room.Name,
+                CheckInDate = checkIn,
+                CheckOutDate = checkOut,
+                TotalPrice = await CalculateTotalPriceAsync(room, interval.Start, interval.End, false, state.GuestCount)
+            });
+        }
+
+        var step = dailyRooms.Count == 0 ? "no-availability" : "select-daily-room";
+        var message = dailyRooms.Count == 0
+            ? "Hiện không còn phòng theo ngày phù hợp với thông tin bạn đã chọn. Bạn thử đổi ngày hoặc chi nhánh giúp mình nhé."
+            : "Mình kiểm tra theo thông tin bạn đã chọn. Các phòng theo ngày còn trống là:";
+        return BuildResponse(sessionId, step, message, state, new AIUiBlock { Type = "dailyRooms", Data = new { rooms = dailyRooms } });
     }
 
     private async Task<AIBookingFlowResponse> BuildAvailableHourlySlotsForDateAsync(string sessionId, AIBookingSessionState state, DateOnly date, string message, CancellationToken cancellationToken)
