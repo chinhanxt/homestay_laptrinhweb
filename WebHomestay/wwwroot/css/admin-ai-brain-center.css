@@ -2070,6 +2070,29 @@
     background: white;
 }
 
+.payment-preview-box {
+    border: 1px dashed #cbd5e1;
+    border-radius: 16px;
+    padding: .8rem;
+    display: grid;
+    gap: .5rem;
+    background: #f8fafc;
+}
+
+.payment-preview-box img {
+    width: min(180px, 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: .4rem;
+    background: white;
+}
+
+.payment-preview-box small,
+.payment-preview-box span {
+    color: #64748b;
+    font-weight: 600;
+}
+
 .chat-form-card input,
 .chat-form-card textarea {
     border: 1px solid #e2e8f0;

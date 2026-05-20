@@ -46,23 +46,23 @@ namespace WebHomestay.Controllers
             var checkoutMode = await _settingService.GetStringAsync("CheckoutMode", "Auto");
             ViewBag.CheckoutMode = checkoutMode;
 
+            var nowTime = DateTime.Now;
+            bool changed = false;
+
+            // 1. Auto Check-In: Confirmed -> CheckedIn when StartTime reached (Always runs)
+            var bookingsToCheckIn = await _context.Bookings
+                .Where(b => !b.IsDeleted && b.Status == "Confirmed" && b.StartTime <= nowTime)
+                .ToListAsync();
+
+            if (bookingsToCheckIn.Any())
+            {
+                foreach (var b in bookingsToCheckIn) b.Status = "CheckedIn";
+                changed = true;
+            }
+
+            // 2. Auto Check-Out: Confirmed/CheckedIn -> CheckedOut when EndTime passed (Only if Auto mode)
             if (checkoutMode == "Auto")
             {
-                var nowTime = DateTime.Now;
-                bool changed = false;
-
-                // 1. Auto Check-In: Confirmed -> CheckedIn when StartTime reached
-                var bookingsToCheckIn = await _context.Bookings
-                    .Where(b => !b.IsDeleted && b.Status == "Confirmed" && b.StartTime <= nowTime)
-                    .ToListAsync();
-
-                if (bookingsToCheckIn.Any())
-                {
-                    foreach (var b in bookingsToCheckIn) b.Status = "CheckedIn";
-                    changed = true;
-                }
-
-                // 2. Auto Check-Out: Confirmed/CheckedIn -> CheckedOut when EndTime passed
                 var pastActiveBookings = await _context.Bookings
                     .Where(b => !b.IsDeleted && 
                                (b.Status == "Confirmed" || b.Status == "CheckedIn") && 
@@ -74,11 +74,11 @@ namespace WebHomestay.Controllers
                     foreach (var b in pastActiveBookings) b.Status = "CheckedOut";
                     changed = true;
                 }
+            }
 
-                if (changed)
-                {
-                    await _context.SaveChangesAsync();
-                }
+            if (changed)
+            {
+                await _context.SaveChangesAsync();
             }
 
             var bookings = await query

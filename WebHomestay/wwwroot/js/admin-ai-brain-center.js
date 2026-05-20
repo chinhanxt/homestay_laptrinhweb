@@ -535,7 +535,8 @@ const bookingFieldLabels = {
     guestCount: 'Số khách',
     idCardFront: 'CCCD mặt trước',
     idCardBack: 'CCCD mặt sau',
-    customerNote: 'Ghi chú'
+    customerNote: 'Ghi chú',
+    paymentQr: 'QR thanh toán'
 };
 const bookingFieldTypes = {
     customerName: 'text',
@@ -544,7 +545,8 @@ const bookingFieldTypes = {
     guestCount: 'number',
     idCardFront: 'image',
     idCardBack: 'image',
-    customerNote: 'textarea'
+    customerNote: 'textarea',
+    paymentQr: 'paymentQr'
 };
 const finalFieldLabels = {
     branch: 'Chi nhánh mong muốn',
@@ -587,15 +589,19 @@ async function loadBookingFormConfig() {
     }
 }
 
-async function saveBookingFormConfig() {
+async function saveBookingFormConfig(showAlert = true) {
     const fields = Array.isArray(bookingFormFields) ? bookingFormFields.map(normalizeBookingFormField) : [];
     const response = await fetch('/admin/ai/booking-form-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ formSchema: JSON.stringify(fields) })
     });
-    if (!response.ok) return alert(`Không lưu được Booking Form config: ${await response.text()}`);
-    alert('Đã lưu Booking Form config.');
+    if (!response.ok) {
+        const message = `Không lưu được Booking Form config: ${await response.text()}`;
+        if (showAlert) alert(message);
+        throw new Error(message);
+    }
+    if (showAlert) alert('Đã lưu Booking Form config.');
 }
 
 function renderBookingFormDesigner() {
@@ -626,9 +632,10 @@ function renderBookingFormDesigner() {
 
     preview.html(`
         <div class="chat-form-card">
-            ${fields.map(field => renderBookingPreviewField(field)).join('')}
+            ${fields.filter(field => normalizeBookingFormField(field).type !== 'paymentQr').map(field => renderBookingPreviewField(field)).join('')}
             <button class="btn btn-dark rounded-pill w-100 mt-2">Gửi thông tin đặt phòng</button>
         </div>
+        ${fields.filter(field => normalizeBookingFormField(field).type === 'paymentQr').map(field => renderBookingPreviewField(field)).join('')}
     `);
 }
 
@@ -645,7 +652,13 @@ function normalizeBookingFormField(field) {
         label: field?.label || bookingFieldLabels[name] || name || 'Thông tin',
         required: field?.required === true,
         helpText: field?.helpText || '',
-        order: Number.isFinite(Number(field?.order)) ? Number(field.order) : 999
+        order: Number.isFinite(Number(field?.order)) ? Number(field.order) : 999,
+        qrImageUrl: field?.qrImageUrl || '',
+        messageTemplate: field?.messageTemplate || '',
+        countdownSeconds: Number.isFinite(Number(field?.countdownSeconds)) ? Number(field.countdownSeconds) : 300,
+        proofLabel: field?.proofLabel || 'Upload bill thanh toán',
+        proofButtonText: field?.proofButtonText || 'Gửi bill thanh toán',
+        successMessage: field?.successMessage || 'Homestay đã nhận bill, nhân viên sẽ xác nhận trong ít phút.'
     };
 }
 
@@ -656,7 +669,9 @@ function renderBookingPreviewField(field) {
     const requiredMark = field.required ? ' <span class="text-danger">*</span>' : '';
     const helpText = field.helpText ? `<small class="text-muted">${escapeBrainHtml(field.helpText)}</small>` : '';
     let control;
-    if (field.type === 'textarea') control = `<textarea placeholder="Nhập ${label.toLowerCase()}..." rows="2"${required}></textarea>`;
+    if (field.type === 'paymentQr') {
+        control = `<div class="payment-preview-box">${field.qrImageUrl ? `<img src="${escapeBrainHtml(field.qrImageUrl)}" alt="QR thanh toán" />` : '<span>Chưa có ảnh QR</span>'}<small>${escapeBrainHtml(field.messageTemplate || 'Nội dung thanh toán sẽ hiện ở đây.')}</small></div>`;
+    } else if (field.type === 'textarea') control = `<textarea placeholder="Nhập ${label.toLowerCase()}..." rows="2"${required}></textarea>`;
     else if (field.type === 'number') control = `<input type="number" min="1" placeholder="2"${required} />`;
     else if (field.type === 'email') control = `<input type="email" placeholder="email@example.com"${required} />`;
     else if (field.type === 'image') control = `<input type="file" accept="image/*"${required} />`;
@@ -851,6 +866,10 @@ function openAddBookingFormFieldModal() {
     $('#final-form-field-type').val('customerName');
     $('#final-form-field-qr-url').val('');
     $('#final-form-field-payment-message').val('');
+    $('#final-form-field-countdown').val('300');
+    $('#final-form-field-proof-label').val('Upload bill thanh toán');
+    $('#final-form-field-proof-button').val('Gửi bill thanh toán');
+    $('#final-form-field-success-message').val('Homestay đã nhận bill, nhân viên sẽ xác nhận trong ít phút.');
     $('#final-form-field-qr-file').val('');
     toggleFinalPaymentQrSettings();
     $('#final-form-field-required').prop('checked', true);
@@ -867,8 +886,12 @@ function openEditBookingFormFieldModal(id) {
     $('#final-form-field-modal-title').text('Sửa trường Booking Form');
     $('#final-form-field-label').val(field.label);
     $('#final-form-field-type').val(field.name || 'customerName');
-    $('#final-form-field-qr-url').val('');
-    $('#final-form-field-payment-message').val('');
+    $('#final-form-field-qr-url').val(field.qrImageUrl || '');
+    $('#final-form-field-payment-message').val(field.messageTemplate || '');
+    $('#final-form-field-countdown').val(field.countdownSeconds || 300);
+    $('#final-form-field-proof-label').val(field.proofLabel || 'Upload bill thanh toán');
+    $('#final-form-field-proof-button').val(field.proofButtonText || 'Gửi bill thanh toán');
+    $('#final-form-field-success-message').val(field.successMessage || 'Homestay đã nhận bill, nhân viên sẽ xác nhận trong ít phút.');
     $('#final-form-field-qr-file').val('');
     toggleFinalPaymentQrSettings();
     $('#final-form-field-required').prop('checked', field.required);
@@ -879,7 +902,7 @@ function openEditBookingFormFieldModal(id) {
     bootstrap.Modal.getOrCreateInstance(document.getElementById('finalFormFieldModal')).show();
 }
 
-function saveBookingFormFieldFromModal() {
+async function saveBookingFormFieldFromModal(saveConfig = false) {
     const label = $('#final-form-field-label').val().trim();
     if (!label) return alert('Vui lòng nhập tên hiển thị cho trường.');
 
@@ -891,7 +914,13 @@ function saveBookingFormFieldFromModal() {
         label,
         required: $('#final-form-field-required').is(':checked'),
         helpText: $('#final-form-field-advanced').val().trim(),
-        order: editingBookingFormFieldId ? bookingFormFields.find(item => item.id === editingBookingFormFieldId)?.order : bookingFormFields.length + 1
+        order: editingBookingFormFieldId ? bookingFormFields.find(item => item.id === editingBookingFormFieldId)?.order : bookingFormFields.length + 1,
+        qrImageUrl: $('#final-form-field-qr-url').val().trim(),
+        messageTemplate: $('#final-form-field-payment-message').val().trim(),
+        countdownSeconds: parseInt($('#final-form-field-countdown').val() || '300', 10),
+        proofLabel: $('#final-form-field-proof-label').val().trim(),
+        proofButtonText: $('#final-form-field-proof-button').val().trim(),
+        successMessage: $('#final-form-field-success-message').val().trim()
     });
 
     if (editingBookingFormFieldId) {
@@ -900,14 +929,22 @@ function saveBookingFormFieldFromModal() {
         bookingFormFields.push(field);
     }
 
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('finalFormFieldModal')).hide();
     renderBookingFormDesigner();
+    if (saveConfig) {
+        try {
+            await saveBookingFormConfig(false);
+            alert('Đã lưu trường và Booking Form config.');
+        } catch {
+            return;
+        }
+    }
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('finalFormFieldModal')).hide();
 }
 
 $(document).on('change', '#final-form-field-type', toggleFinalPaymentQrSettings);
 
 function toggleFinalPaymentQrSettings() {
-    $('#final-payment-qr-settings').toggle(false);
+    $('#final-payment-qr-settings').toggle($('#final-form-field-type').val() === 'paymentQr');
 }
 
 async function uploadFinalPaymentQrImage() {

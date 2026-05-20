@@ -23,7 +23,7 @@ public class AIBookingFlowOrchestratorTests
             BranchId = 1,
             BranchName = "StayEasy Sài Gòn",
             BookingMode = "hourly",
-            HourlyDate = new DateOnly(2026, 5, 20),
+            HourlyDate = new DateOnly(2029, 5, 20),
             GuestCount = 2
         });
 
@@ -54,7 +54,7 @@ public class AIBookingFlowOrchestratorTests
                 BranchId = 1,
                 BranchName = "StayEasy Sài Gòn",
                 BookingMode = "hourly",
-                HourlyDate = new DateOnly(2026, 5, 20),
+                HourlyDate = new DateOnly(2029, 5, 20),
                 GuestCount = 2,
                 SelectedRoomId = 10
             }
@@ -68,8 +68,8 @@ public class AIBookingFlowOrchestratorTests
         Assert.Equal(10, slot.RoomId);
         Assert.Equal("Sài Gòn Couple", slot.RoomName);
         Assert.Equal("09:00-11:00", slot.Label);
-        Assert.Equal(new DateTime(2026, 5, 20, 9, 0, 0), slot.StartTime);
-        Assert.Equal(new DateTime(2026, 5, 20, 11, 0, 0), slot.EndTime);
+        Assert.Equal(new DateTime(2029, 5, 20, 9, 0, 0), slot.StartTime);
+        Assert.Equal(new DateTime(2029, 5, 20, 11, 0, 0), slot.EndTime);
         Assert.DoesNotContain(slots, slot => slot.RoomId != 10);
         Assert.DoesNotContain(slots, slot => slot.Label != "09:00-11:00");
     }
@@ -92,7 +92,7 @@ public class AIBookingFlowOrchestratorTests
                 BranchId = 1,
                 BranchName = "StayEasy Sài Gòn",
                 BookingMode = "hourly",
-                HourlyDate = new DateOnly(2026, 5, 20),
+                HourlyDate = new DateOnly(2029, 5, 20),
                 GuestCount = 2,
                 SelectedRoomId = 10,
                 SelectedRoomName = "Sài Gòn Couple",
@@ -118,8 +118,8 @@ public class AIBookingFlowOrchestratorTests
         Assert.Equal("Đến đúng giờ", booking.CustomerNote);
         Assert.Equal(2, booking.GuestCount);
         Assert.Equal(BookingMode.Hourly, booking.BookingMode);
-        Assert.Equal(new DateTime(2026, 5, 20, 9, 0, 0), booking.StartTime);
-        Assert.Equal(new DateTime(2026, 5, 20, 11, 0, 0), booking.EndTime);
+        Assert.Equal(new DateTime(2029, 5, 20, 9, 0, 0), booking.StartTime);
+        Assert.Equal(new DateTime(2029, 5, 20, 11, 0, 0), booking.EndTime);
         Assert.True(booking.TotalPrice > 0);
         Assert.Equal("AwaitingPayment", booking.Status);
         Assert.Equal("Unpaid", booking.PaymentStatus);
@@ -149,7 +149,7 @@ public class AIBookingFlowOrchestratorTests
                 BranchId = 1,
                 BranchName = "StayEasy Sài Gòn",
                 BookingMode = "hourly",
-                HourlyDate = new DateOnly(2026, 5, 20),
+                HourlyDate = new DateOnly(2029, 5, 20),
                 GuestCount = 2,
                 SelectedRoomId = 10,
                 SelectedRoomName = "Sài Gòn Couple",
@@ -172,6 +172,18 @@ public class AIBookingFlowOrchestratorTests
         await using var context = CreateContext(nameof(HandleChatAsync_WhenGuestAsksVagueAvailability_UsesFormContextAndToday));
         SeedBranchesAndRooms(context);
         var today = DateOnly.FromDateTime(DateTime.Today);
+        
+        // Ensure the slot time is dynamically in the future so the test does not fail due to time-of-day
+        var nowTime = DateTime.Now;
+        var startHour = nowTime.Hour + 2;
+        if (startHour >= 23)
+        {
+            today = today.AddDays(1);
+            startHour = 12;
+        }
+        var startOnly = new TimeOnly(startHour, 0);
+        var endOnly = new TimeOnly(startHour + 1, 0);
+
         context.RoomSlotTemplates.Add(new RoomSlotTemplate
         {
             Id = 2,
@@ -179,8 +191,8 @@ public class AIBookingFlowOrchestratorTests
             Code = "NOON",
             DurationMinutes = 60,
             CleanupMinutes = 0,
-            FixedStartTime = new TimeOnly(12, 0),
-            FixedEndTime = new TimeOnly(13, 0),
+            FixedStartTime = startOnly,
+            FixedEndTime = endOnly,
             IsActive = true
         });
         context.RoomSlotInventories.Add(new RoomSlotInventory
@@ -189,9 +201,9 @@ public class AIBookingFlowOrchestratorTests
             RoomId = 10,
             TemplateId = 2,
             SlotDate = today,
-            SlotLabel = "12:00-13:00",
-            StartTime = today.ToDateTime(new TimeOnly(12, 0)),
-            EndTime = today.ToDateTime(new TimeOnly(13, 0)),
+            SlotLabel = $"{startOnly:HH:mm}-{endOnly:HH:mm}",
+            StartTime = today.ToDateTime(startOnly),
+            EndTime = today.ToDateTime(endOnly),
             Status = "Available"
         });
         await context.SaveChangesAsync();
@@ -228,10 +240,10 @@ public class AIBookingFlowOrchestratorTests
             Id = 101,
             RoomId = 10,
             TemplateId = 1,
-            SlotDate = new DateOnly(2026, 5, 20),
+            SlotDate = new DateOnly(2029, 5, 20),
             SlotLabel = "12:00-13:00",
-            StartTime = new DateTime(2026, 5, 20, 12, 0, 0),
-            EndTime = new DateTime(2026, 5, 20, 13, 0, 0),
+            StartTime = new DateTime(2029, 5, 20, 12, 0, 0),
+            EndTime = new DateTime(2029, 5, 20, 13, 0, 0),
             Status = "Available"
         });
         await context.SaveChangesAsync();
@@ -240,7 +252,7 @@ public class AIBookingFlowOrchestratorTests
         var response = await service.HandleChatAsync(new PublicAIChatRequest
         {
             SessionId = "exact1",
-            Message = "ngày 20/5 còn phòng 9h-11h không?",
+            Message = "ngày 20/5/2029 còn phòng 9h-11h không?",
             BranchId = 1,
             BookingMode = "hourly",
             GuestCount = 2
@@ -268,10 +280,10 @@ public class AIBookingFlowOrchestratorTests
                 Id = 102,
                 RoomId = 10,
                 TemplateId = 1,
-                SlotDate = new DateOnly(2026, 5, 20),
+                SlotDate = new DateOnly(2029, 5, 20),
                 SlotLabel = "08:00-10:00",
-                StartTime = new DateTime(2026, 5, 20, 8, 0, 0),
-                EndTime = new DateTime(2026, 5, 20, 10, 0, 0),
+                StartTime = new DateTime(2029, 5, 20, 8, 0, 0),
+                EndTime = new DateTime(2029, 5, 20, 10, 0, 0),
                 Status = "Available"
             },
             new RoomSlotInventory
@@ -279,10 +291,10 @@ public class AIBookingFlowOrchestratorTests
                 Id = 103,
                 RoomId = 10,
                 TemplateId = 1,
-                SlotDate = new DateOnly(2026, 5, 20),
+                SlotDate = new DateOnly(2029, 5, 20),
                 SlotLabel = "14:00-16:00",
-                StartTime = new DateTime(2026, 5, 20, 14, 0, 0),
-                EndTime = new DateTime(2026, 5, 20, 16, 0, 0),
+                StartTime = new DateTime(2029, 5, 20, 14, 0, 0),
+                EndTime = new DateTime(2029, 5, 20, 16, 0, 0),
                 Status = "Available"
             });
         await context.SaveChangesAsync();
@@ -291,7 +303,7 @@ public class AIBookingFlowOrchestratorTests
         var response = await service.HandleChatAsync(new PublicAIChatRequest
         {
             SessionId = "near1",
-            Message = "ngày 20/5 có phòng 9h-11h không?",
+            Message = "ngày 20/5/2029 có phòng 9h-11h không?",
             BranchId = 1,
             BookingMode = "hourly",
             GuestCount = 2
@@ -407,10 +419,10 @@ public class AIBookingFlowOrchestratorTests
             Id = 100,
             RoomId = 10,
             TemplateId = 1,
-            SlotDate = new DateOnly(2026, 5, 20),
+            SlotDate = new DateOnly(2029, 5, 20),
             SlotLabel = "09:00-11:00",
-            StartTime = new DateTime(2026, 5, 20, 9, 0, 0),
-            EndTime = new DateTime(2026, 5, 20, 11, 0, 0),
+            StartTime = new DateTime(2029, 5, 20, 9, 0, 0),
+            EndTime = new DateTime(2029, 5, 20, 11, 0, 0),
             Status = "Available"
         });
     }

@@ -92,6 +92,7 @@
                                         <button draggable="true" data-booking-field="idCardFront">CCCD mặt trước</button>
                                         <button draggable="true" data-booking-field="idCardBack">CCCD mặt sau</button>
                                         <button draggable="true" data-booking-field="customerNote">Ghi chú</button>
+                                        <button draggable="true" data-booking-field="paymentQr">QR thanh toán</button>
                                     </div>
                                     <div id="booking-form-dropzone" class="form-dropzone">
                                         <div class="empty-state">Kéo trường vào đây để tạo booking form preview.</div>
@@ -141,6 +142,7 @@
                     <option value="idCardFront">CCCD mặt trước</option>
                     <option value="idCardBack">CCCD mặt sau</option>
                     <option value="customerNote">Ghi chú</option>
+                    <option value="paymentQr">QR thanh toán</option>
                 </select>
                 <div class="form-check mb-4">
                     <input id="final-form-field-required" class="form-check-input" type="checkbox" checked />
@@ -156,7 +158,15 @@
                         <button type="button" class="btn btn-outline-primary fw-bold" onclick="uploadFinalPaymentQrImage()">Upload</button>
                     </div>
                     <label class="form-label fw-bold">Nội dung gửi kèm</label>
-                    <textarea id="final-form-field-payment-message" class="form-control" rows="3" placeholder="VD: Bạn vui lòng chuyển khoản theo mã QR bên dưới. Nội dung CK: Họ tên + SĐT + ngày nhận phòng."></textarea>
+                    <textarea id="final-form-field-payment-message" class="form-control mb-3" rows="3" placeholder="VD: Bạn vui lòng chuyển khoản {{amount}} theo mã QR bên dưới. Mã đơn: {{bookingId}}."></textarea>
+                    <label class="form-label fw-bold">Thời gian đếm ngược</label>
+                    <input id="final-form-field-countdown" class="form-control mb-3" type="number" min="60" max="1800" value="300" />
+                    <label class="form-label fw-bold">Nhãn upload bill</label>
+                    <input id="final-form-field-proof-label" class="form-control mb-3" placeholder="VD: Upload bill thanh toán" />
+                    <label class="form-label fw-bold">Nút gửi bill</label>
+                    <input id="final-form-field-proof-button" class="form-control mb-3" placeholder="VD: Gửi bill thanh toán" />
+                    <label class="form-label fw-bold">Thông báo sau khi gửi bill</label>
+                    <textarea id="final-form-field-success-message" class="form-control" rows="2" placeholder="VD: Homestay đã nhận bill, nhân viên sẽ xác nhận trong ít phút."></textarea>
                 </div>
                 <div class="border-top pt-3">
                     <div class="small text-uppercase fw-800 text-primary mb-3">Điều kiện hiển thị</div>
@@ -178,7 +188,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="saveBookingFormFieldFromModal()">Lưu trường</button>
+                <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="saveBookingFormFieldFromModal(true)">Lưu trường & Booking Form</button>
             </div>
         </div>
     </div>

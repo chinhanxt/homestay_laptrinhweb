@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let sessionId = createSessionId();
     let bookingState = {};
+    let latestBookingSummary = null;
 
     loadBranches();
     updateContextDateTimeControls();
@@ -97,10 +98,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     messages.addEventListener('submit', async (event) => {
-        const bookingForm = event.target.closest('.ai-booking-form');
-        if (!bookingForm || !messages.contains(bookingForm)) return;
-
+        const submittedForm = event.target.closest('form');
+        if (!submittedForm || !messages.contains(submittedForm)) return;
         event.preventDefault();
+
+        const bookingForm = submittedForm.closest('.ai-booking-form');
+        if (!bookingForm) return;
+
         const submit = bookingForm.querySelector('[type="submit"]');
         if (submit) submit.disabled = true;
         setBusy(true);
@@ -118,6 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error(data.message || 'AI booking action request failed.');
             await uploadIdCardFiles(data.state?.bookingId, idCardFiles);
             handleActionResponse(data);
+            setOpen(true);
         } catch {
             appendMessage('Xin lỗi, chưa gửi được thông tin đặt phòng. Bạn thử lại giúp mình nhé.', 'bot');
             if (submit) submit.disabled = false;
@@ -354,25 +359,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderBookingSummary(data) {
         const wrapper = appendBlock('ai-booking-summary');
+        latestBookingSummary = wrapper;
+        wrapper.dataset.baseLines = JSON.stringify(Array.isArray(data.lines) ? data.lines.filter(line => !String(line || '').startsWith('Số khách:') && !String(line || '').startsWith('Phụ thu khách thêm:')) : []);
+        wrapper.dataset.totalPrice = toSafeNumber(data.totalPrice).toString();
         const title = document.createElement('h4');
         title.textContent = data.title || 'Tóm tắt đặt phòng';
         wrapper.appendChild(title);
 
-        const lines = Array.isArray(data.lines) ? data.lines : [];
-        if (lines.length) {
-            const list = document.createElement('ul');
-            lines.forEach(line => {
-                const item = document.createElement('li');
-                item.textContent = line;
-                list.appendChild(item);
-            });
-            wrapper.appendChild(list);
-        }
+        const list = document.createElement('ul');
+        wrapper.appendChild(list);
 
         const total = document.createElement('div');
         total.className = 'ai-booking-total';
-        total.textContent = `Tạm tính: ${formatMoney(data.totalPrice)}`;
         wrapper.appendChild(total);
+        updateBookingSummaryTotals(null);
         scrollMessages();
     }
 
@@ -381,6 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const formElement = document.createElement('form');
         formElement.className = 'ai-booking-form';
 
+        const pricing = normalizeBookingPricing(data.pricing);
         const fields = Array.isArray(data.fields) ? data.fields : [];
         const normalizedFields = fields.length ? fields : [
             { name: 'customerName', label: 'Họ tên', type: 'text', required: true, value: getCustomerName() },
@@ -390,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ];
 
         normalizedFields.forEach(field => {
-            if (!field || !field.name) return;
+            if (!field || !field.name || field.name === 'paymentQr' || field.type === 'paymentQr') return;
             const label = document.createElement('label');
             const caption = document.createElement('span');
             caption.textContent = field.label || field.name;
@@ -406,7 +407,14 @@ document.addEventListener('DOMContentLoaded', () => {
             control.name = field.name;
             control.required = !!field.required;
             control.placeholder = getBookingFieldPlaceholder(field, inputType);
-            if (inputType !== 'file') control.value = field.value || (field.name === 'customerName' ? getCustomerName() : '');
+            if (field.name === 'guestCount') {
+                control.type = 'number';
+                control.min = '1';
+                if (pricing.maxGuests > 0) control.max = pricing.maxGuests.toString();
+                control.value = normalizeGuestCount(field.value || bookingState.guestCount || getGuestCount(), pricing).toString();
+            } else if (inputType !== 'file') {
+                control.value = field.value || (field.name === 'customerName' ? getCustomerName() : '');
+            }
             label.appendChild(control);
             if (field.placeholder) {
                 const help = document.createElement('small');
@@ -416,6 +424,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             formElement.appendChild(label);
         });
+
+        const guestCountInput = formElement.querySelector('[name="guestCount"]');
+        if (guestCountInput) {
+            formElement.dataset.bookingPricing = JSON.stringify(pricing);
+            guestCountInput.addEventListener('input', () => syncBookingFormGuestCount(guestCountInput, pricing));
+            guestCountInput.addEventListener('change', () => syncBookingFormGuestCount(guestCountInput, pricing));
+            syncBookingFormGuestCount(guestCountInput, pricing);
+        }
 
         const submit = document.createElement('button');
         submit.className = 'ai-booking-submit';
@@ -427,34 +443,76 @@ document.addEventListener('DOMContentLoaded', () => {
         scrollMessages();
     }
 
-    function renderPaymentQr(data) {
-        const wrapper = appendBlock('ai-payment-block');
-        const message = document.createElement('div');
-        message.textContent = data.message || data.instructions || 'Vui lòng thanh toán để hoàn tất giữ phòng.';
-        wrapper.appendChild(message);
+    function normalizeBookingPricing(pricing) {
+        const safePricing = pricing && typeof pricing === 'object' ? pricing : {};
+        return {
+            capacity: toSafeNumber(safePricing.capacity),
+            maxGuests: toSafeNumber(safePricing.maxGuests),
+            extraGuestFee: toSafeNumber(safePricing.extraGuestFee),
+            baseTotalPrice: toSafeNumber(safePricing.baseTotalPrice)
+        };
+    }
 
-        if (data.amount) {
-            const amount = document.createElement('strong');
-            amount.textContent = `Số tiền: ${formatMoney(data.amount)}`;
-            wrapper.appendChild(amount);
+    function normalizeGuestCount(value, pricing) {
+        const parsed = Number.parseInt(value, 10);
+        const maxGuests = toSafeNumber(pricing?.maxGuests) || 20;
+        if (Number.isNaN(parsed)) return 1;
+        return Math.min(Math.max(parsed, 1), maxGuests);
+    }
+
+    function syncBookingFormGuestCount(input, pricing) {
+        const guestCount = normalizeGuestCount(input.value, pricing);
+        input.value = guestCount.toString();
+        bookingState.guestCount = guestCount;
+        if (guestsInput) guestsInput.value = guestCount;
+        updateBookingSummaryTotals({ ...pricing, guestCount });
+    }
+
+    function updateBookingSummaryTotals(pricing) {
+        if (!latestBookingSummary) return;
+        const baseLines = JSON.parse(latestBookingSummary.dataset.baseLines || '[]');
+        const totalFromServer = toSafeNumber(latestBookingSummary.dataset.totalPrice);
+        const guestCount = normalizeGuestCount(pricing?.guestCount || bookingState.guestCount || getGuestCount(), pricing);
+        const capacity = toSafeNumber(pricing?.capacity);
+        const extraGuestFee = toSafeNumber(pricing?.extraGuestFee);
+        const baseTotalPrice = toSafeNumber(pricing?.baseTotalPrice) || totalFromServer;
+        const extraGuests = Math.max(0, guestCount - capacity);
+        const extraTotal = extraGuests * extraGuestFee;
+        const lines = [...baseLines, `Số khách: ${guestCount}`];
+        if (capacity > 0 && extraGuests > 0 && extraGuestFee > 0) {
+            lines.push(`Phụ thu khách thêm: ${extraGuests} khách × ${formatMoney(extraGuestFee)} = ${formatMoney(extraTotal)}`);
         }
 
-        const paymentUrl = toSafeRelativeUrl(data.paymentUrl);
+        const list = latestBookingSummary.querySelector('ul');
+        if (list) {
+            list.innerHTML = '';
+            lines.forEach(line => {
+                const item = document.createElement('li');
+                item.textContent = line;
+                list.appendChild(item);
+            });
+        }
+
+        const total = latestBookingSummary.querySelector('.ai-booking-total');
+        if (total) total.textContent = `Tạm tính: ${formatMoney(baseTotalPrice + extraTotal)}`;
+    }
+
+    function renderPaymentQr(data) {
+        const wrapper = appendBlock('ai-payment-block');
+        const paymentUrl = toSafeRelativeUrl(data.paymentUrl || data.successUrl);
+        const message = document.createElement('div');
+        message.className = 'ai-payment-message';
+        message.textContent = paymentUrl
+            ? 'Thông tin đặt phòng đã được gửi. Bạn bấm nút bên dưới để qua trang thanh toán.'
+            : 'Thông tin đặt phòng đã được gửi. Không tạo được link thanh toán, bạn liên hệ homestay để được hỗ trợ.';
+        wrapper.appendChild(message);
+
         if (paymentUrl) {
             const link = document.createElement('a');
             link.className = 'ai-chip-btn';
             link.href = paymentUrl;
-            link.textContent = 'Mở trang thanh toán';
+            link.textContent = 'Đi tới trang thanh toán';
             wrapper.appendChild(link);
-        }
-
-        const successUrl = toSafeRelativeUrl(data.successUrl);
-        if (successUrl) {
-            const success = document.createElement('a');
-            success.className = 'ai-payment-success-link';
-            success.href = successUrl;
-            success.textContent = 'Xem trang xác nhận sau thanh toán';
-            wrapper.appendChild(success);
         }
         scrollMessages();
     }
@@ -587,7 +645,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function toSafeRelativeUrl(value) {
         if (!value || typeof value !== 'string') return '';
-        return value.startsWith('/') && !value.startsWith('//') ? value : '';
+        const url = value.trim();
+        if (url.startsWith('/') && !url.startsWith('//')) return url;
+        try {
+            const parsed = new URL(url, window.location.origin);
+            return parsed.origin === window.location.origin ? `${parsed.pathname}${parsed.search}${parsed.hash}` : '';
+        } catch {
+            return '';
+        }
     }
 
     function toSafeInputType(value) {

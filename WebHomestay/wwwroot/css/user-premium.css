@@ -1059,6 +1059,13 @@ h1, h2, h3, h4, h5, h6 {
 .ai-booking-form { display: grid; gap: 10px; }
 .ai-booking-form input, .ai-booking-form textarea { border: 1px solid var(--luxury-border); padding: 10px 12px; text-transform: none; letter-spacing: normal; font-weight: 500; }
 .ai-payment-block { display: grid; gap: 8px; color: var(--luxury-text); }
+.ai-payment-message { color: var(--luxury-text-muted); font-size: .88rem; line-height: 1.45; }
+.ai-payment-amount { color: var(--luxury-accent); font-size: 1rem; }
+.ai-payment-qr-image { width: min(220px, 100%); justify-self: center; border: 1px solid var(--luxury-border); padding: 8px; background: #fff; }
+.ai-payment-countdown { padding: 8px 10px; background: #f8fafc; border: 1px solid rgba(203, 213, 225, 0.9); color: var(--luxury-primary); font-weight: 800; text-align: center; }
+.ai-payment-proof-form { display: grid; gap: 8px; }
+.ai-payment-proof-form input { border: 1px solid var(--luxury-border); padding: 9px; }
+.ai-payment-proof-status { color: var(--luxury-text-muted); font-size: .84rem; }
 .ai-payment-success-link { color: var(--luxury-text-muted); font-size: .84rem; }
 .ai-empty-slots {
     padding: 0.75rem 0.9rem;

@@ -134,6 +134,31 @@ namespace WebHomestay.Controllers
             return Ok(new { success = true });
         }
 
+        [HttpPost("payment-proof")]
+        public async Task<IActionResult> UploadPaymentProof(int bookingId, IFormFile? paymentProof)
+        {
+            var booking = await _context.Bookings.FindAsync(bookingId);
+            if (booking == null) return NotFound(new { message = "Không tìm thấy đơn đặt phòng." });
+            if (paymentProof == null || paymentProof.Length == 0) return BadRequest(new { message = "Bạn chọn ảnh bill thanh toán trước nhé." });
+            if (!paymentProof.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return BadRequest(new { message = "Bill thanh toán phải là file ảnh." });
+
+            var uploadDir = Path.Combine(_environment.WebRootPath, "uploads", "payments");
+            Directory.CreateDirectory(uploadDir);
+            var extension = Path.GetExtension(paymentProof.FileName).ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(extension) || extension.Length > 10) extension = ".png";
+            var fileName = $"bill_{bookingId}_{DateTime.Now:yyyyMMddHHmmss}{extension}";
+            var filePath = Path.Combine(uploadDir, fileName);
+            await using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await paymentProof.CopyToAsync(stream);
+            }
+
+            booking.PaymentProofUrl = "/uploads/payments/" + fileName;
+            booking.Status = "AwaitingApproval";
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true });
+        }
+
         [HttpGet("branches")]
         public async Task<IActionResult> Branches(CancellationToken cancellationToken)
         {
