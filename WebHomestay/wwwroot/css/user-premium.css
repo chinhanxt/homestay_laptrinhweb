@@ -1031,6 +1031,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .ai-booking-block { margin: 12px 0; }
 .ai-room-card,
+.ai-daily-room-option,
 .ai-booking-summary,
 .ai-payment-block { border: 1px solid var(--luxury-border); background: #fff; padding: 14px; margin-bottom: 10px; }
 .ai-room-card h4,

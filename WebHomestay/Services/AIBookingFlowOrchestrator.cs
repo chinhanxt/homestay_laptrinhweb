@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -51,7 +52,7 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         if (state.BookingMode == "daily")
         {
             state.CheckInDate = requestedDate;
-            state.CheckOutDate = requestedDate.AddDays(1);
+            state.CheckOutDate = request.EndTime.HasValue ? DateOnly.FromDateTime(request.EndTime.Value) : requestedDate.AddDays(1);
             return await BuildAvailableDailyRoomsForDateAsync(sessionId, state, requestedDate, cancellationToken);
         }
 
@@ -192,11 +193,11 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
             SlotInventoryId = state.SelectedSlotId,
             CheckInDate = state.CheckInDate,
             CheckOutDate = state.CheckOutDate,
-            CustomerName = form.CustomerName,
-            CustomerPhone = form.PhoneNumber,
-            CustomerEmail = form.Email,
-            CustomerNote = form.Notes,
-            GuestCount = state.GuestCount
+            CustomerName = ResolveFormValue(form, "customerName", form.CustomerName),
+            CustomerPhone = ResolveFormValue(form, "customerPhone", form.PhoneNumber),
+            CustomerEmail = ResolveFormValue(form, "customerEmail", form.Email),
+            CustomerNote = ResolveFormValue(form, "customerNote", form.Notes),
+            GuestCount = ResolveGuestCountFromForm(form, state.GuestCount)
         };
 
         var booking = mode == "daily"
@@ -237,7 +238,9 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
 
     private async Task<AIBookingFlowResponse> BuildAvailableDailyRoomsForDateAsync(string sessionId, AIBookingSessionState state, DateOnly checkIn, CancellationToken cancellationToken)
     {
-        var checkOut = state.CheckOutDate ?? checkIn.AddDays(1);
+        var checkOut = ExtractCheckOutDateFromRequest(state, checkIn);
+        state.CheckInDate = checkIn;
+        state.CheckOutDate = checkOut;
         var interval = BookingTimeRules.BuildDailyStay(checkIn, checkOut);
         var rooms = await _context.Rooms
             .AsNoTracking()
@@ -262,7 +265,8 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
                 RoomName = room.Name,
                 CheckInDate = checkIn,
                 CheckOutDate = checkOut,
-                TotalPrice = await CalculateTotalPriceAsync(room, interval.Start, interval.End, false, state.GuestCount)
+                TotalPrice = await CalculateTotalPriceAsync(room, interval.Start, interval.End, false, state.GuestCount),
+                DetailsUrl = $"/Rooms/Details/{room.Id}"
             });
         }
 
@@ -360,6 +364,16 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         return options;
     }
 
+    private static DateOnly ExtractCheckOutDateFromRequest(AIBookingSessionState state, DateOnly checkIn)
+    {
+        if (state.CheckOutDate.HasValue && state.CheckOutDate.Value > checkIn)
+        {
+            return state.CheckOutDate.Value;
+        }
+
+        return checkIn.AddDays(1);
+    }
+
     private static DateOnly ExtractDateOrDefaultToday(string message, DateTime? requestStartTime)
     {
         var lowered = message.ToLowerInvariant();
@@ -445,7 +459,7 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
                 Type = "bookingSummary",
                 Data = new AIBookingSummaryBlock { Title = "Tóm tắt đặt phòng", State = state, TotalPrice = total, Lines = lines }
             },
-            new AIUiBlock { Type = "bookingForm", Data = new { fields = BuildBookingFormFields(state) } });
+            new AIUiBlock { Type = "bookingForm", Data = new { fields = BuildBookingFormFieldsAsync(state).GetAwaiter().GetResult() } });
     }
 
     private async Task<Room> LoadSelectedRoomAsync(int? roomId)
@@ -474,13 +488,93 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
         $"Số khách: {state.GuestCount}"
     };
 
-    private static List<AIBookingFormField> BuildBookingFormFields(AIBookingSessionState state) => new()
+    private async Task<List<AIBookingFormField>> BuildBookingFormFieldsAsync(AIBookingSessionState state)
+    {
+        var schema = await _context.SystemSettings
+            .AsNoTracking()
+            .Where(setting => setting.GroupName == "AI" && setting.SettingKey == "AIBookingFormSchema")
+            .Select(setting => setting.SettingValue)
+            .FirstOrDefaultAsync();
+
+        var fields = ParseBookingFormSchema(schema, state);
+        return fields.Count > 0 ? fields : BuildDefaultBookingFormFields(state);
+    }
+
+    private static List<AIBookingFormField> BuildDefaultBookingFormFields(AIBookingSessionState state) => new()
     {
         new() { Name = "customerName", Label = "Họ tên", Required = true, Value = state.CustomerName },
         new() { Name = "phoneNumber", Label = "Số điện thoại", Required = true, Type = "tel" },
         new() { Name = "email", Label = "Email", Type = "email" },
         new() { Name = "notes", Label = "Ghi chú", Type = "textarea" }
     };
+
+    private static List<AIBookingFormField> ParseBookingFormSchema(string? schema, AIBookingSessionState state)
+    {
+        if (string.IsNullOrWhiteSpace(schema)) return new List<AIBookingFormField>();
+
+        try
+        {
+            using var document = JsonDocument.Parse(schema);
+            if (document.RootElement.ValueKind != JsonValueKind.Array) return new List<AIBookingFormField>();
+
+            return document.RootElement.EnumerateArray()
+                .Select(field => new AIBookingFormField
+                {
+                    Name = ReadString(field, "id") ?? ReadString(field, "name") ?? string.Empty,
+                    Label = ReadString(field, "label") ?? ReadString(field, "id") ?? string.Empty,
+                    Type = NormalizeFormFieldType(ReadString(field, "type")),
+                    Required = ReadBool(field, "required"),
+                    Placeholder = ReadString(field, "helpText") ?? ReadString(field, "placeholder"),
+                    Value = ReadString(field, "id") is "customerName" ? state.CustomerName : null
+                })
+                .Where(field => !string.IsNullOrWhiteSpace(field.Name))
+                .OrderBy(field => ReadOrder(document.RootElement, field.Name))
+                .ToList();
+        }
+        catch (JsonException)
+        {
+            return new List<AIBookingFormField>();
+        }
+    }
+
+    private static string NormalizeFormFieldType(string? type) => type switch
+    {
+        "tel" => "tel",
+        "email" => "email",
+        "number" => "number",
+        "textarea" => "textarea",
+        "image" => "file",
+        _ => "text"
+    };
+
+    private static string? ReadString(JsonElement element, string propertyName)
+        => element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+
+    private static bool ReadBool(JsonElement element, string propertyName)
+        => element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.True;
+
+    private static int ReadOrder(JsonElement root, string name)
+    {
+        foreach (var field in root.EnumerateArray())
+        {
+            var id = ReadString(field, "id") ?? ReadString(field, "name");
+            if (id == name && field.TryGetProperty("order", out var order) && order.TryGetInt32(out var value)) return value;
+        }
+
+        return int.MaxValue;
+    }
+
+    private static string ResolveFormValue(AIBookingFormSubmission form, string key, string? fallback)
+    {
+        if (form.Values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)) return value.Trim();
+        return fallback?.Trim() ?? string.Empty;
+    }
+
+    private static int ResolveGuestCountFromForm(AIBookingFormSubmission form, int fallback)
+    {
+        if (form.Values.TryGetValue("guestCount", out var value) && int.TryParse(value, out var parsed) && parsed > 0) return parsed;
+        return fallback <= 0 ? 1 : fallback;
+    }
 
     private AIBookingSessionState MergeState(AIBookingActionRequest request)
     {

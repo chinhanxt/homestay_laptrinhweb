@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const branchSelect = widget.querySelector('.ai-context-branch');
     const modeSelect = widget.querySelector('.ai-context-mode');
     const guestsInput = widget.querySelector('.ai-context-guests');
+    const checkInInput = widget.querySelector('.ai-context-checkin');
+    const checkOutInput = widget.querySelector('.ai-context-checkout');
 
     let sessionId = createSessionId();
     let bookingState = {};
@@ -41,6 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     customerName: getCustomerName(),
                     branchId: getBranchId(),
                     bookingMode: getBookingMode(),
+                    startTime: getCheckInDateTime(),
+                    endTime: getCheckOutDateTime(),
                     guestCount: getGuestCount()
                 })
             });
@@ -270,12 +274,36 @@ document.addEventListener('DOMContentLoaded', () => {
         const rooms = Array.isArray(data.rooms) ? data.rooms : [];
         rooms.forEach(room => {
             if (!room || typeof room !== 'object') return;
-            const item = document.createElement('button');
-            item.className = 'ai-chip-btn';
-            item.type = 'button';
-            item.dataset.aiAction = 'select-daily-room';
-            item.dataset.roomId = toSafeNumber(room.roomId).toString();
-            item.textContent = `${room.roomName || 'Phòng'}: ${formatMoney(room.totalPrice || room.pricePerDay)}/ngày`;
+            const item = document.createElement('div');
+            item.className = 'ai-daily-room-option';
+
+            const title = document.createElement('strong');
+            title.textContent = `${room.roomName || 'Phòng'}: ${formatMoney(room.totalPrice || room.pricePerDay)}/ngày`;
+            item.appendChild(title);
+
+            const actions = document.createElement('div');
+            actions.className = 'ai-room-actions';
+
+            const detailsUrl = toSafeRelativeUrl(room.detailsUrl);
+            if (detailsUrl) {
+                const detailsLink = document.createElement('a');
+                detailsLink.className = 'ai-chip-btn';
+                detailsLink.href = detailsUrl;
+                detailsLink.target = '_blank';
+                detailsLink.rel = 'noopener';
+                detailsLink.textContent = 'Xem chi tiết';
+                actions.appendChild(detailsLink);
+            }
+
+            const select = document.createElement('button');
+            select.className = 'ai-chip-btn';
+            select.type = 'button';
+            select.dataset.aiAction = 'select-daily-room';
+            select.dataset.roomId = toSafeNumber(room.roomId).toString();
+            select.textContent = 'Chọn phòng này';
+            actions.appendChild(select);
+
+            item.appendChild(actions);
             wrapper.appendChild(item);
         });
         scrollMessages();
@@ -387,6 +415,10 @@ document.addEventListener('DOMContentLoaded', () => {
         state.branchId = state.branchId || getBranchId();
         state.bookingMode = state.bookingMode && state.bookingMode !== 'unknown' ? state.bookingMode : getBookingMode();
         state.guestCount = state.guestCount || getGuestCount();
+        if (state.bookingMode === 'daily') {
+            state.checkInDate = state.checkInDate || getDateOnly(checkInInput);
+            state.checkOutDate = state.checkOutDate || getDateOnly(checkOutInput);
+        }
 
         const roomId = toSafeNumber(source.dataset.roomId);
         const slotId = toSafeNumber(source.dataset.slotId);
@@ -438,6 +470,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return Math.min(Math.max(count, 1), 20);
     }
 
+    function getDateOnly(inputElement) {
+        return inputElement && inputElement.value ? inputElement.value : null;
+    }
+
+    function getCheckInDateTime() {
+        const value = getDateOnly(checkInInput);
+        return value ? `${value}T00:00:00` : null;
+    }
+
+    function getCheckOutDateTime() {
+        const value = getDateOnly(checkOutInput);
+        return value ? `${value}T00:00:00` : null;
+    }
+
     function formatMoney(value) {
         return new Intl.NumberFormat('vi-VN').format(value || 0) + 'đ';
     }
@@ -453,7 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function toSafeInputType(value) {
-        return ['text', 'tel', 'email', 'number', 'date'].includes(value) ? value : 'text';
+        return ['text', 'tel', 'email', 'number', 'date', 'file'].includes(value) ? value : 'text';
     }
 
     function scrollMessages() {

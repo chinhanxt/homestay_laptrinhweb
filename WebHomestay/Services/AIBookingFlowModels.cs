@@ -96,6 +96,7 @@ namespace WebHomestay.Services
         public DateOnly CheckInDate { get; set; }
         public DateOnly CheckOutDate { get; set; }
         public decimal TotalPrice { get; set; }
+        public string DetailsUrl { get; set; } = string.Empty;
     }
 
     public class AIBookingSummaryBlock
