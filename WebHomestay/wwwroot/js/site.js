@@ -241,6 +241,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const grid = document.createElement('div');
         grid.className = 'ai-slot-grid';
         const slots = Array.isArray(data.slots) ? data.slots : [];
+        if (!slots.length) {
+            const empty = document.createElement('div');
+            empty.className = 'ai-empty-slots';
+            empty.textContent = 'Chưa có khung giờ phù hợp để hiển thị.';
+            wrapper.appendChild(empty);
+            scrollMessages();
+            return;
+        }
+
         slots.forEach(slot => {
             if (!slot || typeof slot !== 'object') return;
             const button = document.createElement('button');
@@ -249,7 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
             button.dataset.aiAction = 'select-slot';
             button.dataset.roomId = toSafeNumber(slot.roomId).toString();
             button.dataset.slotId = toSafeNumber(slot.slotId).toString();
-            button.textContent = `${slot.roomName || 'Phòng'}: ${slot.label || 'Khung giờ'}`;
+            button.textContent = `${slot.roomName || 'Phòng'}: ${slot.label || 'Khung giờ'} · ${formatMoney(slot.totalPrice)}`;
             grid.appendChild(button);
         });
         wrapper.appendChild(grid);
