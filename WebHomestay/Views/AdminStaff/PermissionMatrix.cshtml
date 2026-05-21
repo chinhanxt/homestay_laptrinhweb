@@ -1,0 +1,437 @@
+@using WebHomestay.Helpers
+@using WebHomestay.Models
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Ma trận phân quyền";
+    var roles = (List<string>)ViewBag.Roles;
+    var accounts = (List<AdminUser>)ViewBag.Accounts;
+    var roleTemplates = (List<RolePermissionTemplate>)ViewBag.RoleTemplates;
+
+    var managerPerms = roleTemplates.FirstOrDefault(t => t.Role == "Manager")?.Permissions ?? new();
+    var staffPerms = roleTemplates.FirstOrDefault(t => t.Role == "Staff")?.Permissions ?? new();
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<style>
+  .perm-table th, .perm-table td { vertical-align: middle; text-align: center; }
+  .perm-table td:first-child { text-align: left; }
+  .perm-table .perm-child td:first-child { padding-left: 2.5rem !important; }
+  .perm-table .perm-child .module-icon { opacity: 0.5; }
+  .perm-table .perm-child label { font-size: 0.9em; }
+  .perm-override { outline: 2px solid #c8a97e; outline-offset: 2px; border-radius: 2px; }
+  .perm-inherited { opacity: 0.4; }
+  .account-search { max-width: 400px; }
+  .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 9999; max-width: 400px; }
+  .toast-msg { padding: 0.75rem 1rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin-bottom: 0.5rem; animation: fadeIn 0.3s ease; }
+  @@keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+
+<div class="premium-admin-body">
+  <div class="admin-shell">
+    <header class="admin-hero">
+      <div class="admin-hero-title">
+        <span class="admin-kicker">Quản trị bảo mật</span>
+        <h1><i class="fas fa-lock me-2"></i>Ma trận phân quyền</h1>
+        <p class="text-muted small mt-1">Cấu hình quyền theo vai trò hoặc theo từng tài khoản</p>
+      </div>
+      <div class="admin-hero-actions">
+        <a asp-action="Index" class="btn-premium-outline">
+          <i class="fas fa-arrow-left"></i><span>Quay lại</span>
+        </a>
+      </div>
+    </header>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+      <div class="alert alert-success alert-dismissible fade show mt-3 mb-0">@TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    }
+
+    <!-- Mode toggle -->
+    <div class="admin-card mb-4 p-4">
+      <div class="d-flex align-items-center gap-4 flex-wrap">
+        <div class="btn-group" role="group" id="modeToggle">
+          <input type="radio" class="btn-check" name="mode" id="modeRole" value="role" checked autocomplete="off">
+          <label class="btn btn-outline-primary rounded-pill px-4" for="modeRole">
+            <i class="fas fa-users me-1"></i>Theo Role
+          </label>
+          <input type="radio" class="btn-check" name="mode" id="modeAccount" value="account" autocomplete="off">
+          <label class="btn btn-outline-primary rounded-pill px-4" for="modeAccount">
+            <i class="fas fa-user me-1"></i>Theo Tài khoản
+          </label>
+        </div>
+
+        <div id="roleSelector" class="d-flex align-items-center gap-2">
+          <label class="fw-bold small text-muted">Chọn vai trò:</label>
+          <select id="roleSelect" class="form-select form-select-sm border-0 bg-light rounded-pill px-4" style="width:auto;">
+            <option value="Manager">Manager</option>
+            <option value="Staff">Staff</option>
+          </select>
+        </div>
+
+        <div id="accountSelector" class="d-flex align-items-center gap-2" style="display:none !important;">
+          <label class="fw-bold small text-muted">Chọn tài khoản:</label>
+          <input type="text" id="accountFilter" class="form-control form-control-sm bg-light rounded-pill px-3 account-search" placeholder="Tìm tên / username..." />
+          <select id="accountSelect" class="form-select form-select-sm border-0 bg-light rounded-pill px-3" style="width:auto;min-width:250px;">
+            @foreach (var acc in accounts)
+            {
+              <option value="@acc.Id"
+                      data-name="@acc.FullName"
+                      data-username="@acc.Username"
+                      data-branch="@(acc.Branch?.Name ?? "Tất cả")">
+                @acc.FullName (@@@acc.Username) - @(acc.Branch?.Name ?? "Tất cả CN")
+              </option>
+            }
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Permission Matrix -->
+    <form id="permForm" method="post">
+      <div class="admin-card">
+        <div class="admin-table-responsive">
+          <table class="admin-table perm-table" id="permMatrix">
+            <thead>
+              <tr>
+                <th class="ps-4" style="width:320px;">Module / Tính năng</th>
+                <th class="text-center">Xem</th>
+                <th class="text-center">CT</th>
+                <th class="text-center">Thêm</th>
+                <th class="text-center">Sửa</th>
+                <th class="text-center">Xóa</th>
+                <th class="text-center">Khác</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @{
+                var modules = new (string id, string name, string icon, bool hasDetail, bool hasCreate, bool hasEdit, bool hasDelete, string[] extras)[]
+                {
+                  ("matrix", "Ma trận vận hành", "fa-th", false, false, false, false, Array.Empty<string>()),
+                  ("bookings", "Đơn đặt phòng", "fa-calendar-check", true, true, true, true, new[]{"trash","restore"}),
+                  ("branches", "Chi nhánh", "fa-building", true, true, true, true, Array.Empty<string>()),
+                  ("rooms", "Phòng", "fa-door-open", true, true, true, true, Array.Empty<string>()),
+                  ("images", "Kho ảnh", "fa-images", true, false, false, false, Array.Empty<string>()),
+                  ("statistics", "Thống kê", "fa-chart-bar", false, false, false, false, new[]{"export"}),
+                  ("staff", "Nhân sự", "fa-users-cog", false, true, true, true, new[]{"permissions","logs"}),
+                  ("settings", "Cấu hình", "fa-sliders-h", false, false, false, false, new[]{"update","holidays","slots"}),
+                  ("ai", "AI Brain Center", "fa-brain", false, false, false, false, new[]{"manage"})
+                };
+              }
+
+              @foreach (var mod in modules)
+              {
+                var parentKey = mod.id + ".view";
+
+                <tr data-module="@mod.id">
+                  <td class="ps-4 py-3">
+                    <div class="d-flex align-items-center">
+                      <div class="bg-primary-soft text-primary rounded d-flex align-items-center justify-content-center me-3" style="width:32px;height:32px;">
+                        <i class="fas @mod.icon"></i>
+                      </div>
+                      <span class="fw-bold">@mod.id.ToUpper() - @mod.name</span>
+                    </div>
+                  </td>
+                  <!-- View (parent) -->
+                  <td><input type="checkbox" class="perm-check parent-check" data-module="@mod.id" data-key="@parentKey" value="@parentKey" name="selectedPermissions"></td>
+                  <!-- Detail -->
+                  @if (mod.hasDetail)
+                  {
+                    <td><input type="checkbox" class="perm-check child-check" data-module="@mod.id" data-key="@(mod.id).detail" value="@(mod.id).detail" name="selectedPermissions"></td>
+                  }
+                  else
+                  {
+                    <td><span class="text-muted small">—</span></td>
+                  }
+                  <!-- Create -->
+                  @if (mod.hasCreate)
+                  {
+                    <td><input type="checkbox" class="perm-check child-check" data-module="@mod.id" data-key="@(mod.id).create" value="@(mod.id).create" name="selectedPermissions"></td>
+                  }
+                  else
+                  {
+                    <td><span class="text-muted small">—</span></td>
+                  }
+                  <!-- Edit -->
+                  @if (mod.hasEdit)
+                  {
+                    <td><input type="checkbox" class="perm-check child-check" data-module="@mod.id" data-key="@(mod.id).edit" value="@(mod.id).edit" name="selectedPermissions"></td>
+                  }
+                  else
+                  {
+                    <td><span class="text-muted small">—</span></td>
+                  }
+                  <!-- Delete -->
+                  @if (mod.hasDelete)
+                  {
+                    <td><input type="checkbox" class="perm-check child-check" data-module="@mod.id" data-key="@(mod.id).delete" value="@(mod.id).delete" name="selectedPermissions"></td>
+                  }
+                  else
+                  {
+                    <td><span class="text-muted small">—</span></td>
+                  }
+                  <!-- Extras column -->
+                  <td>
+                    @if (mod.extras.Length > 0)
+                    {
+                      <div class="d-flex gap-1 flex-wrap justify-content-center">
+                        @foreach (var extra in mod.extras)
+                        {
+                          <span class="badge bg-light text-dark border small d-flex align-items-center gap-1">
+                            @extra
+                            <input type="checkbox" class="perm-check child-check" data-module="@mod.id" data-key="@(mod.id).@extra" value="@(mod.id).@extra" name="selectedPermissions" style="width:14px;height:14px;">
+                          </span>
+                        }
+                      </div>
+                    }
+                    else
+                    {
+                      <span class="text-muted small">—</span>
+                    }
+                  </td>
+                  <td class="text-end pe-3">
+                    <button type="button" class="btn btn-sm btn-outline-secondary border-0 module-toggle-all" data-module="@mod.id" title="Bật tất cả"><i class="fas fa-check-double"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary border-0 module-toggle-none" data-module="@mod.id" title="Tắt tất cả"><i class="fas fa-times"></i></button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="mt-4 d-flex gap-3 justify-content-center align-items-center">
+        <button type="submit" class="btn-premium px-5 py-2 fw-bold shadow-sm" id="saveBtn">
+          <i class="fas fa-save"></i><span>LƯU THAY ĐỔI</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toastContainer" class="toast-container"></div>
+
+@section Scripts {
+<script>
+(function() {
+  var currentMode = 'role';
+  var currentRole = 'Manager';
+  var currentAccountId = null;
+
+  var roleData = {
+    Manager: @Html.Raw(JsonSerializer.Serialize(managerPerms)),
+    Staff: @Html.Raw(JsonSerializer.Serialize(staffPerms))
+  };
+
+  var accountOverrides = {};
+  @foreach (var acc in accounts)
+  {
+    var overrideDict = acc.Permissions ?? new Dictionary<string, bool>();
+    <text>accountOverrides[@acc.Id] = @Html.Raw(JsonSerializer.Serialize(overrideDict));</text>
+  }
+
+  var roleSelect = document.getElementById('roleSelect');
+  var accountSelect = document.getElementById('accountSelect');
+  var accountFilter = document.getElementById('accountFilter');
+  var permForm = document.getElementById('permForm');
+
+  function setMode(mode) {
+    currentMode = mode;
+    document.getElementById('roleSelector').style.display = mode === 'role' ? 'flex' : 'none';
+    document.getElementById('accountSelector').style.display = mode === 'account' ? 'flex' : 'none';
+    if (mode === 'role') {
+      permForm.action = '@Url.Action("SaveRoleTemplate", "AdminStaff")';
+      renderMatrixForRole(currentRole);
+    } else {
+      permForm.action = '@Url.Action("SaveAccountPermissions", "AdminStaff")';
+      if (accountSelect.value) renderMatrixForAccount(parseInt(accountSelect.value));
+    }
+  }
+
+  document.getElementById('modeRole').addEventListener('change', function() { if (this.checked) setMode('role'); });
+  document.getElementById('modeAccount').addEventListener('change', function() { if (this.checked) setMode('account'); });
+
+  roleSelect.addEventListener('change', function() {
+    currentRole = this.value;
+    renderMatrixForRole(currentRole);
+  });
+
+  accountFilter.addEventListener('input', function() {
+    var q = this.value.toLowerCase();
+    for (var i = 0; i < accountSelect.options.length; i++) {
+      var opt = accountSelect.options[i];
+      opt.style.display = opt.text.toLowerCase().includes(q) ? '' : 'none';
+    }
+    for (var i = 0; i < accountSelect.options.length; i++) {
+      if (accountSelect.options[i].style.display !== 'none') {
+        accountSelect.selectedIndex = i;
+        accountSelect.dispatchEvent(new Event('change'));
+        break;
+      }
+    }
+  });
+
+  accountSelect.addEventListener('change', function() {
+    if (this.value) {
+      currentAccountId = parseInt(this.value);
+      renderMatrixForAccount(currentAccountId);
+    }
+  });
+
+  function renderMatrixForRole(role) {
+    applyPermsToMatrix(roleData[role] || {}, false);
+  }
+
+  function renderMatrixForAccount(accountId) {
+    var role = getAccountRole(accountId);
+    var template = roleData[role] || {};
+    var override = accountOverrides[accountId] || {};
+    applyPermsWithOverride(template, override);
+  }
+
+  function getAccountRole(accountId) {
+    @foreach (var acc in accounts)
+    {
+      <text>if (accountId === @acc.Id) return '@acc.Role';</text>
+    }
+    return 'Staff';
+  }
+
+  function applyPermsToMatrix(perms, isOverride) {
+    var checks = document.querySelectorAll('.perm-check');
+    for (var i = 0; i < checks.length; i++) {
+      var key = checks[i].value;
+      if (perms[key]) {
+        checks[i].checked = true;
+        checks[i].classList.remove('perm-inherited', 'perm-override');
+        if (isOverride) checks[i].classList.add('perm-override');
+      } else {
+        checks[i].checked = false;
+        checks[i].classList.remove('perm-override', 'perm-inherited');
+      }
+    }
+    validateInheritance();
+  }
+
+  function applyPermsWithOverride(template, override) {
+    var checks = document.querySelectorAll('.perm-check');
+    for (var i = 0; i < checks.length; i++) {
+      var key = checks[i].value;
+      var inTemplate = !!template[key];
+      var inOverride = !!override[key];
+      if (inOverride) {
+        checks[i].checked = true;
+        checks[i].classList.add('perm-override');
+        checks[i].classList.remove('perm-inherited');
+      } else if (inTemplate) {
+        checks[i].checked = true;
+        checks[i].classList.remove('perm-override');
+        checks[i].classList.add('perm-inherited');
+      } else {
+        checks[i].checked = false;
+        checks[i].classList.remove('perm-override', 'perm-inherited');
+      }
+    }
+    validateInheritance();
+  }
+
+  function validateInheritance() {
+    var rows = document.querySelectorAll('#permMatrix tbody tr');
+    for (var i = 0; i < rows.length; i++) {
+      var mod = rows[i].dataset.module;
+      if (!mod) continue;
+      var parentCheck = rows[i].querySelector('.parent-check');
+      var childChecks = rows[i].querySelectorAll('.child-check');
+      if (parentCheck && !parentCheck.checked) {
+        for (var j = 0; j < childChecks.length; j++) {
+          if (childChecks[j].checked) childChecks[j].checked = false;
+        }
+      }
+    }
+  }
+
+  document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('perm-check')) {
+      var mod = e.target.dataset.module;
+      var row = e.target.closest('tr');
+      var parentCheck = row.querySelector('.parent-check');
+      if (e.target.classList.contains('parent-check')) {
+        if (!e.target.checked) {
+          var children = row.querySelectorAll('.child-check');
+          for (var i = 0; i < children.length; i++) children[i].checked = false;
+          showToast('Đã tắt quyền ' + getModuleName(mod) + ' — các quyền con cũng bị tắt theo.');
+        }
+      } else {
+        if (e.target.checked && parentCheck && !parentCheck.checked) {
+          e.target.checked = false;
+          showToast('Cần bật Xem ' + getModuleName(mod) + ' trước khi bật quyền này.');
+        }
+      }
+    }
+  });
+
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.module-toggle-all');
+    if (btn) {
+      var mod = btn.dataset.module;
+      var checks = btn.closest('tr').querySelectorAll('.perm-check');
+      for (var i = 0; i < checks.length; i++) checks[i].checked = true;
+      validateInheritance();
+    }
+    btn = e.target.closest('.module-toggle-none');
+    if (btn) {
+      var mod = btn.dataset.module;
+      var checks = btn.closest('tr').querySelectorAll('.perm-check');
+      for (var i = 0; i < checks.length; i++) checks[i].checked = false;
+    }
+  });
+
+  function getModuleName(mod) {
+    var names = { matrix:'Ma trận vận hành', bookings:'Đơn đặt phòng', branches:'Chi nhánh', rooms:'Phòng', images:'Kho ảnh', statistics:'Thống kê', staff:'Nhân sự', settings:'Cấu hình', ai:'AI Brain Center' };
+    return names[mod] || mod;
+  }
+
+  function showToast(msg) {
+    var container = document.getElementById('toastContainer');
+    var toast = document.createElement('div');
+    toast.className = 'toast-msg alert alert-warning';
+    toast.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>' + msg;
+    container.appendChild(toast);
+    setTimeout(function() { toast.remove(); }, 4000);
+  }
+
+  permForm.addEventListener('submit', function(e) {
+    if (currentMode === 'account' && !accountSelect.value) {
+      e.preventDefault();
+      showToast('Vui lòng chọn tài khoản trước khi lưu.');
+      return;
+    }
+    var inputs = document.querySelectorAll('.parent-check:not(:checked)');
+    for (var i = 0; i < inputs.length; i++) {
+      var mod = inputs[i].dataset.module;
+      var row = inputs[i].closest('tr');
+      var children = row.querySelectorAll('.child-check:checked');
+      if (children.length > 0) {
+        e.preventDefault();
+        showToast('Lỗi: Cần bật Xem ' + getModuleName(mod) + ' trước.');
+        return;
+      }
+    }
+    if (currentMode === 'account') {
+      var inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = 'accountId'; inp.value = accountSelect.value;
+      permForm.appendChild(inp);
+    } else {
+      var inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = 'role'; inp.value = roleSelect.value;
+      permForm.appendChild(inp);
+    }
+  });
+
+  setMode('role');
+})();
+</script>
+}
