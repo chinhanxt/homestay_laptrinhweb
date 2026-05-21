@@ -13,10 +13,12 @@ namespace WebHomestay.Controllers
     public class AdminStaffController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly IPermissionResolveService _permissionResolve;
 
-        public AdminStaffController(ApplicationDbContext context)
+        public AdminStaffController(ApplicationDbContext context, IPermissionResolveService permissionResolve)
         {
             _context = context;
+            _permissionResolve = permissionResolve;
         }
 
         [AdminAuthorize(Permission = "staff.view")]
@@ -208,8 +210,7 @@ namespace WebHomestay.Controllers
 
             await _context.SaveChangesAsync();
 
-            var resolveService = HttpContext.RequestServices.GetRequiredService<IPermissionResolveService>();
-            resolveService.InvalidateCache(role);
+            _permissionResolve.InvalidateCache(role);
 
             await LogAction("Cập nhật quyền Role", $"Role: {role}");
             TempData["SuccessMessage"] = $"Đã cập nhật quyền cho role {role}.";
