@@ -31,6 +31,7 @@ namespace WebHomestay.Data
         public DbSet<AIGraphEdge> AIGraphEdges { get; set; }
         public DbSet<AIAgentDefinition> AIAgentDefinitions { get; set; }
         public DbSet<AIConversationTrace> AIConversationTraces { get; set; }
+        public DbSet<RolePermissionTemplate> RolePermissionTemplates { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -305,6 +306,14 @@ namespace WebHomestay.Data
                 entity.Property(e => e.Id).HasColumnName("id");
                 entity.Property(e => e.Date).HasColumnName("date");
                 entity.Property(e => e.Description).HasColumnName("description");
+            });
+
+            modelBuilder.Entity<RolePermissionTemplate>(entity =>
+            {
+                entity.ToTable("role_permission_templates");
+                entity.Property(e => e.Role).HasColumnName("role");
+                entity.Property(e => e.PermissionsJson).HasColumnName("permissions_json");
+                entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
             });
 
             // Update Room mapping for new fields
