@@ -196,6 +196,12 @@ namespace WebHomestay.Controllers
             var permDict = new Dictionary<string, bool>();
             foreach (var p in selectedPermissions ?? new List<string>()) permDict[p] = true;
 
+            if (!ValidateInheritance(permDict, out var error))
+            {
+                TempData["ErrorMessage"] = error;
+                return RedirectToAction(nameof(PermissionMatrix));
+            }
+
             var template = await _context.RolePermissionTemplates.FirstOrDefaultAsync(t => t.Role == role);
             if (template == null)
             {
@@ -227,6 +233,12 @@ namespace WebHomestay.Controllers
 
             var permDict = new Dictionary<string, bool>();
             foreach (var p in selectedPermissions ?? new List<string>()) permDict[p] = true;
+
+            if (!ValidateInheritance(permDict, out var error))
+            {
+                TempData["ErrorMessage"] = error;
+                return RedirectToAction(nameof(PermissionMatrix));
+            }
 
             user.Permissions = permDict;
             await _context.SaveChangesAsync();
@@ -272,6 +284,47 @@ namespace WebHomestay.Controllers
                 _context.ActivityLogs.Add(log);
                 await _context.SaveChangesAsync();
             }
+        }
+
+        private bool ValidateInheritance(Dictionary<string, bool> perms, out string errorMessage)
+        {
+            var parentChildMap = new Dictionary<string, string[]>
+            {
+                ["bookings.view"] = new[] { "bookings.detail", "bookings.create", "bookings.edit", "bookings.delete", "bookings.trash", "bookings.restore" },
+                ["branches.view"] = new[] { "branches.detail", "branches.create", "branches.edit", "branches.delete" },
+                ["rooms.view"] = new[] { "rooms.detail", "rooms.create", "rooms.edit", "rooms.delete" },
+                ["images.view"] = new[] { "images.detail" },
+                ["statistics.view"] = new[] { "statistics.export" },
+                ["staff.view"] = new[] { "staff.create", "staff.edit", "staff.delete", "staff.permissions", "staff.logs" },
+                ["settings.view"] = new[] { "settings.update", "holidays.manage", "slots.manage" },
+                ["ai.view"] = new[] { "ai.manage" }
+            };
+
+            var moduleNames = new Dictionary<string, string>
+            {
+                ["bookings"] = "Đơn đặt phòng", ["branches"] = "Chi nhánh", ["rooms"] = "Phòng",
+                ["images"] = "Kho ảnh", ["statistics"] = "Thống kê", ["staff"] = "Nhân sự",
+                ["settings"] = "Cấu hình", ["ai"] = "AI Brain Center"
+            };
+
+            foreach (var kvp in parentChildMap)
+            {
+                var parentHas = perms.TryGetValue(kvp.Key, out var pv) && pv;
+                foreach (var child in kvp.Value)
+                {
+                    var childHas = perms.TryGetValue(child, out var cv) && cv;
+                    if (childHas && !parentHas)
+                    {
+                        var modName = child.Split('.')[0];
+                        var display = moduleNames.TryGetValue(modName, out var dn) ? dn : modName;
+                        errorMessage = $"Cần bật Xem {display} trước khi bật quyền này.";
+                        return false;
+                    }
+                }
+            }
+
+            errorMessage = string.Empty;
+            return true;
         }
     }
 }
