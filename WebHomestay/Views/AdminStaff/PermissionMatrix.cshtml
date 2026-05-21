@@ -9,6 +9,19 @@
 
     var managerPerms = roleTemplates.FirstOrDefault(t => t.Role == "Manager")?.Permissions ?? new();
     var staffPerms = roleTemplates.FirstOrDefault(t => t.Role == "Staff")?.Permissions ?? new();
+    var allTruePerms = new Dictionary<string, bool>();
+    var allPermKeys = new[] {
+        "matrix.view",
+        "bookings.view","bookings.detail","bookings.create","bookings.edit","bookings.delete","bookings.trash","bookings.restore",
+        "branches.view","branches.detail","branches.create","branches.edit","branches.delete",
+        "rooms.view","rooms.detail","rooms.create","rooms.edit","rooms.delete",
+        "images.view","images.detail",
+        "statistics.view","statistics.export",
+        "staff.view","staff.create","staff.edit","staff.delete","staff.permissions","staff.logs",
+        "settings.view","settings.update","holidays.manage","slots.manage",
+        "ai.view","ai.manage"
+    };
+    foreach (var k in allPermKeys) allTruePerms[k] = true;
 }
 
 <link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
@@ -68,6 +81,7 @@
           <select id="roleSelect" class="form-select form-select-sm border-0 bg-light rounded-pill px-4" style="width:auto;">
             <option value="Manager">Manager</option>
             <option value="Staff">Staff</option>
+            <option value="Admin">Admin (SuperAdmin)</option>
           </select>
         </div>
 
@@ -98,7 +112,7 @@
               <tr>
                 <th class="ps-4" style="width:320px;">Module / Tính năng</th>
                 <th class="text-center">Xem</th>
-                <th class="text-center">CT</th>
+                <th class="text-center">Chi tiết</th>
                 <th class="text-center">Thêm</th>
                 <th class="text-center">Sửa</th>
                 <th class="text-center">Xóa</th>
@@ -108,17 +122,17 @@
             </thead>
             <tbody>
               @{
-                var modules = new (string id, string name, string icon, bool hasDetail, bool hasCreate, bool hasEdit, bool hasDelete, string[] extras)[]
+                var modules = new (string id, string name, string icon, bool hasDetail, bool hasCreate, bool hasEdit, bool hasDelete, (string key, string label)[] extras)[]
                 {
-                  ("matrix", "Ma trận vận hành", "fa-th", false, false, false, false, Array.Empty<string>()),
-                  ("bookings", "Đơn đặt phòng", "fa-calendar-check", true, true, true, true, new[]{"trash","restore"}),
-                  ("branches", "Chi nhánh", "fa-building", true, true, true, true, Array.Empty<string>()),
-                  ("rooms", "Phòng", "fa-door-open", true, true, true, true, Array.Empty<string>()),
-                  ("images", "Kho ảnh", "fa-images", true, false, false, false, Array.Empty<string>()),
-                  ("statistics", "Thống kê", "fa-chart-bar", false, false, false, false, new[]{"export"}),
-                  ("staff", "Nhân sự", "fa-users-cog", false, true, true, true, new[]{"permissions","logs"}),
-                  ("settings", "Cấu hình", "fa-sliders-h", false, false, false, false, new[]{"update","holidays","slots"}),
-                  ("ai", "AI Brain Center", "fa-brain", false, false, false, false, new[]{"manage"})
+                  ("matrix", "Ma trận vận hành", "fa-th", false, false, false, false, Array.Empty<(string,string)>()),
+                  ("bookings", "Đơn đặt phòng", "fa-calendar-check", true, true, true, true, new[] { ("trash", "Thùng rác"), ("restore", "Khôi phục") }),
+                  ("branches", "Chi nhánh", "fa-building", true, true, true, true, Array.Empty<(string,string)>()),
+                  ("rooms", "Phòng", "fa-door-open", true, true, true, true, Array.Empty<(string,string)>()),
+                  ("images", "Kho ảnh", "fa-images", true, false, false, false, Array.Empty<(string,string)>()),
+                  ("statistics", "Thống kê", "fa-chart-bar", false, false, false, false, new[] { ("export", "Xuất Excel") }),
+                  ("staff", "Nhân sự", "fa-users-cog", false, true, true, true, new[] { ("permissions", "Phân quyền"), ("logs", "Nhật ký") }),
+                  ("settings", "Cấu hình", "fa-sliders-h", false, false, false, false, new[] { ("update", "Cập nhật"), ("holidays", "Ngày lễ"), ("slots", "Khung giờ") }),
+                  ("ai", "AI Brain Center", "fa-brain", false, false, false, false, new[] { ("manage", "Quản lý") })
                 };
               }
 
@@ -180,9 +194,9 @@
                       <div class="d-flex gap-1 flex-wrap justify-content-center">
                         @foreach (var extra in mod.extras)
                         {
-                          <span class="badge bg-light text-dark border small d-flex align-items-center gap-1">
-                            @extra
-                            <input type="checkbox" class="perm-check child-check" data-module="@mod.id" data-key="@(mod.id).@extra" value="@(mod.id).@extra" name="selectedPermissions" style="width:14px;height:14px;">
+                          <span class="badge bg-light text-dark border small d-flex align-items-center gap-1" title="@(mod.id).@extra.key">
+                            @extra.label
+                            <input type="checkbox" class="perm-check child-check" data-module="@mod.id" data-key="@(mod.id).@extra.key" value="@(mod.id).@extra.key" name="selectedPermissions" style="width:14px;height:14px;">
                           </span>
                         }
                       </div>
@@ -223,7 +237,8 @@
 
   var roleData = {
     Manager: @Html.Raw(JsonSerializer.Serialize(managerPerms)),
-    Staff: @Html.Raw(JsonSerializer.Serialize(staffPerms))
+    Staff: @Html.Raw(JsonSerializer.Serialize(staffPerms)),
+    Admin: @Html.Raw(JsonSerializer.Serialize(allTruePerms))
   };
 
   var accountOverrides = {};
@@ -283,6 +298,27 @@
 
   function renderMatrixForRole(role) {
     applyPermsToMatrix(roleData[role] || {}, false);
+    var isAdmin = role === 'Admin';
+    var checks = document.querySelectorAll('.perm-check');
+    for (var i = 0; i < checks.length; i++) {
+      checks[i].disabled = isAdmin;
+    }
+    var saveBtn = document.getElementById('saveBtn');
+    var adminBanner = document.getElementById('adminBanner');
+    if (isAdmin) {
+      saveBtn.style.display = 'none';
+      if (!adminBanner) {
+        adminBanner = document.createElement('div');
+        adminBanner.id = 'adminBanner';
+        adminBanner.className = 'mt-4 p-4 rounded-4 bg-light border text-center';
+        adminBanner.innerHTML = '<i class="fas fa-shield-virus fs-3 text-primary mb-2 d-block"></i><p class="mb-0 text-muted">Tài khoản <strong class="text-primary">SuperAdmin</strong> mặc định có toàn quyền và không cần cấu hình thủ công.</p>';
+        saveBtn.parentNode.insertBefore(adminBanner, saveBtn);
+      }
+      adminBanner.style.display = 'block';
+    } else {
+      saveBtn.style.display = '';
+      if (adminBanner) adminBanner.style.display = 'none';
+    }
   }
 
   function renderMatrixForAccount(accountId) {
