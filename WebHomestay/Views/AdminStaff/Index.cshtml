@@ -27,6 +27,12 @@
                         <span>Thêm nhân sự</span>
                     </a>
                 }
+                @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.edit"))
+                {
+                    <a asp-action="PermissionMatrix" class="btn-premium-outline">
+                        <i class="fas fa-lock"></i><span>Ma trận phân quyền</span>
+                    </a>
+                }
             </div>
         </header>
 

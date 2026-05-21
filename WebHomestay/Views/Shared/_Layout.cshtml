@@ -26,51 +26,57 @@
                     <ul class="navbar-nav flex-grow-1">
                         @if (Context.Session.GetString("AdminUser") != null)
                         {
+                            @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "matrix.view"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link-premium" asp-controller="AdminMatrix" asp-action="Index">
+                                        <i class="fas fa-th me-1"></i>Ma trận vận hành
+                                    </a>
+                                </li>
+                            }
+                            @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "bookings.view"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link-premium" asp-controller="AdminBookings" asp-action="Index">
+                                        <i class="fas fa-calendar-check me-1"></i>Đơn đặt phòng
+                                    </a>
+                                </li>
+                            }
                             <li class="nav-item dropdown">
-                                <a class="nav-link-premium dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" style="color: var(--luxury-accent);">
-                                    Hệ thống Quản trị
+                                <a class="nav-link-premium dropdown-toggle-custom" href="#" role="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-cog me-1"></i>Hệ thống Quản trị <i class="fas fa-chevron-down nav-dropdown-arrow"></i>
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-0 p-3">
-                                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "matrix.view"))
-                                    {
-                                        <li><a class="dropdown-item py-2" asp-controller="AdminMatrix" asp-action="Index"><i class="fas fa-th me-2 text-muted"></i>Ma trận vận hành</a></li>
-                                    }
-                                    
-                                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "branches.view") || 
-                                         WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.view") ||
-                                         WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "bookings.view"))
-                                    {
-                                        <li><hr class="dropdown-divider"></li>
-                                    }
-
                                     @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "branches.view"))
                                     {
-                                        <li><a class="dropdown-item py-2" asp-controller="AdminBranches" asp-action="Index">Quản lý Chi nhánh</a></li>
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminBranches" asp-action="Index"><i class="fas fa-store me-2 text-muted"></i>Quản lý Chi nhánh</a></li>
                                     }
                                     @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.view"))
                                     {
-                                        <li><a class="dropdown-item py-2" asp-controller="AdminRooms" asp-action="Index">Quản lý Phòng</a></li>
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminRooms" asp-action="Index"><i class="fas fa-door-open me-2 text-muted"></i>Quản lý Phòng</a></li>
                                     }
                                     @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "bookings.view"))
                                     {
-                                        <li><a class="dropdown-item py-2" asp-controller="AdminBookings" asp-action="Index">Đơn đặt phòng</a></li>
                                         @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.view"))
                                         {
                                             <li><a class="dropdown-item py-2" asp-controller="AdminImages" asp-action="Index"><i class="fas fa-images me-2 text-muted"></i>Kho ảnh Đơn hàng</a></li>
                                         }
-                                        <li><a class="dropdown-item py-2" asp-controller="AdminStatistics" asp-action="Index">Thống kê doanh thu</a></li>
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminStatistics" asp-action="Index"><i class="fas fa-chart-bar me-2 text-muted"></i>Thống kê doanh thu</a></li>
                                     }
                                     @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.view"))
                                     {
-                                        <li><a class="dropdown-item py-2" asp-controller="AdminStaff" asp-action="Index">Nhân sự & Bảo mật</a></li>
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminStaff" asp-action="Index"><i class="fas fa-user-shield me-2 text-muted"></i>Nhân sự & Bảo mật</a></li>
                                     }
-                                    @if (Context.Session.GetString("AdminRole") == "SuperAdmin")
+                                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "ai.view"))
                                     {
                                         <li><a class="dropdown-item py-2" asp-controller="AdminAI" asp-action="Index"><i class="fas fa-brain me-2 text-muted"></i>AI Brain Center</a></li>
-                                        <li><a class="dropdown-item py-2" asp-controller="AdminSettings" asp-action="Index">Cấu hình hệ thống</a></li>
+                                    }
+                                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "settings.view"))
+                                    {
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminSettings" asp-action="Index"><i class="fas fa-sliders-h me-2 text-muted"></i>Cấu hình hệ thống</a></li>
                                     }
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item py-2 text-danger" asp-controller="AdminAccount" asp-action="Logout">Thoát quản trị</a></li>
+                                    <li><a class="dropdown-item py-2 text-danger" asp-controller="AdminAccount" asp-action="Logout"><i class="fas fa-sign-out-alt me-2"></i>Thoát quản trị</a></li>
                                 </ul>
                             </li>
                         }
