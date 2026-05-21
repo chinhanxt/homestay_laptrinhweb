@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
 using WebHomestay.Models;
 using WebHomestay.Filters;
+using WebHomestay.Services;
 
 namespace WebHomestay.Controllers
 {
@@ -166,6 +167,80 @@ namespace WebHomestay.Controllers
 
             await LogAction("Cập nhật quyền & Chi nhánh", $"Tài khoản: {user.Username}, Chi nhánh ID: {branchId}");
             return RedirectToAction(nameof(Index));
+        }
+
+        [AdminAuthorize(Permission = "staff.edit")]
+        [HttpGet("permission-matrix")]
+        public async Task<IActionResult> PermissionMatrix()
+        {
+            ViewBag.Roles = new List<string> { "Manager", "Staff" };
+            ViewBag.Accounts = await _context.AdminUsers
+                .Where(u => u.Role != AdminRole.SuperAdmin)
+                .Include(u => u.Branch)
+                .OrderBy(u => u.FullName)
+                .ToListAsync();
+            ViewBag.RoleTemplates = await _context.RolePermissionTemplates.ToListAsync();
+            return View();
+        }
+
+        [AdminAuthorize(Permission = "staff.edit")]
+        [HttpPost("permission-matrix/role")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveRoleTemplate(string role, List<string> selectedPermissions)
+        {
+            if (role != "Manager" && role != "Staff")
+                return BadRequest("Role không hợp lệ.");
+
+            var permDict = new Dictionary<string, bool>();
+            foreach (var p in selectedPermissions ?? new List<string>()) permDict[p] = true;
+
+            var template = await _context.RolePermissionTemplates.FirstOrDefaultAsync(t => t.Role == role);
+            if (template == null)
+            {
+                template = new RolePermissionTemplate { Role = role, Permissions = permDict };
+                _context.RolePermissionTemplates.Add(template);
+            }
+            else
+            {
+                template.Permissions = permDict;
+                template.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+
+            var resolveService = HttpContext.RequestServices.GetRequiredService<IPermissionResolveService>();
+            resolveService.InvalidateCache(role);
+
+            await LogAction("Cập nhật quyền Role", $"Role: {role}");
+            TempData["SuccessMessage"] = $"Đã cập nhật quyền cho role {role}.";
+            return RedirectToAction(nameof(PermissionMatrix));
+        }
+
+        [AdminAuthorize(Permission = "staff.edit")]
+        [HttpPost("permission-matrix/account")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveAccountPermissions(int accountId, List<string> selectedPermissions)
+        {
+            var user = await _context.AdminUsers.FindAsync(accountId);
+            if (user == null) return NotFound();
+
+            var permDict = new Dictionary<string, bool>();
+            foreach (var p in selectedPermissions ?? new List<string>()) permDict[p] = true;
+
+            user.Permissions = permDict;
+            await _context.SaveChangesAsync();
+
+            // Update session if this user is currently logged in
+            var currentUserId = HttpContext.Session.GetInt32("AdminUserId");
+            if (currentUserId == accountId)
+            {
+                var permsJson = System.Text.Json.JsonSerializer.Serialize(permDict);
+                HttpContext.Session.SetString("AdminPermissions", permsJson);
+            }
+
+            await LogAction("Cập nhật quyền Tài khoản", $"Tài khoản: {user.Username}");
+            TempData["SuccessMessage"] = $"Đã cập nhật quyền cho {user.FullName}.";
+            return RedirectToAction(nameof(PermissionMatrix));
         }
 
         [AdminAuthorize(Permission = "logs.view")]
