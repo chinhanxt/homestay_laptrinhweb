@@ -4,9 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
 using WebHomestay.Models;
 using WebHomestay.Services;
+using WebHomestay.Filters;
 
 namespace WebHomestay.Controllers;
 
+[AdminAuthorize]
 public class AdminSlotsController : Controller
 {
     private readonly ApplicationDbContext _context;
@@ -47,20 +49,25 @@ public class AdminSlotsController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> EditTemplate(RoomSlotTemplate template)
+    public async Task<IActionResult> EditTemplate(int id, string name, string code, int durationMinutes, int cleanupMinutes, TimeOnly? seedStartTime, bool isActive)
     {
-        if (ModelState.IsValid)
-        {
-            _context.Entry(template).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
-            
-            // Sync changes to all rooms using this template (Selection A)
-            await _slotManagementService.SyncTemplateChangesAsync(template.Id);
-            
-            TempData["SuccessMessage"] = "Đã cập nhật mẫu và đồng bộ lịch trình các phòng.";
-            return Redirect("/admin/settings?tab=time");
-        }
-        return View(template);
+        var template = await _context.RoomSlotTemplates.FindAsync(id);
+        if (template == null) return NotFound();
+
+        template.Name = name;
+        template.Code = code;
+        template.DurationMinutes = durationMinutes;
+        template.CleanupMinutes = cleanupMinutes;
+        template.SeedStartTime = seedStartTime;
+        template.IsActive = isActive;
+
+        await _context.SaveChangesAsync();
+        
+        // Sync changes to all rooms using this template
+        await _slotManagementService.SyncTemplateChangesAsync(template.Id);
+        
+        TempData["SuccessMessage"] = "Đã cập nhật mẫu và đồng bộ lịch trình các phòng.";
+        return Redirect("/admin/settings?tab=time");
     }
 
     [HttpPost]

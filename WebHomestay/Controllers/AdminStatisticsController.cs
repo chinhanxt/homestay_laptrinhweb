@@ -17,12 +17,14 @@ namespace WebHomestay.Controllers
             _statsService = statsService;
         }
 
+        [AdminAuthorize(Permission = "statistics.view")]
         [Route("")]
         public IActionResult Index()
         {
             return View();
         }
 
+        [AdminAuthorize(Permission = "statistics.view")]
         [HttpGet("GetStats")]
         public async Task<IActionResult> GetStats(DateTime? start, DateTime? end, int? branchId)
         {
@@ -33,6 +35,7 @@ namespace WebHomestay.Controllers
             return Json(stats);
         }
 
+        [AdminAuthorize(Permission = "statistics.view")]
         [HttpGet("GetBranches")]
         public async Task<IActionResult> GetBranches()
         {
@@ -40,6 +43,7 @@ namespace WebHomestay.Controllers
             return Json(branches);
         }
 
+        [AdminAuthorize(Permission = "statistics.export")]
         [HttpGet("Export")]
         public async Task<IActionResult> Export(string type, DateTime start, DateTime end, int? branchId)
         {

@@ -17,6 +17,7 @@ namespace WebHomestay.Controllers
             _context = context;
         }
 
+        [AdminAuthorize(Permission = "holidays.manage")]
         [HttpGet]
         public IActionResult Index()
         {
@@ -24,6 +25,7 @@ namespace WebHomestay.Controllers
         }
 
 
+        [AdminAuthorize(Permission = "holidays.manage")]
         [HttpPost("create")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(DateTime date, string description)
@@ -54,6 +56,7 @@ namespace WebHomestay.Controllers
             return Redirect("/admin/settings?tab=holiday");
         }
 
+        [AdminAuthorize(Permission = "holidays.manage")]
         [HttpPost("delete/{id}")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id)
@@ -68,6 +71,7 @@ namespace WebHomestay.Controllers
             return Redirect("/admin/settings?tab=holiday");
         }
 
+        [AdminAuthorize(Permission = "holidays.manage")]
         [HttpPost("create-range")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateRange(DateTime startDate, DateTime endDate, string description)
@@ -106,6 +110,7 @@ namespace WebHomestay.Controllers
             return Redirect("/admin/settings?tab=holiday");
         }
 
+        [AdminAuthorize(Permission = "holidays.manage")]
         [HttpPost("delete-by-desc")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteByDescription(string description)

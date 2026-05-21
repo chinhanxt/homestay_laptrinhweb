@@ -13,13 +13,22 @@ namespace WebHomestay.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly ISettingService _settingService;
+        private readonly IPaymentQrSettingsService _paymentQrSettingsService;
+        private readonly IWebHostEnvironment _environment;
 
-        public AdminSettingsController(ApplicationDbContext context, ISettingService settingService)
+        public AdminSettingsController(
+            ApplicationDbContext context,
+            ISettingService settingService,
+            IPaymentQrSettingsService paymentQrSettingsService,
+            IWebHostEnvironment environment)
         {
             _context = context;
             _settingService = settingService;
+            _paymentQrSettingsService = paymentQrSettingsService;
+            _environment = environment;
         }
 
+        [AdminAuthorize(Permission = "settings.view")]
         [HttpGet("")]
         public async Task<IActionResult> Index()
         {
@@ -33,6 +42,7 @@ namespace WebHomestay.Controllers
                 ViewBag.Branches = branches;
                 ViewBag.Holidays = holidays;
                 ViewBag.Templates = templates;
+                ViewBag.PaymentQrSettings = await _paymentQrSettingsService.GetSettingsForBranchesAsync(branches);
 
                 return View(settings);
             }
@@ -42,6 +52,7 @@ namespace WebHomestay.Controllers
             }
         }
 
+        [AdminAuthorize(Permission = "settings.update")]
         [HttpPost("update")]
         public async Task<IActionResult> Update(string key, string value)
         {
@@ -50,6 +61,7 @@ namespace WebHomestay.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        [AdminAuthorize(Permission = "settings.update")]
         [HttpPost("update-branch")]
         public async Task<IActionResult> UpdateBranch(int branchId, int leadTime)
         {
@@ -60,6 +72,24 @@ namespace WebHomestay.Controllers
                 await _context.SaveChangesAsync();
                 TempData["SuccessMessage"] = $"Cập nhật cấu hình cho chi nhánh {branch.Name} thành công.";
             }
+            return RedirectToAction(nameof(Index));
+        }
+
+        [AdminAuthorize(Permission = "settings.update")]
+        [HttpPost("payment-qr")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdatePaymentQr(WebHomestay.Models.ViewModels.PaymentQrSettingsViewModel model, IFormFile? qrImage)
+        {
+            var result = await _paymentQrSettingsService.SaveSettingsAsync(model, qrImage, _environment.WebRootPath);
+            if (result.Success)
+            {
+                TempData["SuccessMessage"] = result.Message;
+            }
+            else
+            {
+                TempData["ErrorMessage"] = result.Message;
+            }
+
             return RedirectToAction(nameof(Index));
         }
     }

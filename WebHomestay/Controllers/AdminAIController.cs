@@ -5,9 +5,11 @@ using System.Text.RegularExpressions;
 using WebHomestay.Data;
 using WebHomestay.Models;
 using WebHomestay.Services;
+using WebHomestay.Filters;
 
 namespace WebHomestay.Controllers
 {
+    [AdminAuthorize]
     [Route("admin/ai")]
     public class AdminAIController : Controller
     {
