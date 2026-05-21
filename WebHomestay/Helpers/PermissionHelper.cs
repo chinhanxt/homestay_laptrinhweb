@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
-using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using WebHomestay.Services;
 
 namespace WebHomestay.Helpers
 {
@@ -9,19 +10,10 @@ namespace WebHomestay.Helpers
         {
             var role = context.Session.GetString("AdminRole");
             if (role == "SuperAdmin") return true;
+            if (string.IsNullOrEmpty(role)) return false;
 
-            var permsJson = context.Session.GetString("AdminPermissions");
-            if (string.IsNullOrEmpty(permsJson)) return false;
-
-            try
-            {
-                var perms = JsonSerializer.Deserialize<Dictionary<string, bool>>(permsJson);
-                return perms != null && perms.ContainsKey(permission) && perms[permission];
-            }
-            catch
-            {
-                return false;
-            }
+            var resolveService = context.RequestServices.GetRequiredService<IPermissionResolveService>();
+            return resolveService.HasPermission(context, permission);
         }
     }
 }
