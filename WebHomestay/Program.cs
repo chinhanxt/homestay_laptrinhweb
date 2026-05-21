@@ -38,10 +38,12 @@ builder.Services.AddMemoryCache();
 builder.Services.AddScoped<WebHomestay.Services.ISettingService, WebHomestay.Services.SettingService>();
 builder.Services.AddScoped<WebHomestay.Services.IStatisticsService, WebHomestay.Services.StatisticsService>();
 builder.Services.AddScoped<WebHomestay.Services.IImageMaskingService, WebHomestay.Services.ImageMaskingService>();
+builder.Services.AddScoped<WebHomestay.Services.IPaymentQrSettingsService, WebHomestay.Services.PaymentQrSettingsService>();
 builder.Services.AddHttpClient<WebHomestay.Services.IAIModelClient, WebHomestay.Services.AIModelClient>();
 builder.Services.AddScoped<WebHomestay.Services.IAIBrainOrchestrator, WebHomestay.Services.AIBrainOrchestrator>();
 builder.Services.AddScoped<WebHomestay.Services.IAIBookingFlowOrchestrator, WebHomestay.Services.AIBookingFlowOrchestrator>();
 builder.Services.AddScoped<WebHomestay.Services.PricingService>();
+builder.Services.AddScoped<WebHomestay.Services.IPermissionResolveService, WebHomestay.Services.PermissionResolveService>();
 builder.Services.AddHostedService<WebHomestay.Services.BookingCleanupService>();
 
 // Add Session
