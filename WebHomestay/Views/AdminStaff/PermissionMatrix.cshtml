@@ -19,7 +19,8 @@
         "statistics.view","statistics.export",
         "staff.view","staff.create","staff.edit","staff.delete","staff.permissions","staff.logs",
         "settings.view","settings.update","holidays.manage","slots.manage","branch.settings","payment.settings",
-        "ai.view","ai.detail","ai.create","ai.edit","ai.delete","ai.knowledge","ai.graph","ai.response","ai.trace"
+        "ai.view","ai.detail","ai.create","ai.edit","ai.delete","ai.knowledge","ai.graph","ai.response","ai.trace",
+        "chats.view"
     };
     foreach (var k in allPermKeys) allTruePerms[k] = true;
 }
@@ -156,7 +157,8 @@
                             ("graph", "Graph"),
                             ("response", "Response"),
                             ("trace", "Trace")
-                        })
+                        }),
+                    ("chats", "Giám sát Chat", "fa-comment-dots", false, false, false, false, Array.Empty<(string,string)>())
                 };
               }
 
@@ -472,7 +474,7 @@
   });
 
   function getModuleName(mod) {
-    var names = { matrix:'Ma trận vận hành', bookings:'Đơn đặt phòng', branches:'Chi nhánh', rooms:'Phòng', images:'Kho ảnh', statistics:'Thống kê', staff:'Nhân sự', settings:'Cấu hình', ai:'AI Brain Center' };
+    var names = { matrix:'Ma trận vận hành', bookings:'Đơn đặt phòng', branches:'Chi nhánh', rooms:'Phòng', images:'Kho ảnh', statistics:'Thống kê', staff:'Nhân sự', settings:'Cấu hình', ai:'AI Brain Center', chats:'Giám sát Chat' };
     return names[mod] || mod;
   }
 

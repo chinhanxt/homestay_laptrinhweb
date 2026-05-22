@@ -71,6 +71,10 @@
                                     {
                                         <li><a class="dropdown-item py-2" asp-controller="AdminAI" asp-action="Index"><i class="fas fa-brain me-2 text-muted"></i>AI Brain Center</a></li>
                                     }
+                                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "chats.view"))
+                                    {
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminChatMonitor" asp-action="Index"><i class="fas fa-comment-dots me-2 text-muted"></i>Giám sát Chat</a></li>
+                                    }
                                     @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "settings.view"))
                                     {
                                         <li><a class="dropdown-item py-2" asp-controller="AdminSettings" asp-action="Index"><i class="fas fa-sliders-h me-2 text-muted"></i>Cấu hình hệ thống</a></li>
