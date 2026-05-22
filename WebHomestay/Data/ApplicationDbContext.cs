@@ -32,6 +32,8 @@ namespace WebHomestay.Data
         public DbSet<AIAgentDefinition> AIAgentDefinitions { get; set; }
         public DbSet<AIConversationTrace> AIConversationTraces { get; set; }
         public DbSet<RolePermissionTemplate> RolePermissionTemplates { get; set; }
+        public DbSet<AdminChatSession> AdminChatSessions => Set<AdminChatSession>();
+        public DbSet<AdminChatMessage> AdminChatMessages => Set<AdminChatMessage>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -298,6 +300,38 @@ namespace WebHomestay.Data
                 entity.Property(e => e.FinalAnswer).HasColumnName("final_answer");
                 entity.Property(e => e.ModelProvider).HasColumnName("model_provider");
                 entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            });
+
+            modelBuilder.Entity<AdminChatSession>(entity =>
+            {
+                entity.ToTable("admin_chat_sessions");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.SessionId).HasColumnName("session_id");
+                entity.HasIndex(e => e.SessionId).IsUnique();
+                entity.Property(e => e.CustomerName).HasColumnName("customer_name");
+                entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(20);
+                entity.Property(e => e.PausedBy).HasColumnName("paused_by");
+                entity.Property(e => e.PausedAt).HasColumnName("paused_at");
+                entity.Property(e => e.AutoReplyMessage).HasColumnName("auto_reply_message");
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+                entity.Property(e => e.LastActivityAt).HasColumnName("last_activity_at");
+            });
+
+            modelBuilder.Entity<AdminChatMessage>(entity =>
+            {
+                entity.ToTable("admin_chat_messages");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.SessionId).HasColumnName("session_id");
+                entity.Property(e => e.Role).HasColumnName("role").HasMaxLength(20);
+                entity.Property(e => e.Content).HasColumnName("content");
+                entity.Property(e => e.FormBlockJson).HasColumnName("form_block_json");
+                entity.Property(e => e.FormBlockType).HasColumnName("form_block_type");
+                entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+                entity.Property(e => e.IsRead).HasColumnName("is_read");
+                entity.HasIndex(e => new { e.SessionId, e.CreatedAt });
             });
 
             modelBuilder.Entity<Holiday>(entity =>
