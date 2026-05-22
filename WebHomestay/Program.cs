@@ -41,6 +41,7 @@ builder.Services.AddScoped<WebHomestay.Services.IImageMaskingService, WebHomesta
 builder.Services.AddScoped<WebHomestay.Services.IPaymentQrSettingsService, WebHomestay.Services.PaymentQrSettingsService>();
 builder.Services.AddHttpClient<WebHomestay.Services.IAIModelClient, WebHomestay.Services.AIModelClient>();
 builder.Services.AddScoped<WebHomestay.Services.IAIBrainOrchestrator, WebHomestay.Services.AIBrainOrchestrator>();
+builder.Services.AddScoped<WebHomestay.Services.IBookingConductor, WebHomestay.Services.ContextAwareBookingConductor>();
 builder.Services.AddScoped<WebHomestay.Services.PricingService>();
 builder.Services.AddScoped<WebHomestay.Services.IPermissionResolveService, WebHomestay.Services.PermissionResolveService>();
 builder.Services.AddHostedService<WebHomestay.Services.BookingCleanupService>();
