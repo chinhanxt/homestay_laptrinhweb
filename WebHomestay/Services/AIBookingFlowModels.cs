@@ -128,4 +128,32 @@ namespace WebHomestay.Services
         public string? SuccessUrl { get; set; }
         public string? Instructions { get; set; }
     }
+
+    public class BookingConfirmedState
+    {
+        public int? BranchId { get; set; }
+        public string? BranchName { get; set; }
+        public DateOnly? HourlyDate { get; set; }
+        public DateOnly? CheckInDate { get; set; }
+        public DateOnly? CheckOutDate { get; set; }
+        public int GuestCount { get; set; }
+        public string BookingMode { get; set; } = "hourly";
+    }
+
+    public class BookingProgressState
+    {
+        public int? SelectedRoomId { get; set; }
+        public int? SelectedSlotId { get; set; }
+        public string? SelectedSlotLabel { get; set; }
+        public string? CustomerName { get; set; }
+        public string? CustomerPhone { get; set; }
+        public string? CustomerEmail { get; set; }
+        public int? BookingId { get; set; }
+    }
+
+    public class BookingSessionContainer
+    {
+        public BookingConfirmedState Confirmed { get; set; } = new();
+        public BookingProgressState? Progress { get; set; }
+    }
 }
