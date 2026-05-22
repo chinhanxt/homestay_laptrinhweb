@@ -9,5 +9,9 @@ namespace WebHomestay.Services
         public string ModelProvider { get; set; } = string.Empty;
         public bool IsMock { get; set; }
         public string FormSchema { get; set; } = "[]";
+
+        public string BookingAction { get; set; } = "reply";
+        public AIBookingSessionState? BookingState { get; set; }
+        public List<AIUiBlock> UiBlocks { get; set; } = new();
     }
 }
