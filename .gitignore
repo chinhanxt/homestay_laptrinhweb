@@ -46,3 +46,6 @@ build/
 
 # Local AI provider secrets
 key.md
+
+# Agent workspace files
+.claude/
