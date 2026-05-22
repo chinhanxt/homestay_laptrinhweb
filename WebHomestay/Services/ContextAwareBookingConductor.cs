@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using WebHomestay.Data;
@@ -12,6 +13,14 @@ public class ContextAwareBookingConductor : IBookingConductor
     private readonly IServiceScopeFactory _scopeFactory;
     private const string CacheKeyPrefix = "ai-booking-conductor:";
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(30);
+
+    private const string DefaultBookingFormSchema = """
+    [
+      {"id":"customerName","type":"text","label":"Họ và tên","required":true,"helpText":"Nhập đúng họ tên người đặt phòng.","order":1},
+      {"id":"customerPhone","type":"tel","label":"Số điện thoại","required":true,"helpText":"Số điện thoại/Zalo để homestay liên hệ xác nhận.","order":2},
+      {"id":"customerEmail","type":"email","label":"Email","required":false,"helpText":"Email nhận thông tin đặt phòng nếu có.","order":3}
+    ]
+    """;
 
     public ContextAwareBookingConductor(
         ApplicationDbContext context,
@@ -214,7 +223,14 @@ public class ContextAwareBookingConductor : IBookingConductor
                     Answer = "Bạn điền thông tin để mình tiến hành đặt phòng nhé.",
                     Action = ConductorAction.ShowForm,
                     State = container,
-                    UiBlocks = new List<object> { new { type = "bookingForm" } }
+                    UiBlocks = new List<object>
+                    {
+                        new
+                        {
+                            type = "bookingForm",
+                            data = new { fields = LoadBookingFormFields() }
+                        }
+                    }
                 };
 
             case "submit-booking-form":
@@ -304,6 +320,43 @@ public class ContextAwareBookingConductor : IBookingConductor
                 }
             }
         };
+    }
+
+    private List<object> LoadBookingFormFields()
+    {
+        var schemaJson = GetSetting("AIBookingFormSchema", DefaultBookingFormSchema);
+        if (string.IsNullOrWhiteSpace(schemaJson) || schemaJson == "[]")
+            return new List<object>();
+
+        try
+        {
+            using var doc = JsonDocument.Parse(schemaJson);
+            var fields = new List<object>();
+            foreach (var el in doc.RootElement.EnumerateArray())
+            {
+                var id = el.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+                var type = el.TryGetProperty("type", out var typeEl) ? typeEl.GetString() : null;
+                var label = el.TryGetProperty("label", out var labelEl) ? labelEl.GetString() : null;
+                var required = el.TryGetProperty("required", out var reqEl) && reqEl.ValueKind == JsonValueKind.True;
+                var helpText = el.TryGetProperty("helpText", out var helpEl) ? helpEl.GetString() : null;
+
+                if (string.IsNullOrWhiteSpace(id)) continue;
+
+                fields.Add(new
+                {
+                    name = id,
+                    type = type == "image" ? "file" : (type ?? "text"),
+                    label = label ?? id,
+                    required,
+                    placeholder = helpText ?? ""
+                });
+            }
+            return fields;
+        }
+        catch
+        {
+            return new List<object>();
+        }
     }
 
     private int GetShowCount(string sessionId)

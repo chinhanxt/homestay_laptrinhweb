@@ -47,7 +47,13 @@ namespace WebHomestay.Controllers
 
             if (raw.TryGetProperty("formSubmission", out var formEl) && formEl.ValueKind == JsonValueKind.Object)
             {
-                req.FormData = JsonSerializer.Deserialize<Dictionary<string, string>>(formEl.GetRawText());
+                var rawDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(formEl.GetRawText());
+                if (rawDict != null)
+                {
+                    req.FormData = rawDict
+                        .Where(kv => kv.Value.ValueKind == JsonValueKind.String)
+                        .ToDictionary(kv => kv.Key, kv => kv.Value.GetString() ?? "");
+                }
             }
 
             return req;
