@@ -8,21 +8,21 @@ namespace WebHomestay.Controllers
     [Route("ai")]
     public class AIChatController : Controller
     {
-        private readonly ApplicationDbContext _context;
-        private readonly IAIBookingFlowOrchestrator _bookingFlowOrchestrator;
+        private readonly IAIBrainOrchestrator _orchestrator;
         private readonly IWebHostEnvironment _environment;
         private readonly IImageMaskingService _maskingService;
+        private readonly ApplicationDbContext _context;
 
         public AIChatController(
-            ApplicationDbContext context,
-            IAIBookingFlowOrchestrator bookingFlowOrchestrator,
+            IAIBrainOrchestrator orchestrator,
             IWebHostEnvironment environment,
-            IImageMaskingService maskingService)
+            IImageMaskingService maskingService,
+            ApplicationDbContext context)
         {
-            _context = context;
-            _bookingFlowOrchestrator = bookingFlowOrchestrator;
+            _orchestrator = orchestrator;
             _environment = environment;
             _maskingService = maskingService;
+            _context = context;
         }
 
         [HttpPost("chat")]
@@ -30,28 +30,40 @@ namespace WebHomestay.Controllers
         {
             if (request == null || string.IsNullOrWhiteSpace(request.Message))
             {
-                return BadRequest(new AIBookingFlowResponse
+                return BadRequest(new
                 {
-                    SessionId = request?.SessionId ?? string.Empty,
-                    CurrentStep = "intent",
-                    Message = "Bạn nhập giúp mình nhu cầu đặt phòng để mình tư vấn nhé.",
-                    State = new AIBookingSessionState(),
-                    UiBlocks = new List<AIUiBlock>()
+                    answer = "Bạn nhập giúp mình nhu cầu đặt phòng để mình tư vấn nhé.",
+                    message = "Bạn nhập giúp mình nhu cầu đặt phòng để mình tư vấn nhé.",
+                    sessionId = request?.SessionId ?? string.Empty,
+                    currentStep = "reply",
+                    uiBlocks = Array.Empty<object>(),
+                    state = new AIBookingSessionState()
                 });
             }
 
             try
             {
-                var response = await _bookingFlowOrchestrator.HandleChatAsync(request, cancellationToken);
+                var brainRequest = new AIBrainChatRequest
+                {
+                    SessionId = request.SessionId,
+                    Message = request.Message,
+                    Mode = ChatMode.PublicBooking,
+                    BranchId = request.BranchId,
+                    StartTime = request.StartTime,
+                    EndTime = request.EndTime,
+                    GuestCount = request.GuestCount
+                };
+
+                var brainResponse = await _orchestrator.ChatAsync(brainRequest, cancellationToken);
+
                 return Ok(new
                 {
-                    answer = response.Message,
-                    message = response.Message,
-                    sessionId = response.SessionId,
-                    currentStep = response.CurrentStep,
-                    state = response.State,
-                    uiBlocks = response.UiBlocks,
-                    formSchema = "[]"
+                    answer = brainResponse.Answer,
+                    message = brainResponse.Answer,
+                    sessionId = request.SessionId,
+                    currentStep = brainResponse.BookingAction,
+                    uiBlocks = brainResponse.UiBlocks,
+                    state = brainResponse.BookingState ?? new AIBookingSessionState()
                 });
             }
             catch
@@ -62,52 +74,8 @@ namespace WebHomestay.Controllers
                     message = "Xin lỗi, mình chưa kiểm tra được tình trạng phòng lúc này. Bạn thử lại sau ít phút nhé.",
                     sessionId = request.SessionId,
                     currentStep = "error",
-                    state = new AIBookingSessionState(),
-                    uiBlocks = Array.Empty<AIUiBlock>(),
-                    formSchema = "[]"
-                });
-            }
-        }
-
-        [HttpPost("booking-action")]
-        public async Task<IActionResult> BookingAction([FromBody] AIBookingActionRequest request, CancellationToken cancellationToken)
-        {
-            if (request == null || string.IsNullOrWhiteSpace(request.Action))
-            {
-                return BadRequest(new AIBookingFlowResponse
-                {
-                    CurrentStep = "error",
-                    Message = "Thao tác không hợp lệ.",
-                    State = new AIBookingSessionState()
-                });
-            }
-
-            try
-            {
-                var response = await _bookingFlowOrchestrator.HandleActionAsync(request);
-                response.SessionId = request.SessionId;
-                return Ok(response);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new AIBookingFlowResponse
-                {
-                    SessionId = request.SessionId,
-                    CurrentStep = "error",
-                    Message = ex.Message,
-                    State = request.State,
-                    UiBlocks = new List<AIUiBlock>()
-                });
-            }
-            catch
-            {
-                return StatusCode(503, new AIBookingFlowResponse
-                {
-                    SessionId = request.SessionId,
-                    CurrentStep = "error",
-                    Message = "Xin lỗi, thao tác đặt phòng đang tạm thời bận. Bạn thử lại sau ít phút nhé.",
-                    State = request.State,
-                    UiBlocks = new List<AIUiBlock>()
+                    uiBlocks = Array.Empty<object>(),
+                    state = new AIBookingSessionState()
                 });
             }
         }
@@ -172,18 +140,15 @@ namespace WebHomestay.Controllers
         private async Task<string?> SaveSecureFile(IFormFile? file)
         {
             if (file == null || file.Length == 0) return null;
-
             string secureDir = Path.Combine(_environment.ContentRootPath, "App_Data", "SecureUploads", "IDCards");
             if (!Directory.Exists(secureDir)) Directory.CreateDirectory(secureDir);
-
             string fileName = Guid.NewGuid() + Path.GetExtension(file.FileName);
             string filePath = Path.Combine(secureDir, fileName);
             using (var stream = new FileStream(filePath, FileMode.Create))
             {
                 await file.CopyToAsync(stream);
             }
-
             return fileName;
         }
-
-    }}
+    }
+}
