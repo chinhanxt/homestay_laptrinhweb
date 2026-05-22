@@ -1066,3 +1066,33 @@ function renderPaymentQrPreviewField(field, label, requiredMark) {
     const image = field.qrImageUrl ? `<img src="${escapeBrainHtml(field.qrImageUrl)}" alt="${label}" class="payment-qr-preview-image" />` : '<div class="payment-qr-placeholder">Chưa cấu hình ảnh QR</div>';
     return `<div class="payment-qr-preview"><strong>${label}${requiredMark}</strong><p>${message}</p>${image}</div>`;
 }
+
+async function loadPublicBookingConfig() {
+    try {
+        const response = await fetch('/admin/ai/public-booking-config');
+        if (!response.ok) throw new Error(await response.text());
+        const config = await response.json();
+        $('#public-booking-prompt').val(config.prompt || '');
+        $('#public-booking-trigger-words').val(config.triggerWords || '');
+        $('#public-booking-max-tokens').val(config.maxTokens || '300');
+        $('#public-booking-timeout').val(config.timeout || '15');
+    } catch (err) {
+        alert(`Không tải được Public Booking config: ${err.message}`);
+    }
+}
+
+async function savePublicBookingConfig() {
+    const payload = {
+        prompt: $('#public-booking-prompt').val(),
+        triggerWords: $('#public-booking-trigger-words').val(),
+        maxTokens: $('#public-booking-max-tokens').val(),
+        timeout: $('#public-booking-timeout').val()
+    };
+    const response = await fetch('/admin/ai/public-booking-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    if (!response.ok) return alert(`Không lưu được config: ${await response.text()}`);
+    alert('Đã lưu Public Booking config.');
+}

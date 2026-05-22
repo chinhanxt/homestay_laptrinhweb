@@ -14,6 +14,7 @@
             <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-knowledge-graph" type="button">Tri thức & Graph</button></li>
             <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-response-form" type="button" onclick="loadFinalSynthesizerConfig(); loadBookingFormConfig();">Trả lời & Form</button></li>
             <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-test-trace" type="button" onclick="loadBrainConversationTraces()">Test & Trace</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-public-booking" type="button" onclick="loadPublicBookingConfig()">Public Booking Config</button></li>
         </ul>
         <div class="tab-content brain-tab-content">
             <div class="tab-pane fade show active" id="tab-overview">
@@ -108,6 +109,37 @@
                             </div>
                         </div>
                     </div>
+            <div class="tab-pane fade" id="tab-public-booking">
+                <div class="final-synth-grid">
+                    <div class="final-config-card">
+                        <div class="agent-test-info mb-3">
+                            <div class="agent-test-icon"><i class="fas fa-comments"></i></div>
+                            <div>
+                                <h3>Public Booking Config</h3>
+                                <p>Cấu hình cho AI Public Booking mode. Khi khách chat ở /ai/chat, AI sẽ dùng các thiết lập này để quyết định hành động.</p>
+                            </div>
+                        </div>
+                        <label class="form-label fw-bold">Public Booking Prompt (bổ sung vào system prompt)</label>
+                        <textarea id="public-booking-prompt" class="form-control final-style-text" rows="8" placeholder="Booking Conductor đã quyết định hành động: {BookingAction}..."></textarea>
+                        <div class="row g-3 mt-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Trigger Words</label>
+                                <input id="public-booking-trigger-words" class="form-control" placeholder="đặt,chốt,lấy,book,giữ phòng" />
+                                <div class="form-text">Phân cách bằng dấu phẩy. Khi khách dùng từ này, AI hiểu là booking intent.</div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Max Tokens</label>
+                                <input id="public-booking-max-tokens" type="number" class="form-control" value="300" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Timeout (giây)</label>
+                                <input id="public-booking-timeout" type="number" class="form-control" value="15" />
+                            </div>
+                        </div>
+                        <button class="btn btn-primary rounded-pill fw-bold mt-3" onclick="savePublicBookingConfig()"><i class="fas fa-save me-2"></i>Lưu cấu hình</button>
+                    </div>
+                </div>
+            </div>
             <div class="tab-pane fade" id="tab-test-trace"><div class="brain-manager-toolbar"><div><h3>Test public booking flow</h3><p>Test như khách thật: nhập context, nhắn câu hỏi, xem answer và UI blocks.</p></div></div><div class="compact-test-grid"><section class="compact-panel"><input id="public-ai-test-name" class="form-control mb-2" placeholder="Tên khách" /><select id="public-ai-test-branch" class="form-select mb-2"></select><select id="public-ai-test-mode" class="form-select mb-2"><option value="hourly">Theo giờ</option><option value="daily">Theo ngày</option></select><input id="public-ai-test-guests" class="form-control mb-2" type="number" min="1" value="1" /><textarea id="public-ai-test-message" class="form-control mb-2" rows="3" placeholder="VD: ngày mai còn phòng không?"></textarea><button class="btn btn-primary rounded-pill fw-bold" onclick="runPublicAIFlowTest()">Chạy test</button><pre id="public-ai-test-output" class="agent-preview mt-3"></pre></section><section class="compact-panel"><div class="brain-manager-toolbar"><div><h3>Conversation Trace</h3><p>Xem AI đã lưu gì sau mỗi phiên: persona, live snapshot, knowledge, graph reasoning, guard và final answer.</p></div><button class="btn btn-outline-primary rounded-pill fw-bold" onclick="loadBrainConversationTraces()"><i class="fas fa-rotate me-2"></i>Tải trace</button></div><div class="trace-manager-layout">
                     <div class="trace-list-panel">
                         <div id="conversation-trace-list" class="trace-list-items">
