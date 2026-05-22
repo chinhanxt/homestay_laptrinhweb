@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
 using WebHomestay.Filters;
 using WebHomestay.Services;
+using Microsoft.AspNetCore.Http;
 
 namespace WebHomestay.Controllers;
 
@@ -76,4 +77,31 @@ public class AdminChatMonitorController : Controller
 
         return Ok(new { messages, traces });
     }
+
+    [AdminAuthorize(Permission = "chats.view")]
+    [HttpPost("session/{sessionId}/auto-reply")]
+    public async Task<IActionResult> SetAutoReply(string sessionId, [FromBody] AutoReplyRequest request)
+    {
+        var session = await _context.AdminChatSessions
+            .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        if (session == null) return NotFound();
+
+        session.AutoReplyMessage = request.AutoReplyMessage;
+        session.LastActivityAt = DateTime.Now;
+
+        if (request.Paused)
+        {
+            var adminUser = HttpContext.Session.GetString("AdminUser") ?? "admin";
+            await _adminChatService.PauseAsync(sessionId, adminUser);
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+}
+
+public class AutoReplyRequest
+{
+    public string AutoReplyMessage { get; set; } = string.Empty;
+    public bool Paused { get; set; }
 }

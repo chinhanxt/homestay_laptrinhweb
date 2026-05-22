@@ -79,6 +79,43 @@ using (var scope = app.Services.CreateScope())
         });
         context.SaveChanges();
     }
+
+    // Seed ChatMonitor settings
+    if (!context.SystemSettings.Any(s => s.SettingKey == "ChatMonitorAutoReplyEnabled"))
+    {
+        context.SystemSettings.Add(new WebHomestay.Models.SystemSetting
+        {
+            SettingKey = "ChatMonitorAutoReplyEnabled",
+            SettingValue = "true",
+            Description = "Bật/tắt tự động trả lời khi admin pause",
+            GroupName = "ChatMonitor"
+        });
+        context.SaveChanges();
+    }
+
+    if (!context.SystemSettings.Any(s => s.SettingKey == "ChatMonitorAutoReplyMessage"))
+    {
+        context.SystemSettings.Add(new WebHomestay.Models.SystemSetting
+        {
+            SettingKey = "ChatMonitorAutoReplyMessage",
+            SettingValue = "Hiện admin đang bận, vui lòng chờ một chút. Chúng tôi sẽ trả lời bạn sớm nhất.",
+            Description = "Nội dung tự động trả lời khi admin pause",
+            GroupName = "ChatMonitor"
+        });
+        context.SaveChanges();
+    }
+
+    if (!context.SystemSettings.Any(s => s.SettingKey == "ChatMonitorActiveWindowMinutes"))
+    {
+        context.SystemSettings.Add(new WebHomestay.Models.SystemSetting
+        {
+            SettingKey = "ChatMonitorActiveWindowMinutes",
+            SettingValue = "30",
+            Description = "Số phút để xác định session còn hoạt động",
+            GroupName = "ChatMonitor"
+        });
+        context.SaveChanges();
+    }
 }
 
 // Configure the HTTP request pipeline.
