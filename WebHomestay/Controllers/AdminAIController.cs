@@ -190,6 +190,35 @@ namespace WebHomestay.Controllers
             return Ok(new { success = true });
         }
 
+        [AdminAuthorize(Permission = "ai.response")]
+        [HttpGet("public-booking-config")]
+        public async Task<IActionResult> GetPublicBookingConfig()
+        {
+            var settings = await _context.SystemSettings
+                .Where(s => s.GroupName == "AI")
+                .ToDictionaryAsync(s => s.SettingKey, s => s.SettingValue);
+
+            return Ok(new
+            {
+                prompt = GetAISetting(settings, "AIPublicBookingPrompt", string.Empty),
+                triggerWords = GetAISetting(settings, "AIPublicBookingTriggerWords", "đặt,chốt,lấy,book,giữ phòng"),
+                maxTokens = GetAISetting(settings, "AIPublicBookingMaxTokens", "300"),
+                timeout = GetAISetting(settings, "AIPublicBookingTimeout", "15")
+            });
+        }
+
+        [AdminAuthorize(Permission = "ai.edit")]
+        [HttpPost("public-booking-config")]
+        public async Task<IActionResult> SavePublicBookingConfig([FromBody] PublicBookingConfigRequest request)
+        {
+            await UpsertAISetting("AIPublicBookingPrompt", request.Prompt ?? string.Empty, "System prompt bổ sung cho Public Booking mode");
+            await UpsertAISetting("AIPublicBookingTriggerWords", request.TriggerWords ?? "đặt,chốt,lấy,book,giữ phòng", "Từ khoá phát hiện booking intent (phân cách bằng dấu phẩy)");
+            await UpsertAISetting("AIPublicBookingMaxTokens", request.MaxTokens ?? "300", "Max tokens cho public booking mode");
+            await UpsertAISetting("AIPublicBookingTimeout", request.Timeout ?? "15", "Timeout (giây) cho public booking mode");
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true });
+        }
+
         private string GetAISetting(Dictionary<string, string> settings, string key, string fallback)
         {
             return settings.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : fallback;

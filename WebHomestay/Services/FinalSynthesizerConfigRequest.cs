@@ -20,4 +20,12 @@ namespace WebHomestay.Services
         public string? MemoryRule { get; set; }
         public string? ContextFormatRule { get; set; }
     }
+
+    public class PublicBookingConfigRequest
+    {
+        public string? Prompt { get; set; }
+        public string? TriggerWords { get; set; }
+        public string? MaxTokens { get; set; }
+        public string? Timeout { get; set; }
+    }
 }
