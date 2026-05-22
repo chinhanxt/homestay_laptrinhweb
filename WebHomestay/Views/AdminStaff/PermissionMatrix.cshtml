@@ -18,8 +18,8 @@
         "images.view","images.detail",
         "statistics.view","statistics.export",
         "staff.view","staff.create","staff.edit","staff.delete","staff.permissions","staff.logs",
-        "settings.view","settings.update","holidays.manage","slots.manage",
-        "ai.view","ai.manage"
+        "settings.view","settings.update","holidays.manage","slots.manage","branch.settings","payment.settings",
+        "ai.view","ai.detail","ai.create","ai.edit","ai.delete","ai.knowledge","ai.graph","ai.response","ai.trace"
     };
     foreach (var k in allPermKeys) allTruePerms[k] = true;
 }
@@ -124,15 +124,28 @@
               @{
                 var modules = new (string id, string name, string icon, bool hasDetail, bool hasCreate, bool hasEdit, bool hasDelete, (string key, string label)[] extras)[]
                 {
-                  ("matrix", "Ma trận vận hành", "fa-th", false, false, false, false, Array.Empty<(string,string)>()),
-                  ("bookings", "Đơn đặt phòng", "fa-calendar-check", true, true, true, true, new[] { ("trash", "Thùng rác"), ("restore", "Khôi phục") }),
-                  ("branches", "Chi nhánh", "fa-building", true, true, true, true, Array.Empty<(string,string)>()),
-                  ("rooms", "Phòng", "fa-door-open", true, true, true, true, Array.Empty<(string,string)>()),
-                  ("images", "Kho ảnh", "fa-images", true, false, false, false, Array.Empty<(string,string)>()),
-                  ("statistics", "Thống kê", "fa-chart-bar", false, false, false, false, new[] { ("export", "Xuất Excel") }),
-                  ("staff", "Nhân sự", "fa-users-cog", false, true, true, true, new[] { ("permissions", "Phân quyền"), ("logs", "Nhật ký") }),
-                  ("settings", "Cấu hình", "fa-sliders-h", false, false, false, false, new[] { ("update", "Cập nhật"), ("holidays", "Ngày lễ"), ("slots", "Khung giờ") }),
-                  ("ai", "AI Brain Center", "fa-brain", false, false, false, false, new[] { ("manage", "Quản lý") })
+                    ("matrix", "Ma trận vận hành", "fa-th", false, false, false, false, Array.Empty<(string,string)>()),
+                    ("bookings", "Đơn đặt phòng", "fa-calendar-check", true, true, true, true, new[] { ("trash", "Thùng rác"), ("restore", "Khôi phục") }),
+                    ("branches", "Chi nhánh", "fa-building", true, true, true, true, Array.Empty<(string,string)>()),
+                    ("rooms", "Phòng", "fa-door-open", true, true, true, true, Array.Empty<(string,string)>()),
+                    ("images", "Kho ảnh", "fa-images", true, false, false, false, Array.Empty<(string,string)>()),
+                    ("statistics", "Thống kê", "fa-chart-bar", false, false, false, false, new[] { ("export", "Xuất Excel") }),
+                    ("staff", "Nhân sự", "fa-users-cog", false, true, true, true, new[] { ("permissions", "Phân quyền"), ("logs", "Nhật ký") }),
+                    ("settings", "Cấu hình", "fa-sliders-h", false, false, false, false,
+                        new[] {
+                            ("update", "Cập nhật"),
+                            ("holidays.manage", "Ngày lễ"),
+                            ("slots.manage", "Khung giờ"),
+                            ("branch.settings", "Chi nhánh"),
+                            ("payment.settings", "Mã QR")
+                        }),
+                    ("ai", "AI Brain Center", "fa-brain", true, true, true, true,
+                        new[] {
+                            ("knowledge", "Knowledge"),
+                            ("graph", "Graph"),
+                            ("response", "Response"),
+                            ("trace", "Trace")
+                        })
                 };
               }
 
