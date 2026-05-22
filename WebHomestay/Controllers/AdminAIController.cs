@@ -98,6 +98,7 @@ namespace WebHomestay.Controllers
 
 
 
+        [AdminAuthorize(Permission = "ai.response")]
         [HttpGet("final-synthesizer-config")]
         public async Task<IActionResult> GetFinalSynthesizerConfig()
         {
@@ -122,6 +123,7 @@ namespace WebHomestay.Controllers
             });
         }
 
+        [AdminAuthorize(Permission = "ai.response")]
         [HttpGet("booking-form-config")]
         public async Task<IActionResult> GetBookingFormConfig()
         {
@@ -135,6 +137,7 @@ namespace WebHomestay.Controllers
             });
         }
 
+        [AdminAuthorize(Permission = "ai.edit")]
         [HttpPost("booking-form-config")]
         public async Task<IActionResult> SaveBookingFormConfig([FromBody] BookingFormConfigRequest request)
         {
@@ -167,6 +170,7 @@ namespace WebHomestay.Controllers
             return Ok(new { success = true });
         }
 
+        [AdminAuthorize(Permission = "ai.edit")]
         [HttpPost("final-synthesizer-config")]
         public async Task<IActionResult> SaveFinalSynthesizerConfig([FromBody] FinalSynthesizerConfigRequest request)
         {
@@ -213,6 +217,7 @@ namespace WebHomestay.Controllers
             setting.LastUpdated = DateTime.Now;
         }
 
+        [AdminAuthorize(Permission = "ai.edit")]
         [HttpPost("upload-payment-qr")]
         public async Task<IActionResult> UploadPaymentQr(IFormFile file)
         {
@@ -234,6 +239,7 @@ namespace WebHomestay.Controllers
             return Ok(new { url = $"/uploads/ai-payment/{fileName}" });
         }
 
+        [AdminAuthorize(Permission = "ai.trace")]
         [HttpPost("test-agent")]
         public async Task<IActionResult> TestAgent([FromBody] AIAgentTestRequest request)
         {
@@ -344,6 +350,7 @@ namespace WebHomestay.Controllers
             return new { agent = "guard", ok = !warnings.Any(), warnings, policy = "Không xác nhận booking, không bịa giá/phòng trống, không tạo mã khóa/check-in code." };
         }
 
+        [AdminAuthorize(Permission = "ai.view")]
         [HttpGet("")]
         public IActionResult Index()
         {
@@ -354,6 +361,7 @@ namespace WebHomestay.Controllers
 
 
 
+        [AdminAuthorize(Permission = "ai.knowledge")]
         [HttpGet("brain-knowledge")]
         public async Task<IActionResult> GetBrainKnowledge()
         {
@@ -386,6 +394,7 @@ namespace WebHomestay.Controllers
             return Ok(scopes);
         }
 
+        [AdminAuthorize(Permission = "ai.create")]
         [HttpPost("brain-scope")]
         public async Task<IActionResult> SaveBrainScope([FromBody] AIBrainScope scope)
         {
@@ -408,6 +417,7 @@ namespace WebHomestay.Controllers
             return Ok(new { success = true, id = scope.Id });
         }
 
+        [AdminAuthorize(Permission = "ai.create")]
         [HttpPost("brain-knowledge-unit")]
         public async Task<IActionResult> SaveBrainKnowledgeUnit([FromBody] AIKnowledgeUnit unit)
         {
@@ -434,6 +444,7 @@ namespace WebHomestay.Controllers
             return Ok(new { success = true, id = unit.Id });
         }
 
+        [AdminAuthorize(Permission = "ai.delete")]
         [HttpDelete("brain-knowledge-unit/{id}")]
         public async Task<IActionResult> DeleteBrainKnowledgeUnit(Guid id)
         {
@@ -444,6 +455,7 @@ namespace WebHomestay.Controllers
             return Ok(new { success = true });
         }
 
+        [AdminAuthorize(Permission = "ai.graph")]
         [HttpGet("brain-graph")]
         public async Task<IActionResult> GetBrainGraph()
         {
@@ -473,6 +485,7 @@ namespace WebHomestay.Controllers
             return Ok(new { nodes, edges });
         }
 
+        [AdminAuthorize(Permission = "ai.create")]
         [HttpPost("brain-graph-node")]
         public async Task<IActionResult> SaveBrainGraphNode([FromBody] AIGraphNode node)
         {
@@ -496,6 +509,7 @@ namespace WebHomestay.Controllers
             return Ok(new { success = true, id = node.Id });
         }
 
+        [AdminAuthorize(Permission = "ai.delete")]
         [HttpDelete("brain-graph-node/{id}")]
         public async Task<IActionResult> DeleteBrainGraphNode(Guid id)
         {
@@ -506,6 +520,7 @@ namespace WebHomestay.Controllers
             return Ok(new { success = true });
         }
 
+        [AdminAuthorize(Permission = "ai.create")]
         [HttpPost("brain-graph-edge")]
         public async Task<IActionResult> SaveBrainGraphEdge([FromBody] AIGraphEdge edge)
         {
@@ -529,6 +544,7 @@ namespace WebHomestay.Controllers
             return Ok(new { success = true, id = edge.Id });
         }
 
+        [AdminAuthorize(Permission = "ai.delete")]
         [HttpDelete("brain-graph-edge/{id}")]
         public async Task<IActionResult> DeleteBrainGraphEdge(Guid id)
         {
@@ -539,6 +555,7 @@ namespace WebHomestay.Controllers
             return Ok(new { success = true });
         }
 
+        [AdminAuthorize(Permission = "ai.trace")]
         [HttpGet("brain-traces")]
         public async Task<IActionResult> GetBrainTraces()
         {
@@ -559,6 +576,7 @@ namespace WebHomestay.Controllers
             return Ok(traces);
         }
 
+        [AdminAuthorize(Permission = "ai.detail")]
         [HttpGet("brain-trace/{id}")]
         public async Task<IActionResult> GetBrainTrace(Guid id)
         {
@@ -567,6 +585,7 @@ namespace WebHomestay.Controllers
             return Ok(trace);
         }
 
+        [AdminAuthorize(Permission = "ai.edit")]
         [HttpPost("seed-brain-data")]
         public async Task<IActionResult> SeedBrainData()
         {
@@ -708,6 +727,7 @@ namespace WebHomestay.Controllers
             });
         }
 
+        [AdminAuthorize(Permission = "ai.trace")]
         [HttpPost("brain-chat")]
         public async Task<IActionResult> BrainChat([FromBody] AIBrainChatRequest request, CancellationToken cancellationToken)
         {
@@ -730,6 +750,7 @@ namespace WebHomestay.Controllers
             }
         }
 
+        [AdminAuthorize(Permission = "ai.trace")]
         [HttpPost("brain-preview")]
         public async Task<IActionResult> BrainPreview([FromBody] AIModelRequest request, CancellationToken cancellationToken)
         {
@@ -746,6 +767,7 @@ namespace WebHomestay.Controllers
             return Ok(response);
         }
 
+        [AdminAuthorize(Permission = "ai.knowledge")]
         [HttpGet("collections")]
         public async Task<IActionResult> GetCollections()
         {
@@ -769,6 +791,7 @@ namespace WebHomestay.Controllers
             return Ok(collections);
         }
 
+        [AdminAuthorize(Permission = "ai.edit")]
         [HttpPost("save-collection")]
         public async Task<IActionResult> SaveCollection([FromBody] AIKnowledgeCollection collection)
         {
@@ -791,6 +814,7 @@ namespace WebHomestay.Controllers
             return Ok(new { success = true, id = collection.Id });
         }
 
+        [AdminAuthorize(Permission = "ai.delete")]
         [HttpDelete("collection/{id}")]
         public async Task<IActionResult> DeleteCollection(Guid id)
         {
@@ -806,6 +830,7 @@ namespace WebHomestay.Controllers
             return Ok(new { success = true });
         }
 
+        [AdminAuthorize(Permission = "ai.knowledge")]
         [HttpGet("articles/{collectionId}")]
         public async Task<IActionResult> GetArticles(Guid collectionId)
         {
@@ -823,6 +848,7 @@ namespace WebHomestay.Controllers
             return Ok(articles);
         }
 
+        [AdminAuthorize(Permission = "ai.detail")]
         [HttpGet("article/{id}")]
         public async Task<IActionResult> GetArticle(Guid id)
         {
@@ -831,6 +857,7 @@ namespace WebHomestay.Controllers
             return Ok(article);
         }
 
+        [AdminAuthorize(Permission = "ai.edit")]
         [HttpPost("save-article")]
         public async Task<IActionResult> SaveArticle([FromBody] AIKnowledgeArticle article)
         {
@@ -854,6 +881,7 @@ namespace WebHomestay.Controllers
             return Ok(new { success = true, id = article.Id });
         }
 
+        [AdminAuthorize(Permission = "ai.delete")]
         [HttpDelete("article/{id}")]
         public async Task<IActionResult> DeleteArticle(Guid id)
         {
