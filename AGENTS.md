@@ -26,19 +26,21 @@ Before making changes, read **MANDATORY_CONTEXT.md** and **docs/yeucau/TONG_QUAN
 - **AI key:** Read from `../key.md` at startup (`Program.cs:6-16`). Always a Groq key. Listed in `.gitignore`. Never commit secrets.
 - **Mock mode removed:** `AIModelClient` now throws if provider is `"mock"` — no fallback. Provider defaults to `"groq"` but can be overridden to `"openrouter"` or `"9router"`.
 
-## AI: two separate systems
+## AI: two shared systems (unified Brain Center)
 
-### 1. Public AI Chat — deterministic booking flow
-`AIChatController` (route `/ai`) → `AIBookingFlowOrchestrator`
+### 1. Public AI Chat — LLM-powered booking conversation
+`AIChatController` (route `/ai`) → `AIBrainOrchestrator` (with `ChatMode.PublicBooking`)
 
-- **Does NOT call the LLM.** It's a state-machine chatbot that extracts intent, filters rooms/slots via `AvailabilityService`, collects customer info, and hands off to `BookingCreationService`.
-- Steps: `intent` → `select-room`/`select-daily-room` → `select-slot` → `submit-booking-form` → `payment`
-- Session state cached in `IMemoryCache` with 30min TTL under key `ai-booking-flow:{sessionId}`.
-- UI blocks returned as JSON `UiBlocks` (types: `roomCards`, `hourlySlots`, `dailyRooms`, `bookingSummary`, `bookingForm`, `paymentQr`).
-- Booking form fields configurable via `AIBookingFormSchema` in `SystemSettings` (GroupName = "AI"); defaults to 7 fields including `idCardFront`/`idCardBack` (type: image).
-- Upload endpoint: `POST /ai/booking-id-card` + `POST /ai/payment-proof`.
+- **Runs through the same multi-agent pipeline as admin**, with a **Booking Conductor** agent (rule-based, not LLM) that decides when to show rooms, slots, or auto-book.
+- Booking Conductor state cached in `IMemoryCache` with 30min TTL under key `ai-booking-conductor:{sessionId}`.
+- Session state: `AIBookingSessionState` with fields like `SelectedRoomId`, `HourlyDate`, `CheckInDate`, `CheckOutDate`, `GuestCount`, etc.
+- UI blocks returned as JSON arrays (same types: `roomCards`, `hourlySlots`, `dailyRooms`, `bookingSummary`, `bookingForm`, `paymentQr`).
+- LLM (via Final Synthesizer) writes natural-language replies; Booking Conductor decides *when* to trigger booking UI blocks.
+- Auto-booking when all mandatory fields present + clear intent; shows pre-filled form when ambiguous.
+- Booking form fields configurable via `PublicBookingFormSchema` in `SystemSettings` (GroupName = "AI").
+- Upload endpoints: `POST /ai/booking-id-card` + `POST /ai/payment-proof`.
 
-### 2. Admin AI Brain Center — multi-agent/RAG/Graph (preserve this)
+### 2. Admin AI Brain Center — multi-agent/RAG/Graph
 `AdminAIController` (route `/admin/ai`) → `AIBrainOrchestrator` → `AIModelClient`
 
 - Do NOT simplify to basic chatbot. Current implementation has 5 agents orchestrated sequentially:
@@ -95,7 +97,7 @@ ai        │ ai.view        │ manage
 - Session mocking: `WebHomestay.Tests/FakeSession.cs` — implements `ISession` plus `SetString`/`GetString`/`SetInt32`/`GetInt32`.
 - Scope mocking: `WebHomestay.Tests/FakeServiceScopeFactory.cs`.
 - Test directories: `Services/`, `Domain/`, `Admin/`.
-- Check existing test files (especially `AIBookingFlowOrchestratorTests.cs`, `PermissionResolveServiceTests.cs`) for patterns before writing new tests.
+- Check existing test files (especially `PermissionResolveServiceTests.cs`) for patterns before writing new tests.
 
 ## Booking & availability
 
