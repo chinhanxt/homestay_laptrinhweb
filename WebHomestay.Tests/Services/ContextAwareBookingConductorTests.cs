@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using WebHomestay.Data;
 using WebHomestay.Models;
+using WebHomestay.Models.ViewModels;
 using WebHomestay.Services;
 using Xunit;
 
@@ -25,7 +26,8 @@ public class ContextAwareBookingConductorTests
     private static ContextAwareBookingConductor CreateConductor(ApplicationDbContext context, IMemoryCache cache)
     {
         var scopeFactory = new FakeServiceScopeFactory(context);
-        return new ContextAwareBookingConductor(context, cache, scopeFactory);
+        var bookingCreation = new FakeBookingCreationService(context);
+        return new ContextAwareBookingConductor(context, cache, scopeFactory, bookingCreation);
     }
 
     private static void SeedSetting(ApplicationDbContext context, string key, string value)
@@ -200,5 +202,45 @@ public class ContextAwareBookingConductorTests
 
         Assert.Equal(ConductorAction.ShowSlots, result.Action);
         Assert.NotEmpty(result.UiBlocks);
+    }
+}
+
+public class FakeBookingCreationService : IBookingCreationService
+{
+    private readonly ApplicationDbContext _context;
+
+    public FakeBookingCreationService(ApplicationDbContext context)
+    {
+        _context = context;
+    }
+
+    public Task<Booking> CreateHourlyBookingAsync(CreateBookingRequest request)
+    {
+        var booking = new Booking
+        {
+            Id = new Random().Next(1, 99999),
+            RoomId = request.RoomId,
+            CustomerName = request.CustomerName,
+            CustomerPhone = request.CustomerPhone,
+            BookingMode = BookingMode.Hourly,
+            Status = "AwaitingPayment"
+        };
+        _context.Bookings.Add(booking);
+        return Task.FromResult(booking);
+    }
+
+    public Task<Booking> CreateDailyBookingAsync(CreateBookingRequest request)
+    {
+        var booking = new Booking
+        {
+            Id = new Random().Next(1, 99999),
+            RoomId = request.RoomId,
+            CustomerName = request.CustomerName,
+            CustomerPhone = request.CustomerPhone,
+            BookingMode = BookingMode.Daily,
+            Status = "AwaitingPayment"
+        };
+        _context.Bookings.Add(booking);
+        return Task.FromResult(booking);
     }
 }

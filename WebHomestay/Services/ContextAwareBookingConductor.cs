@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using WebHomestay.Data;
 using WebHomestay.Models;
+using WebHomestay.Models.ViewModels;
 
 namespace WebHomestay.Services;
 
@@ -11,6 +12,7 @@ public class ContextAwareBookingConductor : IBookingConductor
     private readonly ApplicationDbContext _context;
     private readonly IMemoryCache _cache;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IBookingCreationService _bookingCreationService;
     private const string CacheKeyPrefix = "ai-booking-conductor:";
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(30);
 
@@ -25,11 +27,13 @@ public class ContextAwareBookingConductor : IBookingConductor
     public ContextAwareBookingConductor(
         ApplicationDbContext context,
         IMemoryCache cache,
-        IServiceScopeFactory scopeFactory)
+        IServiceScopeFactory scopeFactory,
+        IBookingCreationService bookingCreationService)
     {
         _context = context;
         _cache = cache;
         _scopeFactory = scopeFactory;
+        _bookingCreationService = bookingCreationService;
     }
 
     private string CacheKey(string sessionId) => $"{CacheKeyPrefix}{sessionId}";
@@ -244,13 +248,47 @@ public class ContextAwareBookingConductor : IBookingConductor
                         ?? actionRequest.FormData.GetValueOrDefault("customerEmail");
                 }
                 CacheState(actionRequest.SessionId, container);
-                return new BookingActionResult
+
+                try
                 {
-                    Answer = "Cảm ơn bạn! Mình đang tiến hành đặt phòng. Bạn vui lòng chuyển khoản theo mã QR bên dưới để giữ chỗ nhé.",
-                    Action = ConductorAction.PaymentQr,
-                    State = container,
-                    UiBlocks = new List<object> { new { type = "paymentQr" } }
-                };
+                    var createReq = new CreateBookingRequest
+                    {
+                        RoomId = container.Progress.SelectedRoomId ?? 0,
+                        BookingMode = BookingMode.Hourly,
+                        SlotInventoryId = container.Progress.SelectedSlotId,
+                        CustomerName = container.Progress.CustomerName ?? "",
+                        CustomerPhone = container.Progress.CustomerPhone ?? "",
+                        CustomerEmail = container.Progress.CustomerEmail,
+                        GuestCount = Math.Max(container.Confirmed.GuestCount, 1),
+                        CustomerNote = actionRequest.FormData?.GetValueOrDefault("notes")
+                    };
+
+                    var booking = await _bookingCreationService.CreateHourlyBookingAsync(createReq);
+
+                    return new BookingActionResult
+                    {
+                        Answer = $"Đặt phòng thành công! Mã đơn: #{booking.Id}. Bạn vui lòng thanh toán để giữ chỗ.",
+                        Action = ConductorAction.PaymentQr,
+                        State = container,
+                        UiBlocks = new List<object>
+                        {
+                            new
+                            {
+                                type = "paymentQr",
+                                data = new { paymentUrl = $"/bookings/success/{booking.Id}" }
+                            }
+                        }
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new BookingActionResult
+                    {
+                        Answer = $"Xin lỗi, không thể tạo đơn đặt phòng. {ex.Message}",
+                        Action = ConductorAction.Reply,
+                        State = container
+                    };
+                }
 
             default:
                 return new BookingActionResult
