@@ -119,13 +119,61 @@
                                 <p>Cấu hình cho AI Public Booking mode. Khi khách chat ở /ai/chat, AI sẽ dùng các thiết lập này để quyết định hành động.</p>
                             </div>
                         </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Chế độ chủ động</label>
+                            <div class="d-flex gap-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="proactiveMode" id="mode-balanced" value="balanced" checked>
+                                    <label class="form-check-label" for="mode-balanced">Cân bằng (linh hoạt)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="proactiveMode" id="mode-proactive" value="proactive">
+                                    <label class="form-check-label" for="mode-proactive">Chủ động (luôn gợi ý)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="proactiveMode" id="mode-conservative" value="conservative">
+                                    <label class="form-check-label" for="mode-conservative">Bảo thủ (chỉ khi KH yêu cầu)</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="public-booking-auto-show" checked>
+                                    <label class="form-check-label fw-bold" for="public-booking-auto-show">Tự động show phòng</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Max lần show</label>
+                                <input id="public-booking-max-shows" type="number" class="form-control" value="2" min="1" max="10" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Cooldown (messages)</label>
+                                <input id="public-booking-cooldown" type="number" class="form-control" value="3" min="0" max="20" />
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Từ khoá thoát booking</label>
+                            <input id="public-booking-exit-keywords" class="form-control" placeholder="thôi,bỏ,khác,xóa,hủy,không,để sau" />
+                            <div class="form-text">Phân cách bằng dấu phẩy. Khi KH dùng từ này, AI thoát booking mode và xoá progress.</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Tính cách AI</label>
+                            <input id="public-booking-personality" class="form-control" placeholder="thân thiện, nhiệt tình, như lễ tân khách sạn" />
+                        </div>
+
+                        <hr class="my-4" />
+
                         <label class="form-label fw-bold">Public Booking Prompt (bổ sung vào system prompt)</label>
-                        <textarea id="public-booking-prompt" class="form-control final-style-text" rows="8" placeholder="Booking Conductor đã quyết định hành động: {BookingAction}..."></textarea>
+                        <textarea id="public-booking-prompt" class="form-control final-style-text" rows="6" placeholder="Booking Conductor đã quyết định hành động: {Action}..."></textarea>
                         <div class="row g-3 mt-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Trigger Words</label>
                                 <input id="public-booking-trigger-words" class="form-control" placeholder="đặt,chốt,lấy,book,giữ phòng" />
-                                <div class="form-text">Phân cách bằng dấu phẩy. Khi khách dùng từ này, AI hiểu là booking intent.</div>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-bold">Max Tokens</label>

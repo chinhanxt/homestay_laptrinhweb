@@ -1076,6 +1076,12 @@ async function loadPublicBookingConfig() {
         $('#public-booking-trigger-words').val(config.triggerWords || '');
         $('#public-booking-max-tokens').val(config.maxTokens || '300');
         $('#public-booking-timeout').val(config.timeout || '15');
+        $(`input[name="proactiveMode"][value="${config.proactiveMode || 'balanced'}"]`).prop('checked', true);
+        $('#public-booking-auto-show').prop('checked', config.autoShowRooms !== 'false');
+        $('#public-booking-max-shows').val(config.maxRoomShows || '2');
+        $('#public-booking-cooldown').val(config.roomCooldown || '3');
+        $('#public-booking-exit-keywords').val(config.exitKeywords || '');
+        $('#public-booking-personality').val(config.personality || '');
     } catch (err) {
         alert(`Không tải được Public Booking config: ${err.message}`);
     }
@@ -1086,7 +1092,13 @@ async function savePublicBookingConfig() {
         prompt: $('#public-booking-prompt').val(),
         triggerWords: $('#public-booking-trigger-words').val(),
         maxTokens: $('#public-booking-max-tokens').val(),
-        timeout: $('#public-booking-timeout').val()
+        timeout: $('#public-booking-timeout').val(),
+        proactiveMode: $('input[name="proactiveMode"]:checked').val(),
+        autoShowRooms: $('#public-booking-auto-show').is(':checked') ? 'true' : 'false',
+        maxRoomShows: $('#public-booking-max-shows').val(),
+        roomCooldown: $('#public-booking-cooldown').val(),
+        exitKeywords: $('#public-booking-exit-keywords').val(),
+        personality: $('#public-booking-personality').val()
     };
     const response = await fetch('/admin/ai/public-booking-config', {
         method: 'POST',
