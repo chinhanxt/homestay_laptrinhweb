@@ -44,6 +44,7 @@ builder.Services.AddScoped<WebHomestay.Services.IAIBrainOrchestrator, WebHomesta
 builder.Services.AddScoped<WebHomestay.Services.IBookingConductor, WebHomestay.Services.ContextAwareBookingConductor>();
 builder.Services.AddScoped<WebHomestay.Services.PricingService>();
 builder.Services.AddScoped<WebHomestay.Services.IPermissionResolveService, WebHomestay.Services.PermissionResolveService>();
+builder.Services.AddScoped<WebHomestay.Services.IAdminChatService, WebHomestay.Services.AdminChatService>();
 builder.Services.AddHostedService<WebHomestay.Services.BookingCleanupService>();
 
 // Add Session
