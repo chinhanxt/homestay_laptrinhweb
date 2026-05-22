@@ -27,5 +27,11 @@ namespace WebHomestay.Services
         public string? TriggerWords { get; set; }
         public string? MaxTokens { get; set; }
         public string? Timeout { get; set; }
+        public string? ProactiveMode { get; set; }
+        public string? AutoShowRooms { get; set; }
+        public string? MaxRoomShows { get; set; }
+        public string? RoomCooldown { get; set; }
+        public string? ExitKeywords { get; set; }
+        public string? Personality { get; set; }
     }
 }

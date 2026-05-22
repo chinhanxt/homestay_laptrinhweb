@@ -203,7 +203,13 @@ namespace WebHomestay.Controllers
                 prompt = GetAISetting(settings, "AIPublicBookingPrompt", string.Empty),
                 triggerWords = GetAISetting(settings, "AIPublicBookingTriggerWords", "đặt,chốt,lấy,book,giữ phòng"),
                 maxTokens = GetAISetting(settings, "AIPublicBookingMaxTokens", "300"),
-                timeout = GetAISetting(settings, "AIPublicBookingTimeout", "15")
+                timeout = GetAISetting(settings, "AIPublicBookingTimeout", "15"),
+                proactiveMode = GetAISetting(settings, "AIPublicBookingProactiveMode", "balanced"),
+                autoShowRooms = GetAISetting(settings, "AIPublicBookingAutoShowRooms", "true"),
+                maxRoomShows = GetAISetting(settings, "AIPublicBookingMaxRoomShows", "2"),
+                roomCooldown = GetAISetting(settings, "AIPublicBookingRoomCooldown", "3"),
+                exitKeywords = GetAISetting(settings, "AIPublicBookingExitKeywords", "thôi,bỏ,khác,xóa,hủy,không,để sau"),
+                personality = GetAISetting(settings, "AIPublicBookingPersonality", "thân thiện, nhiệt tình, như lễ tân khách sạn")
             });
         }
 
@@ -215,6 +221,12 @@ namespace WebHomestay.Controllers
             await UpsertAISetting("AIPublicBookingTriggerWords", request.TriggerWords ?? "đặt,chốt,lấy,book,giữ phòng", "Từ khoá phát hiện booking intent (phân cách bằng dấu phẩy)");
             await UpsertAISetting("AIPublicBookingMaxTokens", request.MaxTokens ?? "300", "Max tokens cho public booking mode");
             await UpsertAISetting("AIPublicBookingTimeout", request.Timeout ?? "15", "Timeout (giây) cho public booking mode");
+            await UpsertAISetting("AIPublicBookingProactiveMode", request.ProactiveMode ?? "balanced", "Chế độ chủ động của AI (balanced/proactive/conservative)");
+            await UpsertAISetting("AIPublicBookingAutoShowRooms", request.AutoShowRooms ?? "true", "Tự động show phòng khi có branch+date+browsing intent");
+            await UpsertAISetting("AIPublicBookingMaxRoomShows", request.MaxRoomShows ?? "2", "Số lần tối đa show rooms trong 1 session");
+            await UpsertAISetting("AIPublicBookingRoomCooldown", request.RoomCooldown ?? "3", "Số message tạm dừng sau khi show rooms");
+            await UpsertAISetting("AIPublicBookingExitKeywords", request.ExitKeywords ?? "thôi,bỏ,khác,xóa,hủy,không,để sau", "Từ khoá thoát booking mode (phân cách bằng dấu phẩy)");
+            await UpsertAISetting("AIPublicBookingPersonality", request.Personality ?? "thân thiện, nhiệt tình, như lễ tân khách sạn", "Tính cách AI dùng trong system prompt");
             await _context.SaveChangesAsync();
             return Ok(new { success = true });
         }
