@@ -94,8 +94,8 @@ namespace WebHomestay.Controllers
                     ["images.view"] = true, ["images.detail"] = true,
                     ["statistics.view"] = true, ["statistics.export"] = true,
                     ["staff.view"] = true, ["staff.logs"] = true,
-                    ["settings.view"] = true, ["settings.update"] = true, ["holidays.manage"] = true, ["slots.manage"] = true,
-                    ["ai.view"] = true, ["ai.manage"] = true
+                    ["settings.view"] = true, ["settings.update"] = true, ["holidays.manage"] = true, ["slots.manage"] = true, ["branch.settings"] = true, ["payment.settings"] = true,
+                    ["ai.view"] = true, ["ai.detail"] = true, ["ai.create"] = true, ["ai.edit"] = true, ["ai.delete"] = true, ["ai.knowledge"] = true, ["ai.graph"] = true, ["ai.response"] = true, ["ai.trace"] = true
                 };
                 var staffPerms = new Dictionary<string, bool>
                 {
