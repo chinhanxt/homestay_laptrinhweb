@@ -12,9 +12,10 @@ public class PermissionInheritanceTests
             ["branches.view"] = new[] { "branches.detail", "branches.create", "branches.edit", "branches.delete" },
             ["rooms.view"] = new[] { "rooms.detail", "rooms.create", "rooms.edit", "rooms.delete" },
             ["images.view"] = new[] { "images.detail" },
+            ["statistics.view"] = new[] { "statistics.export" },
             ["staff.view"] = new[] { "staff.create", "staff.edit", "staff.delete", "staff.permissions", "staff.logs" },
-            ["settings.view"] = new[] { "settings.update", "holidays.manage", "slots.manage" },
-            ["ai.view"] = new[] { "ai.manage" }
+            ["settings.view"] = new[] { "settings.update", "holidays.manage", "slots.manage", "branch.settings", "payment.settings" },
+            ["ai.view"] = new[] { "ai.detail", "ai.create", "ai.edit", "ai.delete", "ai.knowledge", "ai.graph", "ai.response", "ai.trace" }
         };
 
         foreach (var kvp in parentChildMap)
