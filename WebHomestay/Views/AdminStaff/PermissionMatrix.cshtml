@@ -194,9 +194,9 @@
                       <div class="d-flex gap-1 flex-wrap justify-content-center">
                         @foreach (var extra in mod.extras)
                         {
-                          <span class="badge bg-light text-dark border small d-flex align-items-center gap-1" title="@(mod.id).@extra.key">
+                          <span class="badge bg-light text-dark border small d-flex align-items-center gap-1" title="@(extra.key.Contains('.') ? extra.key : mod.id + "." + extra.key)">
                             @extra.label
-                            <input type="checkbox" class="perm-check child-check" data-module="@mod.id" data-key="@(mod.id).@extra.key" value="@(mod.id).@extra.key" name="selectedPermissions" style="width:14px;height:14px;">
+                             <input type="checkbox" class="perm-check child-check" data-module="@mod.id" data-key="@(extra.key.Contains('.') ? extra.key : mod.id + "." + extra.key)" value="@(extra.key.Contains('.') ? extra.key : mod.id + "." + extra.key)" name="selectedPermissions" style="width:14px;height:14px;">
                           </span>
                         }
                       </div>
