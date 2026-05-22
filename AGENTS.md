@@ -31,7 +31,7 @@ Before making changes, read **MANDATORY_CONTEXT.md** and **docs/yeucau/TONG_QUAN
 ### 1. Public AI Chat — LLM-powered booking conversation
 `AIChatController` (route `/ai`) → `AIBrainOrchestrator` (with `ChatMode.PublicBooking`)
 
-- **Runs through the same multi-agent pipeline as admin**, with a **Booking Conductor** agent (rule-based, not LLM) that decides when to show rooms, slots, or auto-book.
+- **Runs through the same multi-agent pipeline as admin**, with a **Booking Conductor** agent (context-aware, rule-based with intent classification and decision matrix) that decides when to show rooms, slots, or auto-book.
 - Booking Conductor state cached in `IMemoryCache` with 30min TTL under key `ai-booking-conductor:{sessionId}`.
 - Session state: `AIBookingSessionState` with fields like `SelectedRoomId`, `HourlyDate`, `CheckInDate`, `CheckOutDate`, `GuestCount`, etc.
 - UI blocks returned as JSON arrays (same types: `roomCards`, `hourlySlots`, `dailyRooms`, `bookingSummary`, `bookingForm`, `paymentQr`).
@@ -39,6 +39,7 @@ Before making changes, read **MANDATORY_CONTEXT.md** and **docs/yeucau/TONG_QUAN
 - Auto-booking when all mandatory fields present + clear intent; shows pre-filled form when ambiguous.
 - Booking form fields configurable via `PublicBookingFormSchema` in `SystemSettings` (GroupName = "AI").
 - Upload endpoints: `POST /ai/booking-id-card` + `POST /ai/payment-proof`.
+- Booking Conductor configurable via settings: `ProactiveMode` (balanced/proactive/conservative), `AutoShowRooms`, `MaxRoomShows`, `RoomCooldown`, `ExitKeywords`, `Personality`.
 
 ### 2. Admin AI Brain Center — multi-agent/RAG/Graph
 `AdminAIController` (route `/admin/ai`) → `AIBrainOrchestrator` → `AIModelClient`
@@ -54,6 +55,7 @@ Before making changes, read **MANDATORY_CONTEXT.md** and **docs/yeucau/TONG_QUAN
   - `AIFinalSynthesizerStyle`, `AIFinalSynthesizerFormSchema`, `AIFinalConditionOptions`
   - `AIFinalBasePrompt`, `AIFinalLanguageRule`, `AIFinalDataTruthRule`, etc.
   - `AIPublicBookingPrompt`, `AIPublicBookingTriggerWords`, `AIPublicBookingMaxTokens`, `AIPublicBookingTimeout`
+  - `AIPublicBookingProactiveMode`, `AIPublicBookingAutoShowRooms`, `AIPublicBookingMaxRoomShows`, `AIPublicBookingRoomCooldown`, `AIPublicBookingExitKeywords`, `AIPublicBookingPersonality`
 - Every request saves an `AIConversationTrace` with full agent outputs for debugging.
 - Default model: `llama-3.3-70b-versatile` via Groq API.
 - AI tables in DB: `ai_knowledge_collections`, `ai_knowledge_articles`, `ai_brain_scopes`, `ai_knowledge_units`, `ai_graph_nodes`, `ai_graph_edges`, `ai_agent_definitions`, `ai_conversation_traces`.
