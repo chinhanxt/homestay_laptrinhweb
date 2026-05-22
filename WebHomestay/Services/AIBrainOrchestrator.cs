@@ -17,23 +17,23 @@ namespace WebHomestay.Services
         private readonly IAIModelClient _aiModelClient;
         private readonly IMemoryCache _cache;
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly IBookingConductor _bookingConductor;
 
         public AIBrainOrchestrator(
             ApplicationDbContext context,
             IAvailabilityService availabilityService,
             IAIModelClient aiModelClient,
             IMemoryCache cache,
-            IServiceScopeFactory scopeFactory)
+            IServiceScopeFactory scopeFactory,
+            IBookingConductor bookingConductor)
         {
             _context = context;
             _availabilityService = availabilityService;
             _aiModelClient = aiModelClient;
             _cache = cache;
             _scopeFactory = scopeFactory;
+            _bookingConductor = bookingConductor;
         }
-
-        private const string CacheKeyPrefix = "ai-booking-conductor:";
-        private string CacheKey(string sessionId) => $"{CacheKeyPrefix}{sessionId}";
 
         public async Task<AIBrainChatResponse> ChatAsync(AIBrainChatRequest request, CancellationToken cancellationToken = default)
         {
@@ -52,19 +52,17 @@ namespace WebHomestay.Services
             var finalConfig = await GetFinalSynthesizerConfigAsync(cancellationToken);
             var filteredFormSchema = FilterFormSchema(finalConfig.FormSchema, enrichedRequest);
 
-            BookingDecision? bookingDecision = null;
+            ConductorResult? conductorResult = null;
             if (request.Mode == ChatMode.PublicBooking)
             {
-                bookingDecision = await RunBookingConductorAsync(enrichedRequest, sessionId, cancellationToken);
+                conductorResult = await _bookingConductor.DecideAsync(sessionId, request.Message, enrichedRequest, cancellationToken);
             }
 
-            var maxTokens = request.Mode == ChatMode.PublicBooking
-                ? GetPublicBookingMaxTokens()
-                : 900;
+            var maxTokens = 900;
 
             var modelResponse = await _aiModelClient.CompleteAsync(new AIModelRequest
             {
-                SystemPrompt = BuildSystemPrompt(personaSummary, liveSnapshot, knowledge, graphReasoning, guardResult, finalConfig, filteredFormSchema, conversationHistory, bookingDecision, request.Mode),
+                SystemPrompt = BuildSystemPrompt(personaSummary, liveSnapshot, knowledge, graphReasoning, guardResult, finalConfig, filteredFormSchema, conversationHistory, conductorResult, request.Mode),
                 UserMessage = request.Message,
                 Temperature = 0.35m,
                 MaxTokens = maxTokens
@@ -95,9 +93,9 @@ namespace WebHomestay.Services
                 ModelProvider = modelResponse.Provider,
                 IsMock = modelResponse.IsMock,
                 FormSchema = filteredFormSchema,
-                BookingAction = bookingDecision?.Action ?? "reply",
-                BookingState = bookingDecision?.State,
-                UiBlocks = bookingDecision?.UiBlocks ?? new List<AIUiBlock>()
+                BookingAction = conductorResult?.Action.ToString() ?? "reply",
+                BookingState = conductorResult?.State,
+                UiBlocks = conductorResult?.UiBlocks ?? new List<object>()
             };
         }
 
@@ -551,7 +549,7 @@ namespace WebHomestay.Services
             return settings.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : fallback;
         }
 
-        private string BuildSystemPrompt(string personaSummary, string liveSnapshot, List<object> knowledge, List<object> graphReasoning, string guardResult, FinalSynthesizerPromptConfig finalConfig, string formSchema, string conversationHistory, BookingDecision? bookingDecision = null, ChatMode mode = ChatMode.AdminAssistant)
+        private string BuildSystemPrompt(string personaSummary, string liveSnapshot, List<object> knowledge, List<object> graphReasoning, string guardResult, FinalSynthesizerPromptConfig finalConfig, string formSchema, string conversationHistory, ConductorResult? conductorResult = null, ChatMode mode = ChatMode.AdminAssistant)
         {
             var builder = new StringBuilder();
             AppendPromptSection(builder, "Base Prompt", finalConfig.BasePrompt);
@@ -564,27 +562,45 @@ namespace WebHomestay.Services
             AppendPromptSection(builder, "Memory Rule", finalConfig.MemoryRule);
             AppendPromptSection(builder, "Context Format Rule", finalConfig.ContextFormatRule);
 
-            if (mode == ChatMode.PublicBooking && bookingDecision != null)
+            if (mode == ChatMode.PublicBooking && conductorResult != null)
             {
-                var publicPrompt = GetPublicBookingPrompt();
+                var publicPrompt = string.Empty;
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    var setting = db.SystemSettings.FirstOrDefault(s => s.GroupName == "AI" && s.SettingKey == "AIPublicBookingPrompt");
+                    if (setting != null && !string.IsNullOrWhiteSpace(setting.SettingValue))
+                        publicPrompt = setting.SettingValue;
+                }
+                catch { }
+
                 if (!string.IsNullOrWhiteSpace(publicPrompt))
                 {
                     builder.AppendLine(publicPrompt
-                        .Replace("{BookingAction}", bookingDecision.Action)
-                        .Replace("{BookingState}", JsonSerializer.Serialize(bookingDecision.State)));
+                        .Replace("{BookingAction}", conductorResult.Action.ToString())
+                        .Replace("{BookingState}", JsonSerializer.Serialize(conductorResult.State)));
                 }
 
-                if (bookingDecision.Action == "auto_book")
-                {
-                    builder.AppendLine("Booking đã được tạo thành công. Hãy thông báo cho khách và hướng dẫn thanh toán. KHÔNG tự bịa thông tin booking.");
-                }
-                else if (bookingDecision.Action == "show_rooms" || bookingDecision.Action == "show_slots")
+                if (conductorResult.Action == ConductorAction.ShowRooms || conductorResult.Action == ConductorAction.ShowSlots)
                 {
                     builder.AppendLine("UI blocks đã kèm theo. Hãy trả lời ngắn gọn giới thiệu các lựa chọn.");
                 }
-                else if (bookingDecision.Action == "show_form")
+                else if (conductorResult.Action == ConductorAction.ShowForm)
                 {
                     builder.AppendLine("Form đã pre-fill. Hãy hướng dẫn khách điền các field còn thiếu.");
+                }
+                else if (conductorResult.Action == ConductorAction.AutoBook || conductorResult.Action == ConductorAction.PaymentQr)
+                {
+                    builder.AppendLine("Booking đã được tạo thành công. Hãy thông báo cho khách và hướng dẫn thanh toán. KHÔNG tự bịa thông tin booking.");
+                }
+                else if (conductorResult.Action == ConductorAction.Reply)
+                {
+                    builder.AppendLine("Hãy trả lời tự nhiên, KHÔNG gợi ý phòng hay đặt phòng. Chỉ tư vấn thông tin.");
+                }
+                else if (conductorResult.Action == ConductorAction.AskInfo)
+                {
+                    builder.AppendLine("Hãy hỏi thông tin còn thiếu (chi nhánh, ngày, số khách) để tư vấn phòng phù hợp.");
                 }
             }
 
@@ -599,267 +615,7 @@ namespace WebHomestay.Services
             return builder.ToString();
         }
 
-        private async Task<BookingDecision> RunBookingConductorAsync(AIBrainChatRequest request, string sessionId, CancellationToken cancellationToken)
-        {
-            var state = GetCachedState(sessionId) ?? new AIBookingSessionState();
-            state = MergeStateFromRequest(state, request);
-            state.BookingMode = string.IsNullOrWhiteSpace(state.BookingMode) || state.BookingMode == "unknown"
-                ? "hourly" : state.BookingMode;
 
-            var lowered = request.Message.ToLowerInvariant();
-            var triggerWords = GetPublicBookingTriggerWords();
-            var hasBookingIntent = triggerWords.Any(w => lowered.Contains(w.ToLowerInvariant()));
-
-            if (!state.BranchId.HasValue)
-            {
-                CacheState(sessionId, state);
-                return new BookingDecision { Action = "reply", State = state, Reason = "Thiếu chi nhánh, cần hỏi khách." };
-            }
-
-            if (!request.StartTime.HasValue && !state.HourlyDate.HasValue && !state.CheckInDate.HasValue)
-            {
-                CacheState(sessionId, state);
-                return new BookingDecision { Action = "reply", State = state, Reason = "Thiếu thời gian, cần hỏi khách." };
-            }
-
-            if (state.GuestCount <= 0) state.GuestCount = 1;
-
-            if (hasBookingIntent)
-            {
-                if (!state.SelectedRoomId.HasValue)
-                {
-                    var roomDecision = await BuildShowRoomsDecisionAsync(state, cancellationToken);
-                    CacheState(sessionId, roomDecision.State);
-                    return roomDecision;
-                }
-
-                if (string.IsNullOrWhiteSpace(state.SelectedSlotLabel) && state.BookingMode == "hourly")
-                {
-                    var slotDecision = await BuildShowSlotsDecisionAsync(state, cancellationToken);
-                    CacheState(sessionId, slotDecision.State);
-                    return slotDecision;
-                }
-
-                var autoDecision = await BuildAutoBookDecisionAsync(state, cancellationToken);
-                CacheState(sessionId, autoDecision.State);
-                return autoDecision;
-            }
-
-            if (!state.SelectedRoomId.HasValue)
-            {
-                var roomDecision = await BuildShowRoomsDecisionAsync(state, cancellationToken);
-                CacheState(sessionId, roomDecision.State);
-                return roomDecision;
-            }
-
-            CacheState(sessionId, state);
-            return new BookingDecision { Action = "reply", State = state, Reason = "Chưa đủ thông tin hoặc chưa rõ intent." };
-        }
-
-        private AIBookingSessionState? GetCachedState(string sessionId)
-        {
-            return _cache.TryGetValue(CacheKey(sessionId), out AIBookingSessionState? state) ? state : null;
-        }
-
-        private void CacheState(string sessionId, AIBookingSessionState state)
-        {
-            _cache.Set(CacheKey(sessionId), state, TimeSpan.FromMinutes(30));
-        }
-
-        private static AIBookingSessionState MergeStateFromRequest(AIBookingSessionState state, AIBrainChatRequest request)
-        {
-            if (request.BranchId.HasValue) state.BranchId = request.BranchId;
-            if (request.StartTime.HasValue) state.HourlyDate = DateOnly.FromDateTime(request.StartTime.Value);
-            if (request.StartTime.HasValue) state.CheckInDate = DateOnly.FromDateTime(request.StartTime.Value);
-            if (request.EndTime.HasValue) state.CheckOutDate = DateOnly.FromDateTime(request.EndTime.Value);
-            if (request.GuestCount > 0) state.GuestCount = request.GuestCount;
-            return state;
-        }
-
-        private List<string> GetPublicBookingTriggerWords()
-        {
-            try
-            {
-                var setting = _context.SystemSettings.AsNoTracking()
-                    .FirstOrDefault(s => s.GroupName == "AI" && s.SettingKey == "AIPublicBookingTriggerWords");
-                if (setting != null && !string.IsNullOrWhiteSpace(setting.SettingValue))
-                {
-                    return setting.SettingValue.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-                }
-            }
-            catch { }
-            return new List<string> { "đặt", "chốt", "lấy", "book", "giữ phòng" };
-        }
-
-        private int GetPublicBookingMaxTokens()
-        {
-            try
-            {
-                var setting = _context.SystemSettings.AsNoTracking()
-                    .FirstOrDefault(s => s.GroupName == "AI" && s.SettingKey == "AIPublicBookingMaxTokens");
-                if (setting != null && int.TryParse(setting.SettingValue, out var val)) return val;
-            }
-            catch { }
-            return 300;
-        }
-
-        private string GetPublicBookingPrompt()
-        {
-            try
-            {
-                var setting = _context.SystemSettings.AsNoTracking()
-                    .FirstOrDefault(s => s.GroupName == "AI" && s.SettingKey == "AIPublicBookingPrompt");
-                if (setting != null && !string.IsNullOrWhiteSpace(setting.SettingValue)) return setting.SettingValue;
-            }
-            catch { }
-            return @"Booking Conductor đã quyết định hành động: {BookingAction}
-Booking Session State: {BookingState}
-Nếu action = ""reply"": trả lời tự nhiên, không thêm UI.
-Nếu action = ""show_rooms"": giới thiệu phòng ngắn gọn. UI rooms đã kèm.
-Nếu action = ""show_slots"": giới thiệu khung giờ. UI slots đã kèm.
-Nếu action = ""show_form"": hướng dẫn điền form. UI form đã pre-fill.
-Nếu action = ""auto_book"": thông báo thành công + hướng dẫn thanh toán.";
-        }
-
-        private async Task<BookingDecision> BuildShowRoomsDecisionAsync(AIBookingSessionState state, CancellationToken cancellationToken)
-        {
-            var rooms = await _context.Rooms
-                .AsNoTracking()
-                .Include(r => r.Amenities)
-                .Where(r => r.BranchId == state.BranchId && r.Status == "Available" && r.MaxGuests >= state.GuestCount)
-                .OrderBy(r => state.BookingMode == "daily" ? r.PricePerDay : r.PricePerHour)
-                .ThenBy(r => r.Name)
-                .Select(r => new AIRoomCard
-                {
-                    RoomId = r.Id,
-                    Name = r.Name,
-                    Description = r.Description,
-                    PricePerHour = r.PricePerHour,
-                    PricePerDay = r.PricePerDay,
-                    Capacity = r.Capacity,
-                    MaxGuests = r.MaxGuests,
-                    ExtraGuestFee = r.ExtraGuestFee,
-                    ImageUrl = r.ImageUrl,
-                    Amenities = r.Amenities.Select(a => a.Name).ToList(),
-                    DetailsUrl = $"/Rooms/Details/{r.Id}"
-                })
-                .ToListAsync(cancellationToken);
-
-            return new BookingDecision
-            {
-                Action = rooms.Any() ? "show_rooms" : "reply",
-                State = state,
-                Reason = rooms.Any() ? "Có phòng trống, hiển thị danh sách." : "Không còn phòng trống.",
-                UiBlocks = new List<AIUiBlock>
-                {
-                    new() { Type = "roomCards", Data = new { rooms } }
-                }
-            };
-        }
-
-        private async Task<BookingDecision> BuildShowSlotsDecisionAsync(AIBookingSessionState state, CancellationToken cancellationToken)
-        {
-            var room = await _context.Rooms.FindAsync(new object[] { state.SelectedRoomId!.Value }, cancellationToken);
-            if (room == null)
-            {
-                return new BookingDecision { Action = "reply", State = state, Reason = "Phòng không tồn tại." };
-            }
-
-            var slotDate = state.HourlyDate ?? DateOnly.FromDateTime(DateTime.Today);
-            var slots = await _context.RoomSlotInventories
-                .AsNoTracking()
-                .Where(s => s.RoomId == room.Id && s.SlotDate == slotDate && s.Status == "Available")
-                .OrderBy(s => s.StartTime)
-                .ToListAsync(cancellationToken);
-
-            var options = new List<AISlotOption>();
-            foreach (var slot in slots)
-            {
-                if (!await _availabilityService.IsRoomAvailable(room.Id, slot.StartTime, slot.EndTime)) continue;
-                options.Add(new AISlotOption
-                {
-                    SlotId = slot.Id,
-                    RoomId = room.Id,
-                    RoomName = room.Name,
-                    Label = slot.SlotLabel,
-                    StartTime = slot.StartTime,
-                    EndTime = slot.EndTime,
-                    TotalPrice = 0m
-                });
-            }
-
-            return new BookingDecision
-            {
-                Action = options.Any() ? "show_slots" : "reply",
-                State = state,
-                Reason = options.Any() ? "Có slot trống." : "Không còn slot trống.",
-                UiBlocks = new List<AIUiBlock>
-                {
-                    new() { Type = "hourlySlots", Data = new { slots = options } }
-                }
-            };
-        }
-
-        private async Task<BookingDecision> BuildAutoBookDecisionAsync(AIBookingSessionState state, CancellationToken cancellationToken)
-        {
-            try
-            {
-                var room = await _context.Rooms.FindAsync(new object[] { state.SelectedRoomId!.Value }, cancellationToken);
-                if (room == null)
-                {
-                    return new BookingDecision { Action = "reply", State = state, Reason = "Phòng không tồn tại." };
-                }
-
-                using var scope = _scopeFactory.CreateScope();
-                var bookingService = scope.ServiceProvider.GetRequiredService<IBookingCreationService>();
-
-                var createRequest = new CreateBookingRequest
-                {
-                    RoomId = room.Id,
-                    BookingMode = state.BookingMode == "daily" ? BookingMode.Daily : BookingMode.Hourly,
-                    SlotInventoryId = state.SelectedSlotId,
-                    CheckInDate = state.CheckInDate,
-                    CheckOutDate = state.CheckOutDate,
-                    CustomerName = state.CustomerName ?? "Khách từ AI Chat",
-                    CustomerPhone = "Chưa cập nhật",
-                    GuestCount = state.GuestCount
-                };
-
-                var booking = state.BookingMode == "daily"
-                    ? await bookingService.CreateDailyBookingAsync(createRequest)
-                    : await bookingService.CreateHourlyBookingAsync(createRequest);
-
-                state.BookingId = booking.Id;
-                state.PaymentStatus = booking.PaymentStatus;
-
-                return new BookingDecision
-                {
-                    Action = "auto_book",
-                    State = state,
-                    Reason = "Booking đã được tạo thành công.",
-                    UiBlocks = new List<AIUiBlock>
-                    {
-                        new()
-                        {
-                            Type = "paymentQr",
-                            Data = new AIPaymentBlock
-                            {
-                                BookingId = booking.Id,
-                                PaymentStatus = booking.PaymentStatus,
-                                Amount = booking.TotalPrice,
-                                PaymentUrl = $"/Bookings/Success/{booking.Id}",
-                                SuccessUrl = $"/Bookings/Success/{booking.Id}",
-                                Instructions = "Bạn qua trang thanh toán để hoàn tất đặt phòng."
-                            }
-                        }
-                    }
-                };
-            }
-            catch (Exception ex)
-            {
-                return new BookingDecision { Action = "reply", State = state, Reason = $"Lỗi tạo booking: {ex.Message}" };
-            }
-        }
 
         private void AppendPromptSection(StringBuilder builder, string title, string content)
         {

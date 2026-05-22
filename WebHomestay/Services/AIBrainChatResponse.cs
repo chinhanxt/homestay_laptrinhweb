@@ -11,7 +11,7 @@ namespace WebHomestay.Services
         public string FormSchema { get; set; } = "[]";
 
         public string BookingAction { get; set; } = "reply";
-        public AIBookingSessionState? BookingState { get; set; }
-        public List<AIUiBlock> UiBlocks { get; set; } = new();
+        public object? BookingState { get; set; }
+        public List<object> UiBlocks { get; set; } = new();
     }
 }
