@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
@@ -26,6 +27,30 @@ namespace WebHomestay.Controllers
             _maskingService = maskingService;
             _context = context;
             _bookingConductor = bookingConductor;
+        }
+
+        private static BookingActionRequest MapBookingActionRequest(JsonElement raw)
+        {
+            var req = new BookingActionRequest
+            {
+                SessionId = raw.TryGetProperty("sessionId", out var sid) ? sid.GetString() ?? "" : "",
+                Action = raw.TryGetProperty("action", out var act) ? act.GetString() ?? "" : "",
+            };
+
+            if (raw.TryGetProperty("state", out var state) && state.ValueKind == JsonValueKind.Object)
+            {
+                if (state.TryGetProperty("selectedRoomId", out var roomEl) && roomEl.ValueKind == JsonValueKind.Number)
+                    req.RoomId = roomEl.GetInt32();
+                if (state.TryGetProperty("selectedSlotId", out var slotEl) && slotEl.ValueKind == JsonValueKind.Number)
+                    req.SlotId = slotEl.GetInt32();
+            }
+
+            if (raw.TryGetProperty("formSubmission", out var formEl) && formEl.ValueKind == JsonValueKind.Object)
+            {
+                req.FormData = JsonSerializer.Deserialize<Dictionary<string, string>>(formEl.GetRawText());
+            }
+
+            return req;
         }
 
         [HttpPost("chat")]
@@ -84,14 +109,16 @@ namespace WebHomestay.Controllers
         }
 
         [HttpPost("booking-action")]
-        public async Task<IActionResult> BookingAction([FromBody] BookingActionRequest actionRequest, CancellationToken cancellationToken)
+        public async Task<IActionResult> BookingAction([FromBody] JsonElement raw, CancellationToken cancellationToken)
         {
-            if (actionRequest == null || string.IsNullOrWhiteSpace(actionRequest.Action) || string.IsNullOrWhiteSpace(actionRequest.SessionId))
+            var actionRequest = MapBookingActionRequest(raw);
+
+            if (string.IsNullOrWhiteSpace(actionRequest.Action) || string.IsNullOrWhiteSpace(actionRequest.SessionId))
             {
                 return BadRequest(new
                 {
                     answer = "Thao tác không hợp lệ.",
-                    sessionId = actionRequest?.SessionId ?? string.Empty
+                    sessionId = actionRequest.SessionId
                 });
             }
 

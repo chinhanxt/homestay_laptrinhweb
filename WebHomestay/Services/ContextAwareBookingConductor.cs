@@ -217,12 +217,15 @@ public class ContextAwareBookingConductor : IBookingConductor
                     UiBlocks = new List<object> { new { type = "bookingForm" } }
                 };
 
+            case "submit-booking-form":
             case "submit-form":
                 if (actionRequest.FormData != null)
                 {
                     container.Progress.CustomerName = actionRequest.FormData.GetValueOrDefault("customerName");
-                    container.Progress.CustomerPhone = actionRequest.FormData.GetValueOrDefault("customerPhone");
-                    container.Progress.CustomerEmail = actionRequest.FormData.GetValueOrDefault("customerEmail");
+                    container.Progress.CustomerPhone = actionRequest.FormData.GetValueOrDefault("phoneNumber")
+                        ?? actionRequest.FormData.GetValueOrDefault("customerPhone");
+                    container.Progress.CustomerEmail = actionRequest.FormData.GetValueOrDefault("email")
+                        ?? actionRequest.FormData.GetValueOrDefault("customerEmail");
                 }
                 CacheState(actionRequest.SessionId, container);
                 return new BookingActionResult
@@ -258,22 +261,38 @@ public class ContextAwareBookingConductor : IBookingConductor
 
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var slots = await db.RoomSlotInventories
+
+        var room = await db.Rooms
+            .Where(r => r.Id == container.Progress.SelectedRoomId)
+            .Select(r => new { r.Name, r.PricePerHour })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var slotRecords = await db.RoomSlotInventories
             .Where(s => s.RoomId == container.Progress.SelectedRoomId
                         && s.SlotDate == date.Value
                         && s.Status == "Available")
             .OrderBy(s => s.StartTime)
-            .Select(s => new
-            {
-                slotId = s.Id,
-                time = s.StartTime.ToString(@"hh\:mm"),
-                status = s.Status == "Available" ? "available" : "booked"
-            })
             .ToListAsync(cancellationToken);
+
+        var roomName = room?.Name ?? "Phòng";
+        var pricePerHour = room?.PricePerHour ?? 0m;
+        var roomId = container.Progress.SelectedRoomId ?? 0;
+
+        var slotBlocks = slotRecords.Select(s => new
+        {
+            slotId = s.Id,
+            roomId,
+            roomName,
+            label = s.SlotLabel,
+            totalPrice = pricePerHour > 0
+                ? Math.Round((decimal)(s.EndTime - s.StartTime).TotalHours * pricePerHour, 0)
+                : 0m,
+            status = s.Status == "Available" ? "available" : "booked"
+        }).ToList();
 
         return new BookingActionResult
         {
-            Answer = $"Có {slots.Count} khung giờ trống. Bạn chọn giờ nào?",
+            Answer = $"Có {slotBlocks.Count} khung giờ trống. Bạn chọn giờ nào?",
             Action = ConductorAction.ShowSlots,
             State = container,
             UiBlocks = new List<object>
@@ -281,7 +300,7 @@ public class ContextAwareBookingConductor : IBookingConductor
                 new
                 {
                     type = "hourlySlots",
-                    slots = slots.Select(s => new { s.slotId, s.time, s.status }).ToList()
+                    data = new { slots = slotBlocks }
                 }
             }
         };
@@ -331,24 +350,27 @@ public class ContextAwareBookingConductor : IBookingConductor
             })
             .ToListAsync(cancellationToken);
 
-        return rooms.Select(r => (object)new
+        return new List<object>
         {
-            type = "roomCards",
-            rooms = new[]
+            new
             {
-                new
+                type = "roomCards",
+                data = new
                 {
-                    roomId = r.Id,
-                    name = r.Name,
-                    description = r.Description,
-                    pricePerHour = r.PricePerHour,
-                    pricePerDay = r.PricePerDay,
-                    capacity = r.Capacity,
-                    maxGuests = r.MaxGuests,
-                    imageUrl = r.ImageUrl,
-                    amenities = r.Amenities
+                    rooms = rooms.Select(r => new
+                    {
+                        roomId = r.Id,
+                        name = r.Name,
+                        description = r.Description,
+                        pricePerHour = r.PricePerHour,
+                        pricePerDay = r.PricePerDay,
+                        capacity = r.Capacity,
+                        maxGuests = r.MaxGuests,
+                        imageUrl = r.ImageUrl,
+                        amenities = r.Amenities
+                    }).ToList()
                 }
             }
-        }).ToList();
+        };
     }
 }
