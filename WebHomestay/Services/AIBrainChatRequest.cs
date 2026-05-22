@@ -1,5 +1,11 @@
 namespace WebHomestay.Services
 {
+    public enum ChatMode
+    {
+        AdminAssistant,
+        PublicBooking
+    }
+
     public class AIBrainChatRequest
     {
         public string SessionId { get; set; } = string.Empty;
@@ -8,5 +14,6 @@ namespace WebHomestay.Services
         public DateTime? StartTime { get; set; }
         public DateTime? EndTime { get; set; }
         public int GuestCount { get; set; } = 1;
+        public ChatMode Mode { get; set; } = ChatMode.AdminAssistant;
     }
 }
