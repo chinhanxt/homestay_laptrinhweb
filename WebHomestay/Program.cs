@@ -56,6 +56,8 @@ builder.Services.AddSession(options =>
     options.Cookie.Name = ".WebHomestay.Session";
 });
 
+builder.Services.AddSignalR();
+
 var app = builder.Build();
 
 // Auto-migrate database on startup
@@ -98,5 +100,7 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
+
+app.MapHub<WebHomestay.Hubs.ChatHub>("/chatHub");
 
 app.Run();
