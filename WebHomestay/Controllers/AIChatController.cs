@@ -12,17 +12,20 @@ namespace WebHomestay.Controllers
         private readonly IWebHostEnvironment _environment;
         private readonly IImageMaskingService _maskingService;
         private readonly ApplicationDbContext _context;
+        private readonly IBookingConductor _bookingConductor;
 
         public AIChatController(
             IAIBrainOrchestrator orchestrator,
             IWebHostEnvironment environment,
             IImageMaskingService maskingService,
-            ApplicationDbContext context)
+            ApplicationDbContext context,
+            IBookingConductor bookingConductor)
         {
             _orchestrator = orchestrator;
             _environment = environment;
             _maskingService = maskingService;
             _context = context;
+            _bookingConductor = bookingConductor;
         }
 
         [HttpPost("chat")]
@@ -76,6 +79,42 @@ namespace WebHomestay.Controllers
                     currentStep = "error",
                     uiBlocks = Array.Empty<object>(),
                     state = new AIBookingSessionState()
+                });
+            }
+        }
+
+        [HttpPost("booking-action")]
+        public async Task<IActionResult> BookingAction([FromBody] BookingActionRequest actionRequest, CancellationToken cancellationToken)
+        {
+            if (actionRequest == null || string.IsNullOrWhiteSpace(actionRequest.Action) || string.IsNullOrWhiteSpace(actionRequest.SessionId))
+            {
+                return BadRequest(new
+                {
+                    answer = "Thao tác không hợp lệ.",
+                    sessionId = actionRequest?.SessionId ?? string.Empty
+                });
+            }
+
+            try
+            {
+                var result = await _bookingConductor.HandleActionAsync(actionRequest, cancellationToken);
+
+                return Ok(new
+                {
+                    answer = result.Answer,
+                    sessionId = actionRequest.SessionId,
+                    currentStep = result.Action.ToString(),
+                    uiBlocks = result.UiBlocks,
+                    state = result.State
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(503, new
+                {
+                    answer = "Xin lỗi, thao tác đặt phòng đang tạm thời bận. Bạn thử lại sau nhé.",
+                    sessionId = actionRequest.SessionId,
+                    currentStep = "error"
                 });
             }
         }
