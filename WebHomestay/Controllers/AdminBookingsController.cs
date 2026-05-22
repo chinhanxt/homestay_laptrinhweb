@@ -187,6 +187,8 @@ namespace WebHomestay.Controllers
             if (id == null) return NotFound();
             var booking = await _context.Bookings.Include(b => b.Room).FirstOrDefaultAsync(m => m.Id == id);
             if (booking == null) return NotFound();
+
+            ViewBag.CheckoutMode = await _settingService.GetStringAsync("CheckoutMode", "Auto");
             return View(booking);
         }
 
@@ -299,7 +301,7 @@ namespace WebHomestay.Controllers
             var booking = await _context.Bookings.FindAsync(id);
             if (booking == null) return NotFound();
 
-            if (booking.Status == "Confirmed")
+            if (booking.Status == "Confirmed" || booking.Status == "CheckedIn")
             {
                 booking.Status = "CheckedOut";
                 await _context.SaveChangesAsync();

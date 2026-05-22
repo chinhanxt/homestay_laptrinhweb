@@ -143,7 +143,7 @@
                                             </button>
                                         }
                                         
-                                        @if (ViewBag.CheckoutMode == "Manual" && item.Status == "Confirmed")
+                                        @if (ViewBag.CheckoutMode == "Manual" && (item.Status == "Confirmed" || item.Status == "CheckedIn"))
                                         {
                                             bool canCheckout = item.EndTime <= DateTime.UtcNow;
                                             <form asp-action="Checkout" method="post" class="d-inline">
