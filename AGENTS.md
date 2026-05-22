@@ -53,6 +53,7 @@ Before making changes, read **MANDATORY_CONTEXT.md** and **docs/yeucau/TONG_QUAN
 - All configurable rules stored in `SystemSettings` with `GroupName == "AI"`:
   - `AIFinalSynthesizerStyle`, `AIFinalSynthesizerFormSchema`, `AIFinalConditionOptions`
   - `AIFinalBasePrompt`, `AIFinalLanguageRule`, `AIFinalDataTruthRule`, etc.
+  - `AIPublicBookingPrompt`, `AIPublicBookingTriggerWords`, `AIPublicBookingMaxTokens`, `AIPublicBookingTimeout`
 - Every request saves an `AIConversationTrace` with full agent outputs for debugging.
 - Default model: `llama-3.3-70b-versatile` via Groq API.
 - AI tables in DB: `ai_knowledge_collections`, `ai_knowledge_articles`, `ai_brain_scopes`, `ai_knowledge_units`, `ai_graph_nodes`, `ai_graph_edges`, `ai_agent_definitions`, `ai_conversation_traces`.
