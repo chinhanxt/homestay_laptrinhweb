@@ -670,6 +670,8 @@ namespace WebHomestay.Services
         {
             if (request.BranchId.HasValue) state.BranchId = request.BranchId;
             if (request.StartTime.HasValue) state.HourlyDate = DateOnly.FromDateTime(request.StartTime.Value);
+            if (request.StartTime.HasValue) state.CheckInDate = DateOnly.FromDateTime(request.StartTime.Value);
+            if (request.EndTime.HasValue) state.CheckOutDate = DateOnly.FromDateTime(request.EndTime.Value);
             if (request.GuestCount > 0) state.GuestCount = request.GuestCount;
             return state;
         }
