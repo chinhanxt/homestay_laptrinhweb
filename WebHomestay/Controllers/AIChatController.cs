@@ -1,7 +1,9 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
+using WebHomestay.Hubs;
 using WebHomestay.Services;
 
 namespace WebHomestay.Controllers
@@ -14,19 +16,25 @@ namespace WebHomestay.Controllers
         private readonly IImageMaskingService _maskingService;
         private readonly ApplicationDbContext _context;
         private readonly IBookingConductor _bookingConductor;
+        private readonly IAdminChatService _adminChatService;
+        private readonly IHubContext<Hubs.ChatHub> _hubContext;
 
         public AIChatController(
             IAIBrainOrchestrator orchestrator,
             IWebHostEnvironment environment,
             IImageMaskingService maskingService,
             ApplicationDbContext context,
-            IBookingConductor bookingConductor)
+            IBookingConductor bookingConductor,
+            IAdminChatService adminChatService,
+            IHubContext<Hubs.ChatHub> hubContext)
         {
             _orchestrator = orchestrator;
             _environment = environment;
             _maskingService = maskingService;
             _context = context;
             _bookingConductor = bookingConductor;
+            _adminChatService = adminChatService;
+            _hubContext = hubContext;
         }
 
         private static BookingActionRequest MapBookingActionRequest(JsonElement raw)
@@ -43,6 +51,14 @@ namespace WebHomestay.Controllers
                     req.RoomId = roomEl.GetInt32();
                 if (state.TryGetProperty("selectedSlotId", out var slotEl) && slotEl.ValueKind == JsonValueKind.Number)
                     req.SlotId = slotEl.GetInt32();
+                if (state.TryGetProperty("bookingMode", out var modeEl) && modeEl.ValueKind == JsonValueKind.String)
+                    req.BookingMode = modeEl.GetString();
+                if (state.TryGetProperty("checkInDate", out var ciEl) && ciEl.ValueKind == JsonValueKind.String)
+                    req.CheckInDate = ciEl.GetString();
+                if (state.TryGetProperty("checkOutDate", out var coEl) && coEl.ValueKind == JsonValueKind.String)
+                    req.CheckOutDate = coEl.GetString();
+                if (state.TryGetProperty("hourlyDate", out var hdEl) && hdEl.ValueKind == JsonValueKind.String)
+                    req.HourlyDate = hdEl.GetString();
             }
 
             if (raw.TryGetProperty("formSubmission", out var formEl) && formEl.ValueKind == JsonValueKind.Object)
@@ -77,6 +93,50 @@ namespace WebHomestay.Controllers
 
             try
             {
+                // Upsert session + update activity
+                var session = await _adminChatService.UpsertSessionAsync(
+                    request.SessionId, request.CustomerName);
+
+                // Check if paused
+                if (session.Status == "paused")
+                {
+                    await _adminChatService.AddSystemAutoReplyAsync(request.SessionId);
+
+                    var msg = await _context.AdminChatMessages
+                        .Where(m => m.SessionId == request.SessionId)
+                        .OrderByDescending(m => m.CreatedAt)
+                        .FirstAsync(cancellationToken);
+
+                    await _hubContext.Clients.Group($"user_{request.SessionId}")
+                        .SendAsync("newMessage", new
+                        {
+                            role = "system",
+                            content = msg.Content,
+                            createdAt = msg.CreatedAt
+                        }, cancellationToken);
+
+                    await _hubContext.Clients.Group("admin_monitor")
+                        .SendAsync("sessionUpdate", new
+                        {
+                            sessionId = request.SessionId,
+                            status = "paused",
+                            lastMessage = msg.Content,
+                            lastActivityAt = DateTime.Now
+                        }, cancellationToken);
+
+                    return Ok(new
+                    {
+                        answer = msg.Content,
+                        message = msg.Content,
+                        sessionId = request.SessionId,
+                        currentStep = "paused",
+                        isPaused = true,
+                        uiBlocks = Array.Empty<object>(),
+                        state = new AIBookingSessionState()
+                    });
+                }
+
+                // Normal AI flow
                 var brainRequest = new AIBrainChatRequest
                 {
                     SessionId = request.SessionId,
@@ -89,6 +149,16 @@ namespace WebHomestay.Controllers
                 };
 
                 var brainResponse = await _orchestrator.ChatAsync(brainRequest, cancellationToken);
+
+                // Broadcast session update to admin monitor
+                await _hubContext.Clients.Group("admin_monitor")
+                    .SendAsync("sessionUpdate", new
+                    {
+                        sessionId = request.SessionId,
+                        status = session.Status,
+                        lastMessage = brainResponse.Answer,
+                        lastActivityAt = DateTime.Now
+                    }, cancellationToken);
 
                 return Ok(new
                 {
