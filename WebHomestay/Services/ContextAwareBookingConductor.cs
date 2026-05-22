@@ -283,10 +283,12 @@ public class ContextAwareBookingConductor : IBookingConductor
             .Select(r => new { r.Name, r.PricePerHour })
             .FirstOrDefaultAsync(cancellationToken);
 
+        var now = DateTime.Now;
         var slotRecords = await db.RoomSlotInventories
             .Where(s => s.RoomId == container.Progress.SelectedRoomId
                         && s.SlotDate == date.Value
-                        && s.Status == "Available")
+                        && s.Status == "Available"
+                        && s.StartTime > now)
             .OrderBy(s => s.StartTime)
             .ToListAsync(cancellationToken);
 
