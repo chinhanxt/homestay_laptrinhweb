@@ -61,7 +61,7 @@ namespace WebHomestay.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        [AdminAuthorize(Permission = "settings.update")]
+        [AdminAuthorize(Permission = "branch.settings")]
         [HttpPost("update-branch")]
         public async Task<IActionResult> UpdateBranch(int branchId, int leadTime)
         {
@@ -75,7 +75,7 @@ namespace WebHomestay.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        [AdminAuthorize(Permission = "settings.update")]
+        [AdminAuthorize(Permission = "payment.settings")]
         [HttpPost("payment-qr")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdatePaymentQr(WebHomestay.Models.ViewModels.PaymentQrSettingsViewModel model, IFormFile? qrImage)
