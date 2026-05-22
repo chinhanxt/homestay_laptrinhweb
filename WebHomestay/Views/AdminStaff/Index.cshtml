@@ -73,9 +73,6 @@
                             <a asp-action="Edit" asp-route-id="@item.Id" class="btn-premium-outline flex-grow-1 justify-content-center py-2" style="font-size: 0.75rem;">
                                 <i class="fas fa-edit"></i> Chỉnh sửa
                             </a>
-                            <a asp-action="Permissions" asp-route-id="@item.Id" class="admin-btn-icon bg-light" title="Phân quyền">
-                                <i class="fas fa-key"></i>
-                            </a>
                         }
                         @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.delete"))
                         {

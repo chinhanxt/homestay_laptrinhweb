@@ -139,39 +139,6 @@ namespace WebHomestay.Controllers
         }
 
         [AdminAuthorize(Permission = "staff.edit")]
-        [HttpGet("permissions/{id}")]
-        public async Task<IActionResult> Permissions(int? id)
-        {
-            if (id == null) return NotFound();
-            var user = await _context.AdminUsers.FindAsync(id);
-            if (user == null) return NotFound();
-            
-            ViewBag.Branches = await _context.Branches.OrderBy(b => b.Name).ToListAsync();
-            return View(user);
-        }
-
-        [AdminAuthorize(Permission = "staff.edit")]
-        [HttpPost("permissions/{id}")]
-        public async Task<IActionResult> Permissions(int id, List<string> selectedPermissions, int? branchId)
-        {
-            var user = await _context.AdminUsers.FindAsync(id);
-            if (user == null) return NotFound();
-
-            // Cập nhật quyền hạn
-            var permDict = new Dictionary<string, bool>();
-            foreach (var p in selectedPermissions) permDict[p] = true;
-            user.Permissions = permDict;
-
-            // Cập nhật chi nhánh công tác
-            user.BranchId = branchId;
-
-            await _context.SaveChangesAsync();
-
-            await LogAction("Cập nhật quyền & Chi nhánh", $"Tài khoản: {user.Username}, Chi nhánh ID: {branchId}");
-            return RedirectToAction(nameof(Index));
-        }
-
-        [AdminAuthorize(Permission = "staff.edit")]
         [HttpGet("permission-matrix")]
         public async Task<IActionResult> PermissionMatrix()
         {
