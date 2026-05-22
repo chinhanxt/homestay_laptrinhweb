@@ -88,6 +88,7 @@
         <div id="accountSelector" class="d-flex align-items-center gap-2" style="display:none;">
           <label class="fw-bold small text-muted">Chi nhánh:</label>
           <select id="accountBranchSelect" class="form-select form-select-sm border-0 bg-light rounded-pill px-3" style="width:auto;min-width:180px;">
+            <option value="">Tất cả chi nhánh</option>
             @foreach (var branch in (List<WebHomestay.Models.Branch>)ViewBag.Branches)
             {
               <option value="@branch.Id">@branch.Name</option>
@@ -302,6 +303,28 @@
     for (var i = 0; i < accountSelect.options.length; i++) {
       var opt = accountSelect.options[i];
       opt.style.display = opt.text.toLowerCase().includes(q) ? '' : 'none';
+    }
+    for (var i = 0; i < accountSelect.options.length; i++) {
+      if (accountSelect.options[i].style.display !== 'none') {
+        accountSelect.selectedIndex = i;
+        accountSelect.dispatchEvent(new Event('change'));
+        break;
+      }
+    }
+  });
+
+  var accountBranchSelect = document.getElementById('accountBranchSelect');
+
+  accountBranchSelect.addEventListener('change', function() {
+    var branchId = this.value;
+    accountFilter.value = '';
+    for (var i = 0; i < accountSelect.options.length; i++) {
+      var opt = accountSelect.options[i];
+      if (!branchId || opt.dataset.branchId === branchId) {
+        opt.style.display = '';
+      } else {
+        opt.style.display = 'none';
+      }
     }
     for (var i = 0; i < accountSelect.options.length; i++) {
       if (accountSelect.options[i].style.display !== 'none') {

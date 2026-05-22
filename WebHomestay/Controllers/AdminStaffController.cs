@@ -175,14 +175,29 @@ namespace WebHomestay.Controllers
         [HttpGet("permission-matrix")]
         public async Task<IActionResult> PermissionMatrix()
         {
+            var role = HttpContext.Session.GetString("AdminRole");
+            var branchId = HttpContext.Session.GetInt32("AdminBranchId");
+
             ViewBag.Roles = new List<string> { "Manager", "Staff" };
-            ViewBag.Accounts = await _context.AdminUsers
+
+            var accountsQuery = _context.AdminUsers
                 .Where(u => u.Role != AdminRole.SuperAdmin)
                 .Include(u => u.Branch)
-                .OrderBy(u => u.FullName)
-                .ToListAsync();
+                .AsQueryable();
+            if (role != "SuperAdmin" && branchId.HasValue)
+            {
+                accountsQuery = accountsQuery.Where(u => u.BranchId == branchId.Value);
+            }
+            ViewBag.Accounts = await accountsQuery.OrderBy(u => u.FullName).ToListAsync();
+
+            var branchesQuery = _context.Branches.AsQueryable();
+            if (role != "SuperAdmin" && branchId.HasValue)
+            {
+                branchesQuery = branchesQuery.Where(b => b.Id == branchId.Value);
+            }
+            ViewBag.Branches = await branchesQuery.OrderBy(b => b.Name).ToListAsync();
+
             ViewBag.RoleTemplates = await _context.RolePermissionTemplates.ToListAsync();
-            ViewBag.Branches = await _context.Branches.OrderBy(b => b.Name).ToListAsync();
             return View();
         }
 

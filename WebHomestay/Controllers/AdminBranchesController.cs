@@ -21,7 +21,15 @@ namespace WebHomestay.Controllers
         [AdminAuthorize(Permission = "branches.view")]
         public async Task<IActionResult> Index()
         {
-            return View(await _context.Branches.ToListAsync());
+            var role = HttpContext.Session.GetString("AdminRole");
+            var branchId = HttpContext.Session.GetInt32("AdminBranchId");
+
+            var query = _context.Branches.AsQueryable();
+            if (role != "SuperAdmin" && branchId.HasValue)
+            {
+                query = query.Where(b => b.Id == branchId.Value);
+            }
+            return View(await query.ToListAsync());
         }
 
         // GET: admin/branches/details/5
@@ -35,6 +43,13 @@ namespace WebHomestay.Controllers
                 .Include(b => b.Rooms)
                 .FirstOrDefaultAsync(m => m.Id == id);
             if (branch == null) return NotFound();
+
+            var role = HttpContext.Session.GetString("AdminRole");
+            var userBranchId = HttpContext.Session.GetInt32("AdminBranchId");
+            if (role != "SuperAdmin" && userBranchId.HasValue && branch.Id != userBranchId.Value)
+            {
+                return Forbid();
+            }
 
             return View(branch);
         }
@@ -67,8 +82,16 @@ namespace WebHomestay.Controllers
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null) return NotFound();
+
+            var role = HttpContext.Session.GetString("AdminRole");
+            var userBranchId = HttpContext.Session.GetInt32("AdminBranchId");
+
             var branch = await _context.Branches.FindAsync(id);
             if (branch == null) return NotFound();
+            if (role != "SuperAdmin" && userBranchId.HasValue && branch.Id != userBranchId.Value)
+            {
+                return Forbid();
+            }
             return View(branch);
         }
 
@@ -78,6 +101,14 @@ namespace WebHomestay.Controllers
         public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Address,Hotline,Description")] Branch branch)
         {
             if (id != branch.Id) return NotFound();
+
+            var role = HttpContext.Session.GetString("AdminRole");
+            var userBranchId = HttpContext.Session.GetInt32("AdminBranchId");
+            if (role != "SuperAdmin" && userBranchId.HasValue && branch.Id != userBranchId.Value)
+            {
+                return Forbid();
+            }
+
             if (ModelState.IsValid)
             {
                 try
@@ -100,11 +131,18 @@ namespace WebHomestay.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id)
         {
+            var role = HttpContext.Session.GetString("AdminRole");
+            var userBranchId = HttpContext.Session.GetInt32("AdminBranchId");
+
             var branch = await _context.Branches
                 .Include(b => b.Rooms)
                 .FirstOrDefaultAsync(b => b.Id == id);
 
             if (branch == null) return NotFound();
+            if (role != "SuperAdmin" && userBranchId.HasValue && branch.Id != userBranchId.Value)
+            {
+                return Forbid();
+            }
 
             // Kiểm tra xem chi nhánh có phòng nào không
             if (branch.Rooms != null && branch.Rooms.Any())
