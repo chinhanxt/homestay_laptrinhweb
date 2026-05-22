@@ -182,6 +182,7 @@ namespace WebHomestay.Controllers
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
             ViewBag.RoleTemplates = await _context.RolePermissionTemplates.ToListAsync();
+            ViewBag.Branches = await _context.Branches.OrderBy(b => b.Name).ToListAsync();
             return View();
         }
 

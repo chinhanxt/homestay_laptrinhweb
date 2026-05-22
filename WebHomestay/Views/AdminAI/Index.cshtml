@@ -92,7 +92,6 @@
                                         <button draggable="true" data-booking-field="idCardFront">CCCD mặt trước</button>
                                         <button draggable="true" data-booking-field="idCardBack">CCCD mặt sau</button>
                                         <button draggable="true" data-booking-field="customerNote">Ghi chú</button>
-                                        <button draggable="true" data-booking-field="paymentQr">QR thanh toán</button>
                                     </div>
                                     <div id="booking-form-dropzone" class="form-dropzone">
                                         <div class="empty-state">Kéo trường vào đây để tạo booking form preview.</div>
@@ -142,49 +141,13 @@
                     <option value="idCardFront">CCCD mặt trước</option>
                     <option value="idCardBack">CCCD mặt sau</option>
                     <option value="customerNote">Ghi chú</option>
-                    <option value="paymentQr">QR thanh toán</option>
                 </select>
                 <div class="form-check mb-4">
                     <input id="final-form-field-required" class="form-check-input" type="checkbox" checked />
                     <label class="form-check-label fw-bold" for="final-form-field-required">Bắt buộc nhập</label>
                 </div>
-                <div id="final-payment-qr-settings" class="border rounded-4 p-3 mb-4" style="display:none; background:#f8fafc;">
-                    <div class="small text-uppercase fw-800 text-primary mb-3">Cấu hình QR chuyển khoản</div>
-                    <label class="form-label fw-bold">URL ảnh QR</label>
-                    <input id="final-form-field-qr-url" class="form-control mb-3" placeholder="VD: /uploads/ai-payment/qr.png hoặc https://..." />
-                    <label class="form-label fw-bold">Upload ảnh QR</label>
-                    <div class="input-group mb-3">
-                        <input id="final-form-field-qr-file" type="file" class="form-control" accept="image/*" />
-                        <button type="button" class="btn btn-outline-primary fw-bold" onclick="uploadFinalPaymentQrImage()">Upload</button>
-                    </div>
-                    <label class="form-label fw-bold">Nội dung gửi kèm</label>
-                    <textarea id="final-form-field-payment-message" class="form-control mb-3" rows="3" placeholder="VD: Bạn vui lòng chuyển khoản {{amount}} theo mã QR bên dưới. Mã đơn: {{bookingId}}."></textarea>
-                    <label class="form-label fw-bold">Thời gian đếm ngược</label>
-                    <input id="final-form-field-countdown" class="form-control mb-3" type="number" min="60" max="1800" value="300" />
-                    <label class="form-label fw-bold">Nhãn upload bill</label>
-                    <input id="final-form-field-proof-label" class="form-control mb-3" placeholder="VD: Upload bill thanh toán" />
-                    <label class="form-label fw-bold">Nút gửi bill</label>
-                    <input id="final-form-field-proof-button" class="form-control mb-3" placeholder="VD: Gửi bill thanh toán" />
-                    <label class="form-label fw-bold">Thông báo sau khi gửi bill</label>
-                    <textarea id="final-form-field-success-message" class="form-control" rows="2" placeholder="VD: Homestay đã nhận bill, nhân viên sẽ xác nhận trong ít phút."></textarea>
-                </div>
-                <div class="border-top pt-3">
-                    <div class="small text-uppercase fw-800 text-primary mb-3">Điều kiện hiển thị</div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <label class="form-label fw-bold mb-0">Intent khách</label>
-                        <button type="button" class="btn btn-sm btn-light border rounded-pill" onclick="openFinalConditionOptionManager('intent')"><i class="fas fa-gear me-1"></i>Quản lý</button>
-                    </div>
-                    <select id="final-form-field-intent" class="form-select mb-3"></select>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <label class="form-label fw-bold mb-0">Dữ liệu đang thiếu</label>
-                        <button type="button" class="btn btn-sm btn-light border rounded-pill" onclick="openFinalConditionOptionManager('missingData')"><i class="fas fa-gear me-1"></i>Quản lý</button>
-                    </div>
-                    <select id="final-form-field-missing" class="form-select mb-3"></select>
-                    <label class="form-label fw-bold">Từ khóa kích hoạt</label>
-                    <input id="final-form-field-keywords" class="form-control mb-3" placeholder="VD: đặt,chốt,book,giữ phòng" />
-                    <label class="form-label fw-bold">Điều kiện nâng cao</label>
-                    <textarea id="final-form-field-advanced" class="form-control" rows="3" placeholder="VD: Chỉ hỏi số điện thoại khi khách đã muốn giữ phòng hoặc đặt phòng."></textarea>
-                </div>
+                <label class="form-label fw-bold">Mô tả/hướng dẫn dưới field</label>
+                <textarea id="final-form-field-help" class="form-control" rows="3" placeholder="VD: Nhập đúng họ tên người đặt phòng."></textarea>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Hủy</button>

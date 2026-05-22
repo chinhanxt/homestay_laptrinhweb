@@ -5,7 +5,8 @@
     var branches = ViewBag.Branches as List<WebHomestay.Models.Branch> ?? new List<WebHomestay.Models.Branch>();
     var holidays = ViewBag.Holidays as List<WebHomestay.Models.Holiday> ?? new List<WebHomestay.Models.Holiday>();
     var templates = ViewBag.Templates as List<WebHomestay.Models.RoomSlotTemplate> ?? new List<WebHomestay.Models.RoomSlotTemplate>();
-    
+    var paymentQrSettings = ViewBag.PaymentQrSettings as Dictionary<int, WebHomestay.Models.ViewModels.PaymentQrSettingsViewModel> ?? new Dictionary<int, WebHomestay.Models.ViewModels.PaymentQrSettingsViewModel>();
+
     var checkoutMode = Model.FirstOrDefault(s => s.SettingKey == "CheckoutMode")?.SettingValue ?? "Auto";
 }
 
@@ -35,8 +36,8 @@
             <button class="nav-link" id="tab-branch" data-bs-toggle="pill" data-bs-target="#panel-branch" type="button" role="tab">
                 <i class="fas fa-map-marked-alt me-3"></i> <span>Cấu hình Chi nhánh</span>
             </button>
-            <button class="nav-link" id="tab-ai" data-bs-toggle="pill" data-bs-target="#panel-ai" type="button" role="tab">
-                <i class="fas fa-robot me-3"></i> <span>AI Tư vấn đặt phòng</span>
+            <button class="nav-link" id="tab-payment-qr" data-bs-toggle="pill" data-bs-target="#panel-payment-qr" type="button" role="tab">
+                <i class="fas fa-qrcode me-3"></i> <span>Cấu hình mã QR</span>
             </button>
         </div>
         
@@ -53,6 +54,14 @@
                 <div class="lux-toast is-success">
                     <div class="lux-toast-accent"></div>
                     <div class="lux-toast-content">@TempData["SuccessMessage"]</div>
+                </div>
+            </div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="lux-toast-container show" id="temp-toast-error">
+                <div class="lux-toast" style="border-left: 4px solid #ef4444;">
+                    <div class="lux-toast-content">@TempData["ErrorMessage"]</div>
                 </div>
             </div>
         }
@@ -152,7 +161,8 @@
                                                                 onclick="openEditTemplateModal(@t.Id, '@t.Name', '@t.Code', @t.DurationMinutes, @t.CleanupMinutes, '@t.SeedStartTime', @(t.IsActive.ToString().ToLower()))">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
-                                                        <form action="/admin/slots/delete-template/@t.Id" method="post" class="d-inline" onsubmit="return confirm('Xóa mẫu này?')">
+                                                        <form action="/AdminSlots/DeleteTemplate" method="post" class="d-inline" onsubmit="return confirm('Xóa mẫu này?')">
+    <input type="hidden" name="id" value="@t.Id" />
                                                             <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent"><i class="fas fa-trash"></i></button>
                                                         </form>
                                                     </div>
@@ -331,96 +341,133 @@
                 </div>
             </div>
 
-            <!-- PANEL: AI TEST CHATBOT -->
-            <div class="tab-pane fade" id="panel-ai" role="tabpanel">
-                <div class="ai-test-page">
-                    <div class="ai-test-hero">
-                        <div>
-                            <div class="small text-uppercase fw-800 text-primary mb-2">AI Chatbot Connection Test</div>
-                            <h2 class="fw-800 tracking-tighter">Kiểm thử chatbot trước khi đưa ra cho khách</h2>
-                            <p class="text-muted mb-0">Trang này chỉ dùng để test kết nối, dữ liệu live, provider và chất lượng phản hồi. Việc cấu hình Knowledge/Graph/Agents nằm ở trang AI Brain Center riêng.</p>
-                        </div>
-                        <a class="btn btn-dark rounded-pill px-4 fw-bold" asp-controller="AdminAI" asp-action="Index">
-                            <i class="fas fa-brain me-2"></i>Mở AI Brain Center
-                        </a>
-                    </div>
+            <!-- PANEL: CẤU HÌNH MÃ QR -->
+            <div class="tab-pane fade" id="panel-payment-qr" role="tabpanel">
+                <div class="panel-header">
+                    <h2>Cấu hình mã QR</h2>
+                    <p>Thiết lập mã QR thanh toán, nội dung chuyển khoản và thông báo bill riêng cho từng chi nhánh.</p>
+                </div>
 
-                    <div class="ai-test-grid">
-                        <div class="ai-test-card ai-test-chat-card">
-                            <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
-                                <div>
-                                    <div class="small text-uppercase fw-800 text-primary mb-1">Test Console</div>
-                                    <h3 class="fw-800 mb-1">Gửi câu hỏi như khách thật</h3>
-                                    <p class="text-muted mb-0">Kiểm tra chatbot có hỏi lại đúng, tư vấn đúng phòng và không tự xác nhận booking.</p>
-                                </div>
-                                <span class="badge rounded-pill text-bg-light border px-3 py-2" id="ai-brain-provider-badge">Provider: groq</span>
-                            </div>
+                <div class="qr-branch-list">
+                    @foreach (var branch in branches)
+                    {
+                        var qr = paymentQrSettings.ContainsKey(branch.Id)
+                            ? paymentQrSettings[branch.Id]
+                            : new WebHomestay.Models.ViewModels.PaymentQrSettingsViewModel { BranchId = branch.Id, BranchName = branch.Name };
+                        var previewSrc = !string.IsNullOrWhiteSpace(qr.QrImagePath) ? qr.QrImagePath : qr.QrImageUrl;
+                        var hasBankInfo = !string.IsNullOrWhiteSpace(qr.BankCode) && !string.IsNullOrWhiteSpace(qr.BankAccountNumber);
 
-                            <div class="row g-3 mb-3">
-                                <div class="col-md-3">
-                                    <label class="form-label small fw-bold text-muted">Chi nhánh</label>
-                                    <select id="ai-brain-branch" class="form-select premium-input">
-                                        <option value="">Chưa chọn</option>
-                                        @foreach (var branch in branches)
+                        <div class="qr-branch-card">
+                            <div class="qr-branch-header" onclick="toggleQrBranch(this)">
+                                <div class="qr-branch-info">
+                                    <div class="qr-branch-name">
+                                        <i class="fas fa-qrcode"></i>
+                                        @branch.Name
+                                    </div>
+                                    <div class="qr-branch-meta">
+                                        @if (hasBankInfo)
                                         {
-                                            <option value="@branch.Id">@branch.Name</option>
+                                            <span><i class="fas fa-university"></i> @qr.BankCode - @qr.BankAccountNumber</span>
                                         }
-                                    </select>
+                                        else
+                                        {
+                                            <span class="text-muted">Chưa cấu hình ngân hàng</span>
+                                        }
+                                        <span class="qr-countdown-badge"><i class="far fa-clock"></i> @qr.CountdownMinutes phút</span>
+                                    </div>
                                 </div>
-                                <div class="col-md-3">
-                                    <label class="form-label small fw-bold text-muted">Bắt đầu</label>
-                                    <input type="datetime-local" id="ai-brain-start" class="form-control premium-input">
+                                <div class="qr-branch-preview">
+                                    @if (!string.IsNullOrWhiteSpace(previewSrc))
+                                    {
+                                        <img src="@previewSrc" alt="QR @branch.Name" />
+                                    }
+                                    else
+                                    {
+                                        <div class="qr-preview-empty">
+                                            <i class="fas fa-qrcode"></i>
+                                        </div>
+                                    }
                                 </div>
-                                <div class="col-md-3">
-                                    <label class="form-label small fw-bold text-muted">Kết thúc</label>
-                                    <input type="datetime-local" id="ai-brain-end" class="form-control premium-input">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label small fw-bold text-muted">Số khách</label>
-                                    <input type="number" id="ai-brain-guests" class="form-control premium-input" min="1" value="1">
+                                <div class="qr-branch-toggle">
+                                    <i class="fas fa-chevron-down qr-toggle-icon"></i>
                                 </div>
                             </div>
 
-                            <div class="input-group mb-3">
-                                <input type="text" id="ai-brain-message" class="form-control premium-input" placeholder="Ví dụ: Tư vấn phòng cho 2 người tối nay, ưu tiên giá tốt">
-                                <button type="button" id="ai-brain-send-btn" class="btn btn-dark px-4 fw-bold" onclick="sendBrainConsoleMessage()">
-                                    <i class="fas fa-paper-plane me-2"></i>Gửi test
-                                </button>
-                            </div>
+                            <div class="qr-branch-body">
+                                <form asp-action="UpdatePaymentQr" method="post" enctype="multipart/form-data" class="row g-4">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="BranchId" value="@branch.Id" />
+                                    <input type="hidden" name="BranchName" value="@branch.Name" />
 
-                            <div class="ai-brain-result" id="ai-brain-result">
-                                <div class="text-muted small">Chưa có phiên kiểm thử. Kết quả chatbot sẽ hiển thị ở đây.</div>
+                                    <div class="col-lg-4">
+                                        <div class="bg-white border rounded-4 p-3 text-center h-100">
+                                            @if (!string.IsNullOrWhiteSpace(previewSrc))
+                                            {
+                                                <img src="@previewSrc" alt="QR @branch.Name" class="img-fluid mb-3" style="max-height: 220px;" />
+                                            }
+                                            else
+                                            {
+                                                <div class="text-muted small py-5 border rounded-4 bg-light">Chưa có ảnh QR. Nếu nhập ngân hàng và số tài khoản, trang thanh toán sẽ tự tạo VietQR.</div>
+                                            }
+                                            <label class="form-label small fw-bold text-muted mt-3">Upload ảnh QR</label>
+                                            <input type="file" name="qrImage" class="form-control premium-input" accept="image/*" />
+                                            @if (!string.IsNullOrWhiteSpace(qr.QrImagePath))
+                                            {
+                                                <div class="small text-muted mt-2">Ảnh hiện tại: @qr.QrImagePath</div>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    <div class="col-lg-8">
+                                        <div class="row g-3">
+                                            <div class="col-12">
+                                                <label class="form-label small fw-bold text-muted">URL ảnh QR thủ công</label>
+                                                <input type="url" name="QrImageUrl" value="@qr.QrImageUrl" class="form-control premium-input" placeholder="https://..." />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Mã ngân hàng</label>
+                                                <input type="text" name="BankCode" value="@qr.BankCode" class="form-control premium-input" placeholder="MB, VCB..." />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Số tài khoản</label>
+                                                <input type="text" name="BankAccountNumber" value="@qr.BankAccountNumber" class="form-control premium-input" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Chủ tài khoản</label>
+                                                <input type="text" name="BankAccountName" value="@qr.BankAccountName" class="form-control premium-input" />
+                                            </div>
+                                            <div class="col-md-8">
+                                                <label class="form-label small fw-bold text-muted">Mẫu nội dung chuyển khoản</label>
+                                                <input type="text" name="TransferContentTemplate" value="@qr.TransferContentTemplate" class="form-control premium-input" />
+                                                <div class="form-text">Hỗ trợ: {BookingId}, {BranchName}</div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Thời gian đếm ngược (phút)</label>
+                                                <input type="number" name="CountdownMinutes" value="@qr.CountdownMinutes" min="1" class="form-control premium-input" />
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label small fw-bold text-muted">Thông báo trước khi gửi bill</label>
+                                                <textarea name="BeforeBillMessage" rows="2" class="form-control premium-input">@qr.BeforeBillMessage</textarea>
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label small fw-bold text-muted">Thông báo sau khi gửi bill</label>
+                                                <textarea name="AfterBillMessage" rows="2" class="form-control premium-input">@qr.AfterBillMessage</textarea>
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label small fw-bold text-muted">Thông báo khi hết thời gian</label>
+                                                <textarea name="ExpiredMessage" rows="2" class="form-control premium-input">@qr.ExpiredMessage</textarea>
+                                            </div>
+                                            <div class="col-12 text-end">
+                                                <button type="submit" class="btn-premium rounded-pill px-4">
+                                                    <i class="fas fa-save me-2"></i>Lưu cấu hình QR
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </form>
                             </div>
                         </div>
-
-                        <div class="ai-test-card">
-                            <div class="small text-uppercase fw-800 text-primary mb-2">Checklist trước khi public</div>
-                            <ul class="ai-test-checklist">
-                                <li><i class="fas fa-circle-check"></i><span>Provider hoạt động: Groq/OpenRouter.</span></li>
-                                <li><i class="fas fa-circle-check"></i><span>Chatbot lấy đúng live room/availability.</span></li>
-                                <li><i class="fas fa-circle-check"></i><span>Không tự xác nhận đặt phòng.</span></li>
-                                <li><i class="fas fa-circle-check"></i><span>Thiếu dữ liệu thì hỏi lại khách.</span></li>
-                                <li><i class="fas fa-circle-check"></i><span>Câu trả lời dễ hiểu, đúng giọng tư vấn.</span></li>
-                            </ul>
-                            <button class="btn btn-outline-dark rounded-pill fw-bold w-100 mt-3" onclick="loadBrainTraces()">
-                                <i class="fas fa-clock-rotate-left me-2"></i>Xem trace test gần nhất
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="ai-brain-traces mt-4" id="ai-brain-traces" style="display:none;">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div>
-                                <div class="small text-uppercase fw-800 text-primary mb-1">Test Trace</div>
-                                <h4 class="fw-800 mb-0">Lịch sử test chatbot gần nhất</h4>
-                            </div>
-                            <button class="btn btn-sm btn-light border rounded-pill px-3" onclick="$('#ai-brain-traces').hide()">Ẩn</button>
-                        </div>
-                        <div class="row g-3">
-                            <div class="col-lg-4"><div id="ai-brain-trace-list" class="ai-brain-trace-list"></div></div>
-                            <div class="col-lg-8"><div id="ai-brain-trace-detail" class="ai-brain-trace-detail text-muted">Chọn một trace để xem dữ liệu chatbot đã dùng.</div></div>
-                        </div>
-                    </div>
+                    }
                 </div>
             </div>
         </div>
@@ -511,54 +558,102 @@
 <div class="modal fade" id="createTemplateModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content premium-modal">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold">Thêm Mẫu khung giờ</h5>
+            <div class="modal-header border-0 pb-0 px-4 pt-4">
+                <div>
+                    <h5 class="modal-title fw-bold mb-1">Tạo Mẫu khung giờ</h5>
+                    <p class="small text-muted mb-0">Định nghĩa khung thời gian cho phiên đặt phòng</p>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form action="/admin/slots/CreateTemplate" method="post">
+            <form action="/AdminSlots/CreateTemplate" method="post">
                 @Html.AntiForgeryToken()
-                <div class="modal-body py-4">
+                <div class="modal-body px-4 py-4">
 
-                    <div class="admin-form-group mb-3">
-                        <label class="admin-form-label">Tên hiển thị (VD: Combo 4h Trưa)</label>
-                        <input name="Name" class="admin-form-input" placeholder="Nhập tên mẫu..." required />
-                    </div>
-
-                    <div class="admin-form-group mb-3">
-                        <label class="admin-form-label">Mã định danh (Duy nhất)</label>
-                        <input name="Code" class="admin-form-input" placeholder="VD: 4H_NOON" required />
-                    </div>
-
+                    <!-- Row: Name + Code -->
                     <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <div class="admin-form-group">
-                                <label class="admin-form-label">Thời lượng (phút)</label>
-                                <input name="DurationMinutes" type="number" class="admin-form-input" value="120" required />
+                        <div class="col-md-7">
+                            <div class="form-field-card">
+                                <label class="admin-form-label"><i class="fas fa-tag me-1" style="opacity:0.5"></i> Tên hiển thị</label>
+                                <div style="display:flex;align-items:center">
+                                    <input name="Name" class="admin-form-input" placeholder="VD: Combo 4h Trưa" required />
+                                    <span class="input-cursor"></span>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="admin-form-group">
-                                <label class="admin-form-label">Dọn dẹp (phút)</label>
-                                <input name="CleanupMinutes" type="number" class="admin-form-input" value="30" required />
+                        <div class="col-md-5">
+                            <div class="form-field-card">
+                                <label class="admin-form-label"><i class="fas fa-hashtag me-1" style="opacity:0.5"></i> Mã định danh</label>
+                                <div style="display:flex;align-items:center">
+                                    <input name="Code" class="admin-form-input" placeholder="VD: 4H_NOON" required />
+                                    <span class="input-cursor"></span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="admin-form-group mb-3">
-                        <label class="admin-form-label">Thời điểm bắt đầu nhảy slot</label>
-                        <input name="SeedStartTime" type="time" class="admin-form-input" value="09:00" />
-                    </div>
-
-                    <div class="admin-form-group mb-0">
-                        <div class="form-check custom-check">
-                            <input name="IsActive" class="form-check-input" type="checkbox" value="true" checked />
-                            <label class="form-check-label fw-bold small text-primary">Kích hoạt mẫu này để sử dụng</label>
+                    <!-- Duration Hub -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-7">
+                            <div class="form-field-card">
+                                <label class="admin-form-label"><i class="fas fa-clock me-1" style="opacity:0.5"></i> Thời lượng mỗi phiên</label>
+                                <div class="duration-hub">
+                                    <div class="duration-input-area">
+                                        <input name="DurationHours" id="create-duration-hours" type="number" class="admin-form-input" value="2" min="0.5" step="0.5" required />
+                                        <span class="duration-unit">giờ</span>
+                                    </div>
+                                    <span class="duration-equals">→</span>
+                                    <div class="minutes-badge">
+                                        <i class="far fa-clock"></i>
+                                        <span class="minutes-value" id="durationPreview">120</span>
+                                        <span>phút</span>
+                                    </div>
+                                </div>
+                                <input name="DurationMinutes" type="hidden" id="durationMinutesHidden" value="120" />
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="form-field-card">
+                                <label class="admin-form-label"><i class="fas fa-broom me-1" style="opacity:0.5"></i> Dọn dẹp</label>
+                                <div class="duration-hub">
+                                    <div class="duration-input-area" style="flex:0 1 auto;">
+                                        <input name="CleanupMinutes" type="number" class="admin-form-input" value="30" min="0" step="5" required style="font-size:1.2rem !important;width:60px" />
+                                        <span class="duration-unit" style="font-size:0.85rem">phút</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Seed Start Time -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-12">
+                            <div class="form-field-card">
+                                <label class="admin-form-label"><i class="fas fa-play-circle me-1" style="opacity:0.5"></i> Thời điểm bắt đầu nhảy slot</label>
+                                <div class="time-pick-group">
+                                    <input name="SeedStartTime" type="time" class="admin-form-input" value="09:00" style="width:160px" />
+                                    <span class="time-hint"><i class="far fa-lightbulb me-1"></i> Slot đầu tiên trong ngày sẽ bắt đầu từ mốc này</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Toggle -->
+                    <div class="template-toggle-card">
+                        <div class="toggle-label">
+                            <i class="fas fa-power-off"></i>
+                            <span>Kích hoạt mẫu ngay sau khi tạo</span>
+                        </div>
+                        <div class="form-check form-switch mb-0">
+                            <input name="IsActive" class="form-check-input" type="checkbox" role="switch" value="true" checked id="create-is-active" />
+                        </div>
+                    </div>
+
                 </div>
-                <div class="modal-footer border-0 p-4 pt-0">
-                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn-premium rounded-pill px-4">Lưu mẫu cấu hình</button>
+                <div class="modal-footer border-0 px-4 pb-4 pt-2">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal" style="padding:10px 24px;font-weight:600">Hủy</button>
+                    <button type="submit" class="btn-premium rounded-pill px-4" style="padding:10px 28px;font-size:0.9rem">
+                        <i class="fas fa-check-circle me-1"></i> Lưu mẫu
+                    </button>
                 </div>
             </form>
         </div>
@@ -569,59 +664,113 @@
 <div class="modal fade" id="editTemplateModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content premium-modal">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold">Chỉnh sửa Mẫu khung giờ</h5>
+            <div class="modal-header border-0 pb-0 px-4 pt-4">
+                <div>
+                    <h5 class="modal-title fw-bold mb-1">Chỉnh sửa Mẫu khung giờ</h5>
+                    <p class="small text-muted mb-0">Cập nhật cấu hình — thay đổi sẽ đồng bộ tới các phòng đang dùng</p>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form action="/admin/slots/EditTemplate" method="post">
+            <form action="/AdminSlots/EditTemplate" method="post">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="Id" id="edit-id" />
 
-                <div class="modal-body py-4">
-                    <div class="alert alert-warning border-0 small mb-4" style="background: #fffbeb; color: #92400e;">
-                        <i class="fas fa-exclamation-triangle me-2"></i> Lưu ý: Thay đổi sẽ được đồng bộ tới tất cả phòng đang dùng mẫu này.
+                <div class="modal-body px-4 py-4">
+
+                    <!-- Sync warning -->
+                    <div class="d-flex align-items-center gap-3 p-3 mb-3" style="background:#fffbeb;border-radius:12px;border:1px solid #fde68a;">
+                        <i class="fas fa-sync-alt" style="color:#d97706;font-size:1.1rem"></i>
+                        <div>
+                            <div class="fw-semibold small" style="color:#92400e;">Thay đổi sẽ được đồng bộ</div>
+                            <div class="small" style="color:#b45309;">Tới tất cả phòng đang dùng mẫu này ngay khi lưu</div>
+                        </div>
                     </div>
 
-                    <div class="admin-form-group mb-3">
-                        <label class="admin-form-label">Tên hiển thị</label>
-                        <input name="Name" id="edit-name" class="admin-form-input" placeholder="Nhập tên mẫu..." required />
-                    </div>
-
-                    <div class="admin-form-group mb-3">
-                        <label class="admin-form-label">Mã định danh</label>
-                        <input name="Code" id="edit-code" class="admin-form-input" placeholder="VD: 4H_NOON" required />
-                    </div>
-
+                    <!-- Row: Name + Code -->
                     <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <div class="admin-form-group">
-                                <label class="admin-form-label">Thời lượng (phút)</label>
-                                <input name="DurationMinutes" id="edit-duration" type="number" class="admin-form-input" required />
+                        <div class="col-md-7">
+                            <div class="form-field-card">
+                                <label class="admin-form-label"><i class="fas fa-tag me-1" style="opacity:0.5"></i> Tên hiển thị</label>
+                                <div style="display:flex;align-items:center">
+                                    <input name="Name" id="edit-name" class="admin-form-input" placeholder="Nhập tên mẫu..." required />
+                                    <span class="input-cursor"></span>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="admin-form-group">
-                                <label class="admin-form-label">Dọn dẹp (phút)</label>
-                                <input name="CleanupMinutes" id="edit-cleanup" type="number" class="admin-form-input" required />
+                        <div class="col-md-5">
+                            <div class="form-field-card">
+                                <label class="admin-form-label"><i class="fas fa-hashtag me-1" style="opacity:0.5"></i> Mã định danh</label>
+                                <div style="display:flex;align-items:center">
+                                    <input name="Code" id="edit-code" class="admin-form-input" placeholder="VD: 4H_NOON" required />
+                                    <span class="input-cursor"></span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="admin-form-group mb-3">
-                        <label class="admin-form-label">Thời điểm bắt đầu nhảy slot</label>
-                        <input name="SeedStartTime" id="edit-seed" type="time" class="admin-form-input" />
-                    </div>
-
-                    <div class="admin-form-group mb-0">
-                        <div class="form-check custom-check">
-                            <input name="IsActive" id="edit-active" class="form-check-input" type="checkbox" value="true" />
-                            <label class="form-check-label fw-bold small text-primary">Kích hoạt mẫu này</label>
+                    <!-- Duration Hub -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-7">
+                            <div class="form-field-card">
+                                <label class="admin-form-label"><i class="fas fa-clock me-1" style="opacity:0.5"></i> Thời lượng mỗi phiên</label>
+                                <div class="duration-hub">
+                                    <div class="duration-input-area">
+                                        <input name="DurationHours" id="edit-duration-hours" type="number" class="admin-form-input" min="0.5" step="0.5" required />
+                                        <span class="duration-unit">giờ</span>
+                                    </div>
+                                    <span class="duration-equals">→</span>
+                                    <div class="minutes-badge">
+                                        <i class="far fa-clock"></i>
+                                        <span class="minutes-value" id="editDurationPreview">0</span>
+                                        <span>phút</span>
+                                    </div>
+                                </div>
+                                <input name="DurationMinutes" id="edit-duration" type="hidden" />
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="form-field-card">
+                                <label class="admin-form-label"><i class="fas fa-broom me-1" style="opacity:0.5"></i> Dọn dẹp</label>
+                                <div class="duration-hub">
+                                    <div class="duration-input-area" style="flex:0 1 auto;">
+                                        <input name="CleanupMinutes" id="edit-cleanup" type="number" class="admin-form-input" min="0" step="5" required style="font-size:1.2rem !important;width:60px" />
+                                        <span class="duration-unit" style="font-size:0.85rem">phút</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Seed Start Time -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-12">
+                            <div class="form-field-card">
+                                <label class="admin-form-label"><i class="fas fa-play-circle me-1" style="opacity:0.5"></i> Thời điểm bắt đầu nhảy slot</label>
+                                <div class="time-pick-group">
+                                    <input name="SeedStartTime" id="edit-seed" type="time" class="admin-form-input" style="width:160px" />
+                                    <span class="time-hint"><i class="far fa-lightbulb me-1"></i> Slot đầu tiên trong ngày sẽ bắt đầu từ mốc này</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Toggle -->
+                    <div class="template-toggle-card">
+                        <div class="toggle-label">
+                            <i class="fas fa-power-off"></i>
+                            <span>Kích hoạt mẫu</span>
+                        </div>
+                        <div class="form-check form-switch mb-0">
+                            <input name="IsActive" id="edit-active" class="form-check-input" type="checkbox" role="switch" value="true" />
+                        </div>
+                    </div>
+
                 </div>
-                <div class="modal-footer border-0 p-4 pt-0">
-                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn-premium rounded-pill px-4">Cập nhật & Đồng bộ</button>
+                <div class="modal-footer border-0 px-4 pb-4 pt-2">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal" style="padding:10px 24px;font-weight:600">Hủy</button>
+                    <button type="submit" class="btn-premium rounded-pill px-4" style="padding:10px 28px;font-size:0.9rem">
+                        <i class="fas fa-sync-alt me-1"></i> Cập nhật & Đồng bộ
+                    </button>
                 </div>
             </form>
         </div>
@@ -1018,6 +1167,235 @@
     .cursor-pointer { cursor: pointer; }
     .transition-all { transition: all 0.2s; }
 
+    /* === Template Form Premium === */
+    .modal-form-divider {
+        height: 1px;
+        background: linear-gradient(to right, transparent, var(--admin-border), transparent);
+        margin: 20px 0;
+    }
+
+    .form-field-card {
+        background: var(--admin-surface-soft);
+        border: 1px solid var(--admin-border);
+        border-radius: 14px;
+        padding: 14px 18px;
+        transition: all 0.25s ease;
+        position: relative;
+    }
+
+    .form-field-card::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 18px;
+        right: 18px;
+        height: 2px;
+        background: #e2e8f0;
+        border-radius: 0 0 2px 2px;
+        transition: all 0.3s ease;
+        opacity: 0.4;
+    }
+
+    .form-field-card:focus-within {
+        background: white;
+        border-color: var(--admin-primary);
+        box-shadow: 0 0 0 4px var(--admin-primary-soft);
+    }
+
+    .form-field-card:focus-within::after {
+        background: var(--admin-primary);
+        opacity: 1;
+        height: 2.5px;
+    }
+
+    .form-field-card .admin-form-label {
+        margin-bottom: 2px;
+        font-size: 0.65rem;
+        letter-spacing: 0.04em;
+    }
+
+    .form-field-card .admin-form-input {
+        padding: 4px 0;
+        border: none;
+        background: transparent;
+        font-size: 1rem;
+        border-radius: 0;
+        caret-color: var(--admin-primary);
+    }
+
+    .form-field-card .admin-form-input:focus {
+        box-shadow: none;
+    }
+
+    .form-field-card .input-cursor {
+        display: inline-block;
+        width: 1.5em;
+        height: 1.4em;
+        background: #f1f4f9;
+        border-radius: 4px;
+        margin-left: 6px;
+        vertical-align: middle;
+        opacity: 0.5;
+        transition: all 0.2s;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .form-field-card .input-cursor::before {
+        content: '|';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 1rem;
+        font-weight: 300;
+        color: #94a3b8;
+        animation: cursor-blink 1.2s step-end infinite;
+    }
+
+    .form-field-card:focus-within .input-cursor {
+        opacity: 1;
+        background: var(--admin-primary-soft);
+    }
+
+    .form-field-card:focus-within .input-cursor::before {
+        color: var(--admin-primary);
+    }
+
+    @@keyframes cursor-blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+    }
+
+    .duration-hub {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .duration-input-area {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .duration-input-area .admin-form-input {
+        font-size: 1.6rem !important;
+        font-weight: 800 !important;
+        color: var(--admin-primary) !important;
+        width: 80px;
+        text-align: center;
+        padding: 0 !important;
+        -moz-appearance: textfield;
+    }
+
+    .duration-input-area .admin-form-input::-webkit-outer-spin-button,
+    .duration-input-area .admin-form-input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .duration-unit {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--admin-text-soft);
+        letter-spacing: 0.02em;
+    }
+
+    .duration-equals {
+        font-size: 0.85rem;
+        color: var(--admin-text-soft);
+        font-weight: 500;
+    }
+
+    .minutes-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--admin-primary-soft);
+        color: var(--admin-primary);
+        font-weight: 700;
+        font-size: 0.85rem;
+        padding: 6px 16px;
+        border-radius: 100px;
+        white-space: nowrap;
+        transition: all 0.3s ease;
+    }
+
+    .minutes-badge i {
+        font-size: 0.75rem;
+        opacity: 0.6;
+    }
+
+    .minutes-badge .minutes-value {
+        min-width: 2.2em;
+        display: inline-block;
+        text-align: center;
+        transition: all 0.2s ease;
+    }
+
+    .time-pick-group {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .time-pick-group .admin-form-input[type="time"] {
+        width: 140px;
+        font-weight: 600;
+        font-family: monospace;
+        font-size: 1.05rem;
+        letter-spacing: 0.05em;
+    }
+
+    .time-hint {
+        font-size: 0.75rem;
+        color: var(--admin-text-soft);
+        font-weight: 500;
+    }
+
+    .template-toggle-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        background: var(--admin-surface-soft);
+        border: 1px solid var(--admin-border);
+        border-radius: 14px;
+        transition: all 0.25s ease;
+    }
+
+    .template-toggle-card:hover {
+        background: white;
+        border-color: #10b981;
+    }
+
+    .template-toggle-card .toggle-label {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--admin-text);
+    }
+
+    .template-toggle-card .toggle-label i {
+        font-size: 1.1rem;
+        color: var(--admin-gold);
+    }
+
+    .template-toggle-card .form-check-input {
+        width: 3em;
+        height: 1.5em;
+        cursor: pointer;
+    }
+
+    .template-toggle-card .form-check-input:checked {
+        background-color: #10b981;
+        border-color: #10b981;
+    }
+
     /* Calendar Premium */
     .calendar-grid-premium { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
     .cal-header { text-align: center; font-weight: 800; font-size: 0.65rem; color: #94a3b8; padding-bottom: 10px; text-transform: uppercase; }
@@ -1333,17 +1711,63 @@
             arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
         }
 
+        function toggleQrBranch(header) {
+            const body = header.nextElementSibling;
+            const icon = header.querySelector('.qr-toggle-icon');
+            body.classList.toggle('is-open');
+            icon.classList.toggle('is-open');
+        }
+
+        // Hours → minutes conversion helpers
+        function syncDurationPreview(hoursInput, hiddenMinutes, previewEl) {
+            const h = parseFloat(hoursInput.value) || 0;
+            const m = Math.round(h * 60);
+            hiddenMinutes.value = m;
+            previewEl.textContent = m;
+        }
+
+        document.getElementById('create-duration-hours').addEventListener('input', function () {
+            syncDurationPreview(this, document.getElementById('durationMinutesHidden'), document.getElementById('durationPreview'));
+        });
+        const createForm = document.querySelector('#createTemplateModal form');
+        if (createForm) {
+            createForm.addEventListener('submit', function () {
+                syncDurationPreview(
+                    document.getElementById('create-duration-hours'),
+                    document.getElementById('durationMinutesHidden'),
+                    document.getElementById('durationPreview')
+                );
+            });
+        }
+
         // Time Template Helper
         function openEditTemplateModal(id, name, code, duration, cleanup, seed, isActive) {
             document.getElementById('edit-id').value = id;
             document.getElementById('edit-name').value = name;
             document.getElementById('edit-code').value = code;
+            const hours = duration / 60;
+            document.getElementById('edit-duration-hours').value = hours;
             document.getElementById('edit-duration').value = duration;
+            document.getElementById('editDurationPreview').textContent = duration;
             document.getElementById('edit-cleanup').value = cleanup;
             document.getElementById('edit-seed').value = seed;
             document.getElementById('edit-active').checked = isActive;
             
             new bootstrap.Modal(document.getElementById('editTemplateModal')).show();
+        }
+
+        document.getElementById('edit-duration-hours').addEventListener('input', function () {
+            syncDurationPreview(this, document.getElementById('edit-duration'), document.getElementById('editDurationPreview'));
+        });
+        const editForm = document.querySelector('#editTemplateModal form');
+        if (editForm) {
+            editForm.addEventListener('submit', function () {
+                syncDurationPreview(
+                    document.getElementById('edit-duration-hours'),
+                    document.getElementById('edit-duration'),
+                    document.getElementById('editDurationPreview')
+                );
+            });
         }
 
         // Handle tab selection from URL
@@ -1356,7 +1780,7 @@
                     'time': 'tab-time',
                     'holiday': 'tab-holiday',
                     'branch': 'tab-branch',
-                    'ai': 'tab-ai'
+                    'payment-qr': 'tab-payment-qr'
                 };
                 const tabId = tabMap[tabParam];
                 if (tabId) {

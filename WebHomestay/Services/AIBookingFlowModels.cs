@@ -127,10 +127,5 @@ namespace WebHomestay.Services
         public string? PaymentUrl { get; set; }
         public string? SuccessUrl { get; set; }
         public string? Instructions { get; set; }
-        public string? QrImageUrl { get; set; }
-        public int CountdownSeconds { get; set; } = 300;
-        public string ProofLabel { get; set; } = "Upload bill thanh toán";
-        public string ProofButtonText { get; set; } = "Gửi bill thanh toán";
-        public string SuccessMessage { get; set; } = "Homestay đã nhận bill, nhân viên sẽ xác nhận trong ít phút.";
     }
 }

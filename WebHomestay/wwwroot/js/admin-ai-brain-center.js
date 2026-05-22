@@ -535,8 +535,7 @@ const bookingFieldLabels = {
     guestCount: 'Số khách',
     idCardFront: 'CCCD mặt trước',
     idCardBack: 'CCCD mặt sau',
-    customerNote: 'Ghi chú',
-    paymentQr: 'QR thanh toán'
+    customerNote: 'Ghi chú'
 };
 const bookingFieldTypes = {
     customerName: 'text',
@@ -545,8 +544,7 @@ const bookingFieldTypes = {
     guestCount: 'number',
     idCardFront: 'image',
     idCardBack: 'image',
-    customerNote: 'textarea',
-    paymentQr: 'paymentQr'
+    customerNote: 'textarea'
 };
 const finalFieldLabels = {
     branch: 'Chi nhánh mong muốn',
@@ -632,10 +630,9 @@ function renderBookingFormDesigner() {
 
     preview.html(`
         <div class="chat-form-card">
-            ${fields.filter(field => normalizeBookingFormField(field).type !== 'paymentQr').map(field => renderBookingPreviewField(field)).join('')}
+            ${fields.map(field => renderBookingPreviewField(field)).join('')}
             <button class="btn btn-dark rounded-pill w-100 mt-2">Gửi thông tin đặt phòng</button>
         </div>
-        ${fields.filter(field => normalizeBookingFormField(field).type === 'paymentQr').map(field => renderBookingPreviewField(field)).join('')}
     `);
 }
 
@@ -652,13 +649,7 @@ function normalizeBookingFormField(field) {
         label: field?.label || bookingFieldLabels[name] || name || 'Thông tin',
         required: field?.required === true,
         helpText: field?.helpText || '',
-        order: Number.isFinite(Number(field?.order)) ? Number(field.order) : 999,
-        qrImageUrl: field?.qrImageUrl || '',
-        messageTemplate: field?.messageTemplate || '',
-        countdownSeconds: Number.isFinite(Number(field?.countdownSeconds)) ? Number(field.countdownSeconds) : 300,
-        proofLabel: field?.proofLabel || 'Upload bill thanh toán',
-        proofButtonText: field?.proofButtonText || 'Gửi bill thanh toán',
-        successMessage: field?.successMessage || 'Homestay đã nhận bill, nhân viên sẽ xác nhận trong ít phút.'
+        order: Number.isFinite(Number(field?.order)) ? Number(field.order) : 999
     };
 }
 
@@ -669,9 +660,7 @@ function renderBookingPreviewField(field) {
     const requiredMark = field.required ? ' <span class="text-danger">*</span>' : '';
     const helpText = field.helpText ? `<small class="text-muted">${escapeBrainHtml(field.helpText)}</small>` : '';
     let control;
-    if (field.type === 'paymentQr') {
-        control = `<div class="payment-preview-box">${field.qrImageUrl ? `<img src="${escapeBrainHtml(field.qrImageUrl)}" alt="QR thanh toán" />` : '<span>Chưa có ảnh QR</span>'}<small>${escapeBrainHtml(field.messageTemplate || 'Nội dung thanh toán sẽ hiện ở đây.')}</small></div>`;
-    } else if (field.type === 'textarea') control = `<textarea placeholder="Nhập ${label.toLowerCase()}..." rows="2"${required}></textarea>`;
+    if (field.type === 'textarea') control = `<textarea placeholder="Nhập ${label.toLowerCase()}..." rows="2"${required}></textarea>`;
     else if (field.type === 'number') control = `<input type="number" min="1" placeholder="2"${required} />`;
     else if (field.type === 'email') control = `<input type="email" placeholder="email@example.com"${required} />`;
     else if (field.type === 'image') control = `<input type="file" accept="image/*"${required} />`;
@@ -864,19 +853,8 @@ function openAddBookingFormFieldModal() {
     $('#final-form-field-modal-title').text('Thêm trường Booking Form');
     $('#final-form-field-label').val('');
     $('#final-form-field-type').val('customerName');
-    $('#final-form-field-qr-url').val('');
-    $('#final-form-field-payment-message').val('');
-    $('#final-form-field-countdown').val('300');
-    $('#final-form-field-proof-label').val('Upload bill thanh toán');
-    $('#final-form-field-proof-button').val('Gửi bill thanh toán');
-    $('#final-form-field-success-message').val('Homestay đã nhận bill, nhân viên sẽ xác nhận trong ít phút.');
-    $('#final-form-field-qr-file').val('');
-    toggleFinalPaymentQrSettings();
     $('#final-form-field-required').prop('checked', true);
-    $('#final-form-field-intent').val('always');
-    $('#final-form-field-missing').val('');
-    $('#final-form-field-keywords').val('');
-    $('#final-form-field-advanced').val('');
+    $('#final-form-field-help').val('');
     bootstrap.Modal.getOrCreateInstance(document.getElementById('finalFormFieldModal')).show();
 }
 
@@ -886,19 +864,8 @@ function openEditBookingFormFieldModal(id) {
     $('#final-form-field-modal-title').text('Sửa trường Booking Form');
     $('#final-form-field-label').val(field.label);
     $('#final-form-field-type').val(field.name || 'customerName');
-    $('#final-form-field-qr-url').val(field.qrImageUrl || '');
-    $('#final-form-field-payment-message').val(field.messageTemplate || '');
-    $('#final-form-field-countdown').val(field.countdownSeconds || 300);
-    $('#final-form-field-proof-label').val(field.proofLabel || 'Upload bill thanh toán');
-    $('#final-form-field-proof-button').val(field.proofButtonText || 'Gửi bill thanh toán');
-    $('#final-form-field-success-message').val(field.successMessage || 'Homestay đã nhận bill, nhân viên sẽ xác nhận trong ít phút.');
-    $('#final-form-field-qr-file').val('');
-    toggleFinalPaymentQrSettings();
     $('#final-form-field-required').prop('checked', field.required);
-    $('#final-form-field-intent').val('always');
-    $('#final-form-field-missing').val('');
-    $('#final-form-field-keywords').val('');
-    $('#final-form-field-advanced').val(field.helpText || '');
+    $('#final-form-field-help').val(field.helpText || '');
     bootstrap.Modal.getOrCreateInstance(document.getElementById('finalFormFieldModal')).show();
 }
 
@@ -913,14 +880,8 @@ async function saveBookingFormFieldFromModal(saveConfig = false) {
         type: bookingFieldTypes[fieldName] || 'text',
         label,
         required: $('#final-form-field-required').is(':checked'),
-        helpText: $('#final-form-field-advanced').val().trim(),
-        order: editingBookingFormFieldId ? bookingFormFields.find(item => item.id === editingBookingFormFieldId)?.order : bookingFormFields.length + 1,
-        qrImageUrl: $('#final-form-field-qr-url').val().trim(),
-        messageTemplate: $('#final-form-field-payment-message').val().trim(),
-        countdownSeconds: parseInt($('#final-form-field-countdown').val() || '300', 10),
-        proofLabel: $('#final-form-field-proof-label').val().trim(),
-        proofButtonText: $('#final-form-field-proof-button').val().trim(),
-        successMessage: $('#final-form-field-success-message').val().trim()
+        helpText: $('#final-form-field-help').val().trim(),
+        order: editingBookingFormFieldId ? bookingFormFields.find(item => item.id === editingBookingFormFieldId)?.order : bookingFormFields.length + 1
     });
 
     if (editingBookingFormFieldId) {
@@ -941,29 +902,11 @@ async function saveBookingFormFieldFromModal(saveConfig = false) {
     bootstrap.Modal.getOrCreateInstance(document.getElementById('finalFormFieldModal')).hide();
 }
 
-$(document).on('change', '#final-form-field-type', toggleFinalPaymentQrSettings);
-
-function toggleFinalPaymentQrSettings() {
-    $('#final-payment-qr-settings').toggle($('#final-form-field-type').val() === 'paymentQr');
-}
-
-async function uploadFinalPaymentQrImage() {
-    const file = document.getElementById('final-form-field-qr-file')?.files?.[0];
-    if (!file) return alert('Vui lòng chọn ảnh QR trước.');
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await fetch('/admin/ai/upload-payment-qr', { method: 'POST', body: formData });
-    if (!response.ok) return alert(`Không upload được ảnh QR: ${await response.text()}`);
-    const result = await response.json();
-    $('#final-form-field-qr-url').val(result.url || '');
-    alert('Đã upload ảnh QR.');
-}
-
 function resolveEditableFieldType(type) {
     if (type === 'note') return 'textarea';
     if (type === 'datetime') return 'datetime-local';
     if (type === 'guestCount') return 'number';
-    return ['text', 'number', 'datetime-local', 'textarea', 'image', 'paymentQr'].includes(type) ? type : 'text';
+    return ['text', 'number', 'datetime-local', 'textarea', 'image'].includes(type) ? type : 'text';
 }
 
 function removeBookingFormField(id) {

@@ -30,6 +30,18 @@ namespace WebHomestay.Controllers
 
             var selectedDate = hourlyDate ?? DateOnly.FromDateTime(DateTime.Today);
             var model = await _roomBookingViewService.BuildAsync(room, selectedDate);
+
+            var allImages = new List<string>();
+            if (!string.IsNullOrEmpty(room.ImageUrl))
+                allImages.Add(room.ImageUrl);
+            if (!string.IsNullOrEmpty(room.AdditionalImages))
+            {
+                var extra = System.Text.Json.JsonSerializer.Deserialize<List<string>>(room.AdditionalImages);
+                if (extra != null)
+                    allImages.AddRange(extra);
+            }
+            model.AllImages = allImages;
+
             return View(model);
         }
 

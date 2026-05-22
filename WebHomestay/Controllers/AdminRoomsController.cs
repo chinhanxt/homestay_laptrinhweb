@@ -88,9 +88,11 @@ namespace WebHomestay.Controllers
                     var imagePaths = new List<string>();
                     foreach (var file in illustrationFiles)
                     {
-                        imagePaths.Add(await SaveFile(file));
+                        if (file.Length > 0)
+                            imagePaths.Add(await SaveFile(file));
                     }
-                    room.AdditionalImages = System.Text.Json.JsonSerializer.Serialize(imagePaths);
+                    if (imagePaths.Count > 0)
+                        room.AdditionalImages = System.Text.Json.JsonSerializer.Serialize(imagePaths);
                 }
 
                 _context.Add(room);
@@ -139,15 +141,20 @@ namespace WebHomestay.Controllers
                     // Update Illustration Images if new files uploaded
                     if (illustrationFiles != null && illustrationFiles.Count > 0)
                     {
-                        var imagePaths = new List<string>();
+                        var existingPaths = !string.IsNullOrEmpty(existingRoom.AdditionalImages)
+                            ? System.Text.Json.JsonSerializer.Deserialize<List<string>>(existingRoom.AdditionalImages) ?? new List<string>()
+                            : new List<string>();
+                        var newPaths = new List<string>();
                         foreach (var file in illustrationFiles)
                         {
-                            imagePaths.Add(await SaveFile(file));
+                            if (file.Length > 0)
+                                newPaths.Add(await SaveFile(file));
                         }
-                        room.AdditionalImages = System.Text.Json.JsonSerializer.Serialize(imagePaths);
+                        existingPaths.AddRange(newPaths);
+                        room.AdditionalImages = System.Text.Json.JsonSerializer.Serialize(existingPaths);
                     }
 
-                    room.CreatedAt = existingRoom.CreatedAt; // Preserve CreatedAt
+                    room.CreatedAt = existingRoom.CreatedAt;
 
                     _context.Update(room);
                     await _context.SaveChangesAsync();

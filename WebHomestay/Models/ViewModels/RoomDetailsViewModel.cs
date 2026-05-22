@@ -9,6 +9,7 @@ public class RoomDetailsViewModel
     public DateOnly SelectedHourlyDate { get; set; }
     public List<HourlySlotGroupViewModel> HourlyGroups { get; set; } = new();
     public List<CalendarDayViewModel> DailyCalendar { get; set; } = new();
+    public List<string> AllImages { get; set; } = new();
 }
 
 public class HourlySlotGroupViewModel

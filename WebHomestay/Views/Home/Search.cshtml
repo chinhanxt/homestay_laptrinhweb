@@ -1,0 +1,126 @@
+@model WebHomestay.Models.ViewModels.SearchResultViewModel
+@{
+    ViewData["Title"] = "Kết quả tìm kiếm phòng";
+    var branches = ViewBag.Branches as List<WebHomestay.Models.Branch>;
+}
+
+<!-- Search Bar -->
+<section class="py-2" style="padding-top: 85px !important;">
+    <div class="container">
+        <form method="get" action="/Home/Search" class="editorial-search">
+            <div class="search-field">
+                <label class="search-label">Chi nhánh</label>
+                <select class="search-input" name="branchId">
+                    <option value="">Tất cả địa điểm</option>
+                    @if (branches != null)
+                    {
+                        foreach (var branch in branches)
+                        {
+                            <option value="@branch.Id" selected="@(branch.Id == Model.BranchId ? true : null)">@branch.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="search-field">
+                <label class="search-label">Nhận phòng</label>
+                <input type="date" class="search-input" name="checkIn" value="@Model.CheckIn.ToString("yyyy-MM-dd")" required>
+            </div>
+            <div class="search-field">
+                <label class="search-label">Trả phòng</label>
+                <input type="date" class="search-input" name="checkOut" value="@Model.CheckOut.ToString("yyyy-MM-dd")" required>
+            </div>
+            <div class="search-field">
+                <label class="search-label">Số khách</label>
+                <select class="search-input" name="guests">
+                    @for (int g = 1; g <= 10; g++)
+                    {
+                        <option value="@g" selected="@(g == Model.Guests ? true : null)">@g Khách</option>
+                    }
+                </select>
+            </div>
+            <button type="submit" class="btn-search-luxury">TÌM PHÒNG</button>
+        </form>
+    </div>
+</section>
+
+<!-- Results -->
+<section class="py-4 bg-white" style="min-height: 400px;">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="fw-bold mb-1">
+                    @if (Model.Rooms.Count > 0)
+                    {
+                        <span>Có <span class="text-primary">@Model.Rooms.Count</span> phòng trống</span>
+                    }
+                    else
+                    {
+                        <span>Không tìm thấy phòng trống</span>
+                    }
+                </h4>
+                <p class="text-muted small mb-0">
+                    @Model.CheckIn.ToString("dd/MM/yyyy") - @Model.CheckOut.ToString("dd/MM/yyyy") · @Model.Guests khách
+                </p>
+            </div>
+            <a href="/" class="btn btn-outline-secondary rounded-pill px-4 btn-sm">
+                <i class="fas fa-arrow-left me-1"></i> Về trang chủ
+            </a>
+        </div>
+
+        @if (Model.Rooms.Count == 0)
+        {
+            <div class="text-center py-5">
+                <div class="mb-3" style="font-size: 4rem; color: #ddd;">
+                    <i class="fas fa-bed"></i>
+                </div>
+                <h5 class="text-muted">Không có phòng nào phù hợp</h5>
+                <p class="text-muted small">Thử thay đổi chi nhánh hoặc thời gian tìm kiếm khác.</p>
+            </div>
+        }
+        else
+        {
+            <div class="row g-4">
+                @foreach (var room in Model.Rooms)
+                {
+                    <div class="col-md-6 col-lg-4">
+                        <div class="luxury-card">
+                            <div class="luxury-card-img-wrapper">
+                                <span class="luxury-badge">@room.Branch?.Name</span>
+                                <img src="@(string.IsNullOrEmpty(room.ImageUrl) ? "https://images.unsplash.com/photo-1590490359683-658d3d23f972?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" : room.ImageUrl)" 
+                                     class="luxury-card-img" alt="@room.Name">
+                                <span class="luxury-price-badge">
+                                    @room.PricePerDay.ToString("N0")đ
+                                    <small>/đêm</small>
+                                </span>
+                            </div>
+                            <div class="p-4">
+                                <h3 class="h5 mb-2">@room.Name</h3>
+                                <p class="text-muted small mb-3">@room.Description</p>
+                                <div class="d-flex gap-2 mb-3">
+                                    <span class="badge bg-light text-dark rounded-pill px-3 py-2">
+                                        <i class="fas fa-user me-1"></i> @room.MaxGuests khách
+                                    </span>
+                                    <span class="badge bg-light text-dark rounded-pill px-3 py-2">
+                                        <i class="fas fa-ruler-combined me-1"></i> @room.Capacity
+                                    </span>
+                                </div>
+                                <div class="d-flex gap-2 flex-wrap mb-3">
+                                    @foreach (var amenity in room.Amenities.Take(3))
+                                    {
+                                        <span class="badge border rounded-pill px-3 py-1 text-muted fw-normal">
+                                            <i class="fas @amenity.IconClass me-1"></i>@amenity.Name
+                                        </span>
+                                    }
+                                </div>
+                                <a asp-controller="Rooms" asp-action="Details" asp-route-id="@room.Id" 
+                                   class="btn btn-outline-dark w-100 rounded-pill py-2 fw-bold">
+                                    XEM CHI TIẾT
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</section>

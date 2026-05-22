@@ -625,7 +625,7 @@ public class AIBookingFlowOrchestrator : IAIBookingFlowOrchestrator
                         Value = ResolveInitialFieldValue(name, state)
                     };
                 })
-                .Where(field => !string.IsNullOrWhiteSpace(field.Name) && !string.Equals(field.Name, "paymentQr", StringComparison.OrdinalIgnoreCase))
+                .Where(field => !string.IsNullOrWhiteSpace(field.Name))
                 .OrderBy(field => ReadOrder(document.RootElement, field.Name))
                 .ToList();
         }

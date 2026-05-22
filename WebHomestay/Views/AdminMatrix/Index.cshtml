@@ -55,9 +55,9 @@
         if (booking.BookingMode == WebHomestay.Models.BookingMode.Daily)
         {
             var visibleStart = booking.StartTime.Date < startDate ? startDate : booking.StartTime.Date;
-            var visibleEndExclusive = booking.EndTime.Date > endDate ? endDate : booking.EndTime.Date;
+            var visibleEndInclusive = booking.EndTime.Date >= endDate ? endDate.AddDays(-1) : booking.EndTime.Date;
 
-            for (var date = visibleStart; date < visibleEndExclusive; date = date.AddDays(1))
+            for (var date = visibleStart; date <= visibleEndInclusive; date = date.AddDays(1))
             {
                 var key = cellKey(booking.RoomId, date);
                 if (!bookingsByRoomDate.TryGetValue(key, out var bucket))
@@ -305,7 +305,7 @@
                                                             var toneClass = bookingTone(booking.Status);
                                                             var isDaily = booking.BookingMode == WebHomestay.Models.BookingMode.Daily;
                                                             var isStartSegment = isDaily && day.Date == booking.StartTime.Date;
-                                                            var isEndSegment = isDaily && day.Date == booking.EndTime.Date.AddDays(-1);
+                                                            var isEndSegment = isDaily && day.Date == booking.EndTime.Date;
 
                                                             var displayStatus = booking.Status switch
                                                             {
@@ -1571,7 +1571,7 @@
                             return startDate === dateKey;
                         }
 
-                        return dateKey >= startDate && dateKey < endDate;
+                        return dateKey >= startDate && dateKey <= endDate;
                     })
                     .sort((left, right) => left.startTime.localeCompare(right.startTime));
             };

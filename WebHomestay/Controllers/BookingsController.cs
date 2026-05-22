@@ -14,6 +14,7 @@ namespace WebHomestay.Controllers
         private readonly IBookingCreationService _bookingCreationService;
         private readonly IWebHostEnvironment _environment;
         private readonly IImageMaskingService _maskingService;
+        private readonly IPaymentQrSettingsService _paymentQrSettingsService;
 
         public BookingsController(
             ApplicationDbContext context, 
@@ -21,7 +22,8 @@ namespace WebHomestay.Controllers
             IRoomBookingViewService roomBookingViewService,
             IBookingCreationService bookingCreationService,
             IWebHostEnvironment environment,
-            IImageMaskingService maskingService)
+            IImageMaskingService maskingService,
+            IPaymentQrSettingsService paymentQrSettingsService)
         {
             _context = context;
             _availabilityService = availabilityService;
@@ -29,6 +31,7 @@ namespace WebHomestay.Controllers
             _bookingCreationService = bookingCreationService;
             _environment = environment;
             _maskingService = maskingService;
+            _paymentQrSettingsService = paymentQrSettingsService;
         }
 
         [HttpGet]
@@ -148,6 +151,7 @@ namespace WebHomestay.Controllers
                 .ThenInclude(r => r.Branch)
                 .FirstOrDefaultAsync(b => b.Id == id);
             if (booking == null) return NotFound();
+            ViewBag.PaymentQrDisplay = await _paymentQrSettingsService.BuildDisplayAsync(booking);
             return View(booking);
         }
 

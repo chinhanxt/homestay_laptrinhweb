@@ -86,6 +86,14 @@
         </div>
 
         <div id="accountSelector" class="d-flex align-items-center gap-2" style="display:none;">
+          <label class="fw-bold small text-muted">Chi nhánh:</label>
+          <select id="accountBranchSelect" class="form-select form-select-sm border-0 bg-light rounded-pill px-3" style="width:auto;min-width:180px;">
+            @foreach (var branch in (List<WebHomestay.Models.Branch>)ViewBag.Branches)
+            {
+              <option value="@branch.Id">@branch.Name</option>
+            }
+          </select>
+          <span class="text-muted small">|</span>
           <label class="fw-bold small text-muted">Chọn tài khoản:</label>
           <input type="text" id="accountFilter" class="form-control form-control-sm bg-light rounded-pill px-3 account-search" placeholder="Tìm tên / username..." />
           <select id="accountSelect" class="form-select form-select-sm border-0 bg-light rounded-pill px-3" style="width:auto;min-width:250px;">
@@ -94,7 +102,9 @@
               <option value="@acc.Id"
                       data-name="@acc.FullName"
                       data-username="@acc.Username"
-                      data-branch="@(acc.Branch?.Name ?? "Tất cả")">
+                      data-branch="@(acc.Branch?.Name ?? "Tất cả")"
+                      data-role="@acc.Role"
+                      data-branch-id="@(acc.BranchId?.ToString() ?? "")">
                 @acc.FullName (@@@acc.Username) - @(acc.Branch?.Name ?? "Tất cả CN")
               </option>
             }
@@ -473,6 +483,9 @@
       var inp = document.createElement('input');
       inp.type = 'hidden'; inp.name = 'accountId'; inp.value = accountSelect.value;
       permForm.appendChild(inp);
+      var br = document.createElement('input');
+      br.type = 'hidden'; br.name = 'branchId'; br.value = document.getElementById('accountBranchSelect').value;
+      permForm.appendChild(br);
     } else {
       var inp = document.createElement('input');
       inp.type = 'hidden'; inp.name = 'role'; inp.value = roleSelect.value;

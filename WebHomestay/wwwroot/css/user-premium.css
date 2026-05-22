@@ -17,6 +17,7 @@
     --luxury-radius: 0px; /* Minimalist sharp/slight radius for editorial feel */
     --luxury-font-heading: 'Outfit', sans-serif;
     --luxury-font-body: 'Source Sans 3', sans-serif;
+    --luxury-highlight: #4f8cff;
 }
 
 body {
@@ -57,7 +58,9 @@ h1, h2, h3, h4, h5, h6 {
     margin: 0 1rem;
     position: relative;
     text-decoration: none;
-    transition: color 0.3s;
+    transition: color 0.3s, transform 0.3s;
+    display: inline-block;
+    white-space: nowrap;
 }
 
 .nav-link-premium::after {
@@ -66,13 +69,51 @@ h1, h2, h3, h4, h5, h6 {
     bottom: -4px;
     left: 0;
     width: 0;
-    height: 1.5px;
-    background: var(--luxury-accent);
-    transition: width 0.3s ease;
+    height: 2px;
+    background: var(--luxury-highlight, #4f8cff);
+    box-shadow: 0 0 10px var(--luxury-highlight, #4f8cff);
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-link-premium:hover {
+    color: var(--luxury-highlight, #4f8cff);
+    transform: translateY(-1px);
 }
 
 .nav-link-premium:hover::after {
     width: 100%;
+}
+
+.dropdown-toggle-custom {
+    cursor: pointer;
+}
+
+.dropdown-toggle-custom::after {
+    display: none !important;
+}
+
+.nav-dropdown-arrow {
+    font-size: 0.65rem;
+    margin-left: 4px;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.dropdown-toggle-custom:hover .nav-dropdown-arrow,
+.dropdown.show .nav-dropdown-arrow {
+    transform: rotate(-180deg);
+}
+
+.nav-item .dropdown-item {
+    transition: background 0.2s, transform 0.2s, color 0.2s;
+    position: relative;
+}
+
+.nav-item .dropdown-item:hover {
+    background: rgba(79, 140, 255, 0.08);
+    color: var(--luxury-highlight, #4f8cff);
+    transform: translateX(4px);
 }
 
 /* Redesign Auth Buttons - Removing heavy blue background */

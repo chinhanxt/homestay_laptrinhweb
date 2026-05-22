@@ -10,7 +10,7 @@
         <div class="row justify-content-center">
             
             <div class="col-lg-12">
-                <div class="editorial-search reveal-up">
+                <form method="get" action="/Home/Search" class="editorial-search reveal-up">
                     <div class="search-field">
                         <label class="search-label">Chi nhánh</label>
                         <select class="search-input" name="branchId">
@@ -25,21 +25,45 @@
                         </select>
                     </div>
                     <div class="search-field">
-                        <label class="search-label">Thời gian</label>
-                        <input type="text" class="search-input" placeholder="Chọn ngày..." onfocus="(this.type='date')">
+                        <label class="search-label">Nhận phòng</label>
+                        <input type="date" class="search-input" name="checkIn" id="searchCheckIn" required>
                     </div>
                     <div class="search-field">
-                        <label class="search-label">Số lượng</label>
-                        <input type="text" class="search-input" value="1 Khách" readonly>
+                        <label class="search-label">Trả phòng</label>
+                        <input type="date" class="search-input" name="checkOut" id="searchCheckOut" required>
                     </div>
-                    <button class="btn-search-luxury">
+                    <div class="search-field">
+                        <label class="search-label">Số khách</label>
+                        <select class="search-input" name="guests">
+                            @for (int g = 1; g <= 10; g++)
+                            {
+                                <option value="@g">@g Khách</option>
+                            }
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-search-luxury">
                         TÌM PHÒNG
                     </button>
-                </div>
-            </div>
+                </form>
         </div>
     </div>
 </section>
+
+@section Scripts {
+    <script>
+        var checkIn = document.getElementById('searchCheckIn');
+        var checkOut = document.getElementById('searchCheckOut');
+        var today = new Date().toISOString().split('T')[0];
+        checkIn.setAttribute('min', today);
+        checkOut.setAttribute('min', today);
+        checkIn.addEventListener('change', function() {
+            var d = new Date(this.value);
+            d.setDate(d.getDate() + 1);
+            checkOut.value = d.toISOString().split('T')[0];
+            checkOut.setAttribute('min', checkOut.value);
+        });
+    </script>
+}
 
 <!-- Collection of Rooms -->
 <section class="py-2 bg-white">
