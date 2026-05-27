@@ -8,6 +8,11 @@
     var paymentQrSettings = ViewBag.PaymentQrSettings as Dictionary<int, WebHomestay.Models.ViewModels.PaymentQrSettingsViewModel> ?? new Dictionary<int, WebHomestay.Models.ViewModels.PaymentQrSettingsViewModel>();
 
     var checkoutMode = Model.FirstOrDefault(s => s.SettingKey == "CheckoutMode")?.SettingValue ?? "Auto";
+    var cancellationMode = Model.FirstOrDefault(s => s.SettingKey == "CancellationHandlingMode")?.SettingValue ?? "Manual";
+    var cancellationNoticeHours = Model.FirstOrDefault(s => s.SettingKey == "CancellationNoticeHours")?.SettingValue ?? "24";
+    var cancellationRefundBefore = Model.FirstOrDefault(s => s.SettingKey == "CancellationRefundPercentBeforeNotice")?.SettingValue ?? "50";
+    var cancellationRefundAfter = Model.FirstOrDefault(s => s.SettingKey == "CancellationRefundPercentAfterNotice")?.SettingValue ?? "0";
+    var cancellationPolicyMessage = Model.FirstOrDefault(s => s.SettingKey == "CancellationPolicyMessage")?.SettingValue ?? "";
 }
 
 <link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
@@ -106,6 +111,62 @@
                                     </div>
                                 </div>
                                 <input type="hidden" name="key" value="CheckoutMode" />
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="bento-item full-width">
+                        <div class="bento-inner">
+                            <h5 class="bento-title"><i class="fas fa-ban me-2 text-danger"></i>Chính sách hủy đơn</h5>
+                            <p class="text-muted small mb-4">Cấu hình cách nhân viên xử lý yêu cầu hủy phòng và tỷ lệ hoàn tiền hiển thị cho khách.</p>
+
+                            <form asp-action="UpdateCancellationPolicy" method="post">
+                                @Html.AntiForgeryToken()
+                                <div class="mode-selector-grid mb-4">
+                                    <div class="mode-card">
+                                        <input type="radio" name="handlingMode" id="cancel-mode-manual" value="Manual" @(cancellationMode == "Manual" ? "checked" : "")>
+                                        <label for="cancel-mode-manual">
+                                            <div class="mode-icon"><i class="fas fa-user-check"></i></div>
+                                            <div class="mode-info">
+                                                <span class="mode-name">Thủ công</span>
+                                                <span class="mode-desc">Duyệt yêu cầu và gửi email, nhân viên tự cập nhật trạng thái booking.</span>
+                                            </div>
+                                            <div class="mode-check"><i class="fas fa-check-circle"></i></div>
+                                        </label>
+                                    </div>
+                                    <div class="mode-card">
+                                        <input type="radio" name="handlingMode" id="cancel-mode-auto" value="Auto" @(cancellationMode == "Auto" ? "checked" : "")>
+                                        <label for="cancel-mode-auto">
+                                            <div class="mode-icon"><i class="fas fa-bolt"></i></div>
+                                            <div class="mode-info">
+                                                <span class="mode-name">Tự động</span>
+                                                <span class="mode-desc">Khi chấp nhận hủy, hệ thống tự chuyển booking sang Cancelled và trả slot.</span>
+                                            </div>
+                                            <div class="mode-check"><i class="fas fa-check-circle"></i></div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-bold text-muted">Ngưỡng trước check-in (giờ)</label>
+                                        <input type="number" name="noticeHours" value="@cancellationNoticeHours" min="0" class="form-control-premium" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-bold text-muted">Hoàn tiền trước ngưỡng (%)</label>
+                                        <input type="number" name="refundBefore" value="@cancellationRefundBefore" min="0" max="100" class="form-control-premium" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-bold text-muted">Hoàn tiền sau ngưỡng (%)</label>
+                                        <input type="number" name="refundAfter" value="@cancellationRefundAfter" min="0" max="100" class="form-control-premium" />
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">Thông báo chính sách cho khách</label>
+                                        <textarea name="policyMessage" rows="3" class="form-control premium-input">@cancellationPolicyMessage</textarea>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn-config-lux mt-4">Lưu chính sách hủy</button>
                             </form>
                         </div>
                     </div>

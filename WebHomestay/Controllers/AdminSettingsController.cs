@@ -61,6 +61,29 @@ namespace WebHomestay.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        [AdminAuthorize(Permission = "settings.update")]
+        [HttpPost("cancellation-policy")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateCancellationPolicy(string handlingMode, int noticeHours, int refundBefore, int refundAfter, string policyMessage)
+        {
+            handlingMode = handlingMode == "Auto" ? "Auto" : "Manual";
+            noticeHours = Math.Max(0, noticeHours);
+            refundBefore = Math.Clamp(refundBefore, 0, 100);
+            refundAfter = Math.Clamp(refundAfter, 0, 100);
+            policyMessage = string.IsNullOrWhiteSpace(policyMessage)
+                ? "Yêu cầu hủy sẽ được nhân viên kiểm tra và phản hồi qua email."
+                : policyMessage.Trim();
+
+            await _settingService.UpdateSettingAsync("CancellationHandlingMode", handlingMode);
+            await _settingService.UpdateSettingAsync("CancellationNoticeHours", noticeHours.ToString());
+            await _settingService.UpdateSettingAsync("CancellationRefundPercentBeforeNotice", refundBefore.ToString());
+            await _settingService.UpdateSettingAsync("CancellationRefundPercentAfterNotice", refundAfter.ToString());
+            await _settingService.UpdateSettingAsync("CancellationPolicyMessage", policyMessage);
+
+            TempData["SuccessMessage"] = "Cập nhật chính sách hủy đơn thành công.";
+            return RedirectToAction(nameof(Index));
+        }
+
         [AdminAuthorize(Permission = "branch.settings")]
         [HttpPost("update-branch")]
         public async Task<IActionResult> UpdateBranch(int branchId, int leadTime)

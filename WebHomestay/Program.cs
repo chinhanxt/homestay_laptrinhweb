@@ -117,6 +117,24 @@ using (var scope = app.Services.CreateScope())
         });
         context.SaveChanges();
     }
+
+    var cancellationDefaults = new[]
+    {
+        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationHandlingMode", SettingValue = "Manual", Description = "Chế độ xử lý hủy đơn", GroupName = "Cancellation" },
+        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationNoticeHours", SettingValue = "24", Description = "Số giờ tối thiểu trước check-in để hủy thuận lợi", GroupName = "Cancellation" },
+        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationRefundPercentBeforeNotice", SettingValue = "50", Description = "Phần trăm hoàn tiền trước ngưỡng hủy", GroupName = "Cancellation" },
+        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationRefundPercentAfterNotice", SettingValue = "0", Description = "Phần trăm hoàn tiền sau ngưỡng hủy", GroupName = "Cancellation" },
+        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationPolicyMessage", SettingValue = "Yêu cầu hủy trước thời hạn quy định có thể được hoàn theo chính sách. Sau thời hạn quy định, yêu cầu vẫn được tiếp nhận nhưng có thể bị giảm hoặc không hoàn tiền.", Description = "Thông báo chính sách hủy đơn", GroupName = "Cancellation" }
+    };
+
+    foreach (var setting in cancellationDefaults)
+    {
+        if (!context.SystemSettings.Any(s => s.SettingKey == setting.SettingKey))
+        {
+            context.SystemSettings.Add(setting);
+        }
+    }
+    context.SaveChanges();
 }
 
 // Configure the HTTP request pipeline.
