@@ -138,6 +138,114 @@ public class BookingCancellationServiceTests
             service.RejectAsync(new ProcessCancellationDto(46, " ", 0, "admin", null)));
     }
 
+    [Fact]
+    public async Task CreateAsync_StoresUploadsUnderProtectedLocationWithGuidNameAndDetectedExtension()
+    {
+        await using var context = CreateContext();
+        var env = new FakeWebHostEnvironment();
+        var service = CreateService(context, env: env);
+
+        var request = await service.CreateAsync(new CreateCancellationRequestDto(
+            "chat-uploads", "B-99", "Khach", "090", "k@example.com",
+            CreateImage(PngBytes(), "../../evil.exe", "image/png"), null, null, null, null));
+
+        var uploadsRoot = Path.Combine(env.ContentRootPath, "App_Data", "SecureUploads", "Cancellations", "confirmation");
+        Assert.StartsWith(uploadsRoot, request.ConfirmationEmailProofPath, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(env.WebRootPath, request.ConfirmationEmailProofPath, StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith(".png", request.ConfirmationEmailProofPath);
+        Assert.Matches(@"^[0-9a-f]{32}\.png$", Path.GetFileName(request.ConfirmationEmailProofPath));
+        Assert.DoesNotContain("evil", request.ConfirmationEmailProofPath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsOversizedImage()
+    {
+        await using var context = CreateContext();
+        var service = CreateService(context);
+
+        var tooLarge = CreateImage(new byte[BookingCancellationService.MaxImageBytes + 1], "large.png", "image/png");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(new CreateCancellationRequestDto(
+            "chat-large", null, "Khach", "090", "k@example.com", tooLarge, null, null, null, null)));
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsInvalidContentType()
+    {
+        await using var context = CreateContext();
+        var service = CreateService(context);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(new CreateCancellationRequestDto(
+            "chat-type", null, "Khach", "090", "k@example.com",
+            CreateImage(PngBytes(), "proof.png", "text/plain"), null, null, null, null)));
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsSpoofedImageContent()
+    {
+        await using var context = CreateContext();
+        var service = CreateService(context);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(new CreateCancellationRequestDto(
+            "chat-spoof", null, "Khach", "090", "k@example.com",
+            CreateImage(new byte[] { 1, 2, 3, 4 }, "proof.png", "image/png"), null, null, null, null)));
+    }
+
+    [Theory]
+    [InlineData("image/png", ".png")]
+    [InlineData("image/jpeg", ".jpg")]
+    [InlineData("image/gif", ".gif")]
+    [InlineData("image/webp", ".webp")]
+    public async Task CreateAsync_AcceptsValidImageSignatures(string contentType, string expectedExtension)
+    {
+        await using var context = CreateContext();
+        var service = CreateService(context);
+
+        var request = await service.CreateAsync(new CreateCancellationRequestDto(
+            $"chat-{expectedExtension}", null, "Khach", "090", "k@example.com",
+            CreateImage(ImageBytes(contentType), $"proof{expectedExtension}", contentType), null, null, null, null));
+
+        Assert.EndsWith(expectedExtension, request.ConfirmationEmailProofPath);
+    }
+
+    [Fact]
+    public async Task CreateAsync_TrimsValuesAndRejectsOverMaxLengths()
+    {
+        await using var context = CreateContext();
+        var service = CreateService(context);
+
+        var request = await service.CreateAsync(new CreateCancellationRequestDto(
+            " chat-trim ", " BOOK-1 ", " Khach ", " 090 ", " k@example.com ",
+            CreateImage(), null, " Bank ", " 123 ", " Holder "));
+
+        Assert.Equal("chat-trim", request.ChatSessionId);
+        Assert.Equal("BOOK-1", request.SubmittedBookingCode);
+        Assert.Equal("Khach", request.CustomerName);
+        Assert.Equal("090", request.CustomerPhone);
+        Assert.Equal("k@example.com", request.CustomerEmail);
+        Assert.Equal("Bank", request.RefundBankName);
+        Assert.Equal("123", request.RefundBankAccountNumber);
+        Assert.Equal("Holder", request.RefundBankAccountHolder);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(new CreateCancellationRequestDto(
+            new string('c', 101), null, "Khach", "090", "k@example.com", CreateImage(), null, null, null, null)));
+    }
+
+    [Fact]
+    public async Task ApproveAsync_RejectsOverMaxStaffFields()
+    {
+        await using var context = CreateContext();
+        context.Bookings.Add(CreateBooking(36, "Khach", "090", "k@example.com"));
+        context.BookingCancellationRequests.Add(CreateRequest(47, 36));
+        await context.SaveChangesAsync();
+        var service = CreateService(context);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ApproveAsync(new ProcessCancellationDto(47, new string('r', 2001), 50, "admin", CreateImage())));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ApproveAsync(new ProcessCancellationDto(47, "Hợp lệ", 50, new string('a', 101), CreateImage())));
+    }
+
     private static ApplicationDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -146,15 +254,37 @@ public class BookingCancellationServiceTests
         return new ApplicationDbContext(options);
     }
 
-    private static BookingCancellationService CreateService(ApplicationDbContext context, FakeSettingService? settings = null)
+    private static BookingCancellationService CreateService(ApplicationDbContext context, FakeSettingService? settings = null, FakeWebHostEnvironment? env = null)
     {
-        return new BookingCancellationService(context, settings ?? new FakeSettingService(), new FakeMailService(), new FakeWebHostEnvironment());
+        return new BookingCancellationService(context, settings ?? new FakeSettingService(), new FakeMailService(), env ?? new FakeWebHostEnvironment());
     }
 
     private static FormFile CreateImage()
     {
-        var stream = new MemoryStream(new byte[] { 1, 2, 3 });
-        return new FormFile(stream, 0, stream.Length, "file", "test.png") { Headers = new HeaderDictionary(), ContentType = "image/png" };
+        return CreateImage(PngBytes(), "test.png", "image/png");
+    }
+
+    private static FormFile CreateImage(byte[] bytes, string fileName, string contentType)
+    {
+        var stream = new MemoryStream(bytes);
+        return new FormFile(stream, 0, stream.Length, "file", fileName) { Headers = new HeaderDictionary(), ContentType = contentType };
+    }
+
+    private static byte[] ImageBytes(string contentType)
+    {
+        return contentType switch
+        {
+            "image/png" => PngBytes(),
+            "image/jpeg" => new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10 },
+            "image/gif" => "GIF89a"u8.ToArray(),
+            "image/webp" => new byte[] { (byte)'R', (byte)'I', (byte)'F', (byte)'F', 0x04, 0x00, 0x00, 0x00, (byte)'W', (byte)'E', (byte)'B', (byte)'P' },
+            _ => throw new ArgumentOutOfRangeException(nameof(contentType), contentType, null)
+        };
+    }
+
+    private static byte[] PngBytes()
+    {
+        return new byte[] { 0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A, 0x00 };
     }
 
     private static Booking CreateBooking(int id, string name, string phone, string email, BookingMode mode = BookingMode.Daily, int? slotId = null, string status = "Confirmed")

@@ -9,6 +9,14 @@ public class BookingCancellationService : IBookingCancellationService
 {
     public const long MaxImageBytes = 5 * 1024 * 1024;
 
+    private static readonly Dictionary<string, string> AllowedImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["image/png"] = ".png",
+        ["image/jpeg"] = ".jpg",
+        ["image/gif"] = ".gif",
+        ["image/webp"] = ".webp"
+    };
+
     private readonly ApplicationDbContext _context;
     private readonly ISettingService _settingService;
     private readonly IMailService _mailService;
@@ -38,31 +46,46 @@ public class BookingCancellationService : IBookingCancellationService
 
     public async Task<BookingCancellationRequest> CreateAsync(CreateCancellationRequestDto dto, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(dto.ChatSessionId)) throw new InvalidOperationException("Vui lòng cung cấp phiên chat yêu cầu hủy.");
-        if (string.IsNullOrWhiteSpace(dto.CustomerName)) throw new InvalidOperationException("Vui lòng nhập họ tên khách hàng.");
-        if (string.IsNullOrWhiteSpace(dto.CustomerPhone)) throw new InvalidOperationException("Vui lòng nhập số điện thoại.");
-        if (string.IsNullOrWhiteSpace(dto.CustomerEmail)) throw new InvalidOperationException("Vui lòng nhập email.");
+        var chatSessionId = RequireTrimmed(dto.ChatSessionId, 100, "Vui lòng cung cấp phiên chat yêu cầu hủy.", "Phiên chat không được vượt quá 100 ký tự.");
+        var customerName = RequireTrimmed(dto.CustomerName, 200, "Vui lòng nhập họ tên khách hàng.", "Họ tên khách hàng không được vượt quá 200 ký tự.");
+        var customerPhone = RequireTrimmed(dto.CustomerPhone, 20, "Vui lòng nhập số điện thoại.", "Số điện thoại không được vượt quá 20 ký tự.");
+        var customerEmail = RequireTrimmed(dto.CustomerEmail, 200, "Vui lòng nhập email.", "Email không được vượt quá 200 ký tự.");
+        var submittedBookingCode = OptionalTrimmed(dto.SubmittedBookingCode, 50, "Mã booking không được vượt quá 50 ký tự.");
+        var refundBankName = OptionalTrimmed(dto.RefundBankName, 100, "Tên ngân hàng không được vượt quá 100 ký tự.");
+        var refundBankAccountNumber = OptionalTrimmed(dto.RefundBankAccountNumber, 50, "Số tài khoản hoàn tiền không được vượt quá 50 ký tự.");
+        var refundBankAccountHolder = OptionalTrimmed(dto.RefundBankAccountHolder, 200, "Tên chủ tài khoản không được vượt quá 200 ký tự.");
+        var normalizedDto = dto with
+        {
+            ChatSessionId = chatSessionId,
+            SubmittedBookingCode = submittedBookingCode,
+            CustomerName = customerName,
+            CustomerPhone = customerPhone,
+            CustomerEmail = customerEmail,
+            RefundBankName = refundBankName,
+            RefundBankAccountNumber = refundBankAccountNumber,
+            RefundBankAccountHolder = refundBankAccountHolder
+        };
 
         var confirmationPath = await SaveProtectedImageAsync(dto.ConfirmationEmailProof, "confirmation", cancellationToken);
         var refundQrPath = dto.RefundQrImage is null ? null : await SaveProtectedImageAsync(dto.RefundQrImage, "refundQr", cancellationToken);
         var policy = await GetPolicyAsync(cancellationToken);
-        var parsedBookingId = ParseBookingId(dto.SubmittedBookingCode);
-        var suggestedIds = await GetSuggestedBookingIdsAsync(dto, parsedBookingId, cancellationToken);
-        var linkedBookingId = await GetAutoLinkedBookingIdAsync(parsedBookingId, dto.CustomerEmail, dto.CustomerPhone, cancellationToken);
+        var parsedBookingId = ParseBookingId(submittedBookingCode);
+        var suggestedIds = await GetSuggestedBookingIdsAsync(normalizedDto, parsedBookingId, cancellationToken);
+        var linkedBookingId = await GetAutoLinkedBookingIdAsync(parsedBookingId, customerEmail, customerPhone, cancellationToken);
 
         var request = new BookingCancellationRequest
         {
-            ChatSessionId = dto.ChatSessionId.Trim(),
+            ChatSessionId = chatSessionId,
             BookingId = linkedBookingId,
-            SubmittedBookingCode = string.IsNullOrWhiteSpace(dto.SubmittedBookingCode) ? null : dto.SubmittedBookingCode.Trim(),
-            CustomerName = dto.CustomerName.Trim(),
-            CustomerPhone = dto.CustomerPhone.Trim(),
-            CustomerEmail = dto.CustomerEmail.Trim(),
+            SubmittedBookingCode = submittedBookingCode,
+            CustomerName = customerName,
+            CustomerPhone = customerPhone,
+            CustomerEmail = customerEmail,
             ConfirmationEmailProofPath = confirmationPath,
             RefundQrImagePath = refundQrPath,
-            RefundBankName = string.IsNullOrWhiteSpace(dto.RefundBankName) ? null : dto.RefundBankName.Trim(),
-            RefundBankAccountNumber = string.IsNullOrWhiteSpace(dto.RefundBankAccountNumber) ? null : dto.RefundBankAccountNumber.Trim(),
-            RefundBankAccountHolder = string.IsNullOrWhiteSpace(dto.RefundBankAccountHolder) ? null : dto.RefundBankAccountHolder.Trim(),
+            RefundBankName = refundBankName,
+            RefundBankAccountNumber = refundBankAccountNumber,
+            RefundBankAccountHolder = refundBankAccountHolder,
             SuggestedBookingIdsJson = JsonSerializer.Serialize(suggestedIds),
             PolicyNoticeHoursSnapshot = policy.NoticeHours,
             RefundPercentBeforeNoticeSnapshot = policy.RefundPercentBeforeNotice,
@@ -88,12 +111,15 @@ public class BookingCancellationService : IBookingCancellationService
         var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == request.BookingId.Value, cancellationToken)
             ?? throw new InvalidOperationException("Không tìm thấy booking được liên kết.");
 
+        var staffReason = RequireTrimmed(dto.StaffReason, 2000, "Vui lòng nhập lý do xử lý.", "Lý do xử lý không được vượt quá 2000 ký tự.");
+        var processedBy = OptionalTrimmed(dto.ProcessedBy, 100, "Người xử lý không được vượt quá 100 ký tự.");
+
         request.RefundBillProofPath = await SaveProtectedImageAsync(dto.RefundBillProof, "refundBill", cancellationToken);
         request.Status = "Approved";
         request.RefundStatus = "Refunded";
         request.AppliedRefundPercent = Math.Clamp(dto.AppliedRefundPercent, 0, 100);
-        request.StaffReason = dto.StaffReason.Trim();
-        request.ProcessedBy = string.IsNullOrWhiteSpace(dto.ProcessedBy) ? null : dto.ProcessedBy.Trim();
+        request.StaffReason = staffReason;
+        request.ProcessedBy = processedBy;
         request.ProcessedAt = DateTime.UtcNow;
         request.UpdatedAt = DateTime.UtcNow;
 
@@ -117,10 +143,13 @@ public class BookingCancellationService : IBookingCancellationService
     {
         if (string.IsNullOrWhiteSpace(dto.StaffReason)) throw new InvalidOperationException("Vui lòng nhập lý do xử lý.");
 
+        var staffReason = RequireTrimmed(dto.StaffReason, 2000, "Vui lòng nhập lý do xử lý.", "Lý do xử lý không được vượt quá 2000 ký tự.");
+        var processedBy = OptionalTrimmed(dto.ProcessedBy, 100, "Người xử lý không được vượt quá 100 ký tự.");
+
         var request = await LoadPendingRequestAsync(dto.RequestId, cancellationToken);
         request.Status = "Rejected";
-        request.StaffReason = dto.StaffReason.Trim();
-        request.ProcessedBy = string.IsNullOrWhiteSpace(dto.ProcessedBy) ? null : dto.ProcessedBy.Trim();
+        request.StaffReason = staffReason;
+        request.ProcessedBy = processedBy;
         request.ProcessedAt = DateTime.UtcNow;
         request.UpdatedAt = DateTime.UtcNow;
 
@@ -159,21 +188,53 @@ public class BookingCancellationService : IBookingCancellationService
     {
         if (file is null || file.Length == 0) throw new InvalidOperationException("Vui lòng tải lên ảnh hợp lệ.");
         if (file.Length > MaxImageBytes) throw new InvalidOperationException("Ảnh tải lên không được vượt quá 5MB.");
-        if (string.IsNullOrWhiteSpace(file.ContentType) || !file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Chỉ chấp nhận tệp hình ảnh.");
+        if (string.IsNullOrWhiteSpace(file.ContentType) || !AllowedImageContentTypes.ContainsKey(file.ContentType))
+            throw new InvalidOperationException("Chỉ chấp nhận ảnh PNG, JPEG, GIF hoặc WebP hợp lệ.");
 
-        var extension = Path.GetExtension(file.FileName);
-        if (string.IsNullOrWhiteSpace(extension) || extension.Length > 10) extension = ".bin";
-        extension = string.Concat(extension.Where(c => char.IsLetterOrDigit(c) || c == '.')).ToLowerInvariant();
-        if (string.IsNullOrWhiteSpace(extension)) extension = ".bin";
+        await using var inputStream = file.OpenReadStream();
+        var detectedExtension = await DetectImageExtensionAsync(inputStream, cancellationToken);
+        if (detectedExtension is null)
+            throw new InvalidOperationException("Tệp tải lên không phải ảnh PNG, JPEG, GIF hoặc WebP hợp lệ.");
+        if (!string.Equals(detectedExtension, AllowedImageContentTypes[file.ContentType], StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Định dạng ảnh tải lên không khớp với loại tệp đã khai báo.");
 
+        inputStream.Position = 0;
         var directory = Path.Combine(_env.ContentRootPath, "App_Data", "SecureUploads", "Cancellations", folder);
         Directory.CreateDirectory(directory);
-        var path = Path.Combine(directory, $"{Guid.NewGuid():N}{extension}");
+        var path = Path.Combine(directory, $"{Guid.NewGuid():N}{detectedExtension}");
 
-        await using var stream = new FileStream(path, FileMode.CreateNew);
-        await file.CopyToAsync(stream, cancellationToken);
+        await using var outputStream = new FileStream(path, FileMode.CreateNew);
+        await inputStream.CopyToAsync(outputStream, cancellationToken);
         return path;
+    }
+
+    private static async Task<string?> DetectImageExtensionAsync(Stream stream, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[12];
+        var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+
+        if (bytesRead >= 8 && buffer.AsSpan(0, 8).SequenceEqual(new byte[] { 0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A })) return ".png";
+        if (bytesRead >= 3 && buffer[0] == 0xFF && buffer[1] == 0xD8 && buffer[2] == 0xFF) return ".jpg";
+        if (bytesRead >= 6 && (buffer.AsSpan(0, 6).SequenceEqual("GIF87a"u8) || buffer.AsSpan(0, 6).SequenceEqual("GIF89a"u8))) return ".gif";
+        if (bytesRead >= 12 && buffer.AsSpan(0, 4).SequenceEqual("RIFF"u8) && buffer.AsSpan(8, 4).SequenceEqual("WEBP"u8)) return ".webp";
+
+        return null;
+    }
+
+    private static string RequireTrimmed(string? value, int maxLength, string requiredMessage, string maxLengthMessage)
+    {
+        if (string.IsNullOrWhiteSpace(value)) throw new InvalidOperationException(requiredMessage);
+        var trimmed = value.Trim();
+        if (trimmed.Length > maxLength) throw new InvalidOperationException(maxLengthMessage);
+        return trimmed;
+    }
+
+    private static string? OptionalTrimmed(string? value, int maxLength, string maxLengthMessage)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var trimmed = value.Trim();
+        if (trimmed.Length > maxLength) throw new InvalidOperationException(maxLengthMessage);
+        return trimmed;
     }
 
     private async Task<List<int>> GetSuggestedBookingIdsAsync(CreateCancellationRequestDto dto, int? parsedBookingId, CancellationToken cancellationToken)
