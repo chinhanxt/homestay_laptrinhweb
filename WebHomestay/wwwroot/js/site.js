@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const checkOutInput = widget.querySelector('.ai-context-checkout');
     const timeFields = Array.from(widget.querySelectorAll('.ai-hourly-time-field'));
     const checkOutField = checkOutInput ? checkOutInput.closest('label') : null;
+    const cancelAction = widget.querySelector('#ai-cancel-booking-action');
 
     let sessionId = createSessionId();
     let bookingState = {};
@@ -57,13 +58,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderAdminFormBlock(formBlockJson, formBlockType) {
         try {
             const block = JSON.parse(formBlockJson);
-            let msg = '📋 Admin đã gửi ';
-            if (formBlockType === 'roomSelector') msg += 'danh sách phòng.';
-            else if (formBlockType === 'slotPicker') msg += 'khung giờ.';
-            else if (formBlockType === 'infoForm') msg += 'yêu cầu điền thông tin: ' + (block.fields || []).join(', ');
-            else if (formBlockType === 'paymentQr') msg += 'QR thanh toán.';
-            else msg += 'một biểu mẫu.';
-            appendMessage(msg, 'bot');
+            if ((formBlockType === 'uiBlocks' || Array.isArray(block.uiBlocks)) && Array.isArray(block.uiBlocks)) {
+                renderUiBlocks(block.uiBlocks);
+                return;
+            }
+            appendMessage('Admin đã gửi một biểu mẫu, nhưng trình duyệt chưa đọc được nội dung.', 'bot');
         } catch (e) {
             console.error('Error parsing form block:', e);
         }
@@ -75,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     toggle.addEventListener('click', () => setOpen(!widget.classList.contains('is-open')));
     close.addEventListener('click', () => setOpen(false));
+    if (cancelAction) cancelAction.addEventListener('click', () => renderCancellationForm());
     if (modeSelect) modeSelect.addEventListener('change', updateContextDateTimeControls);
 
     form.addEventListener('submit', async (event) => {
@@ -109,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             appendMessage(data.answer || data.message || 'Mình chưa trả lời được lúc này, bạn thử lại giúp mình nhé.', 'bot');
             renderUiBlocks(data.uiBlocks || []);
+            if (isCancellationIntent(message)) renderCancellationPrompt();
         } catch {
             appendMessage('Xin lỗi, trợ lý AI đang tạm thời bận. Bạn thử lại sau ít phút nhé.', 'bot');
         } finally {
@@ -149,6 +150,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const submittedForm = event.target.closest('form');
         if (!submittedForm || !messages.contains(submittedForm)) return;
         event.preventDefault();
+
+        const cancellationForm = submittedForm.closest('.ai-cancellation-form');
+        if (cancellationForm) {
+            await submitCancellationForm(cancellationForm);
+            return;
+        }
 
         const bookingForm = submittedForm.closest('.ai-booking-form');
         if (!bookingForm) return;
@@ -544,6 +551,105 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const total = latestBookingSummary.querySelector('.ai-booking-total');
         if (total) total.textContent = `Tạm tính: ${formatMoney(baseTotalPrice + extraTotal)}`;
+    }
+
+    function renderCancellationPrompt() {
+        const wrapper = appendBlock('ai-cancellation-prompt');
+        const text = document.createElement('div');
+        text.className = 'ai-payment-message';
+        text.textContent = 'AI không tự hủy phòng, nhưng bạn có thể gửi yêu cầu để nhân viên kiểm tra.';
+        wrapper.appendChild(text);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ai-chip-btn';
+        button.textContent = 'Mở form yêu cầu hủy';
+        button.addEventListener('click', () => renderCancellationForm());
+        wrapper.appendChild(button);
+        scrollMessages();
+    }
+
+    async function renderCancellationForm() {
+        setOpen(true);
+        const wrapper = appendBlock('ai-cancellation-form-block');
+        wrapper.textContent = 'Đang tải chính sách hủy...';
+        let policy = null;
+        try {
+            const response = await fetch('/ai/cancellations/policy');
+            policy = await response.json().catch(() => null);
+        } catch {}
+
+        wrapper.innerHTML = '';
+        const formElement = document.createElement('form');
+        formElement.className = 'ai-cancellation-form ai-booking-form';
+
+        const title = document.createElement('h4');
+        title.textContent = 'Yêu cầu hủy phòng';
+        formElement.appendChild(title);
+
+        const policyBox = document.createElement('div');
+        policyBox.className = 'ai-payment-message';
+        policyBox.textContent = policy
+            ? `${policy.policyMessage || ''} Trước ${policy.noticeHours} giờ: hoàn ${policy.refundPercentBeforeNotice}%. Sau ngưỡng: hoàn ${policy.refundPercentAfterNotice}%.`
+            : 'Yêu cầu hủy sẽ được nhân viên kiểm tra và phản hồi qua email.';
+        formElement.appendChild(policyBox);
+
+        addCancellationInput(formElement, 'bookingCode', 'Mã đơn nếu có', 'text', false);
+        addCancellationInput(formElement, 'customerName', 'Họ tên', 'text', true, getCustomerName());
+        addCancellationInput(formElement, 'customerPhone', 'Số điện thoại', 'tel', true);
+        addCancellationInput(formElement, 'customerEmail', 'Email nhận phản hồi', 'email', true);
+        addCancellationInput(formElement, 'confirmationEmailProof', 'Ảnh email xác nhận đặt phòng', 'file', true);
+        addCancellationInput(formElement, 'refundQrImage', 'Ảnh QR nhận hoàn tiền', 'file', false);
+        addCancellationInput(formElement, 'refundBankName', 'Ngân hàng ví dụ MB, VCB', 'text', false);
+        addCancellationInput(formElement, 'refundBankAccountNumber', 'Số tài khoản', 'text', false);
+        addCancellationInput(formElement, 'refundBankAccountHolder', 'Tên chủ tài khoản', 'text', false);
+
+        const submit = document.createElement('button');
+        submit.className = 'ai-booking-submit';
+        submit.type = 'submit';
+        submit.textContent = 'Gửi yêu cầu hủy';
+        formElement.appendChild(submit);
+        wrapper.appendChild(formElement);
+        scrollMessages();
+    }
+
+    function addCancellationInput(formElement, name, labelText, type, required, value) {
+        const label = document.createElement('label');
+        const caption = document.createElement('span');
+        caption.textContent = labelText;
+        label.appendChild(caption);
+        const inputEl = document.createElement('input');
+        inputEl.name = name;
+        inputEl.type = type;
+        inputEl.required = required;
+        if (type === 'file') inputEl.accept = 'image/*';
+        if (type !== 'file' && value) inputEl.value = value;
+        label.appendChild(inputEl);
+        formElement.appendChild(label);
+    }
+
+    async function submitCancellationForm(cancellationForm) {
+        const submit = cancellationForm.querySelector('[type="submit"]');
+        if (submit) submit.disabled = true;
+        setBusy(true);
+        try {
+            const formData = new FormData(cancellationForm);
+            formData.append('sessionId', sessionId);
+            const response = await fetch('/ai/cancellations/submit', { method: 'POST', body: formData });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || 'Không gửi được yêu cầu hủy.');
+            appendMessage(data.message || 'Yêu cầu hủy đã được gửi. Nhân viên sẽ phản hồi qua email.', 'bot');
+            cancellationForm.remove();
+        } catch (error) {
+            appendMessage(error.message || 'Chưa gửi được yêu cầu hủy. Bạn thử lại giúp mình nhé.', 'bot');
+            if (submit) submit.disabled = false;
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    function isCancellationIntent(message) {
+        const text = String(message || '').toLowerCase();
+        return (text.includes('hủy') || text.includes('huy')) && text.includes('phòng');
     }
 
     function renderPaymentQr(data) {

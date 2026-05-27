@@ -105,6 +105,9 @@
 
     @{
         var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+        var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
+        var isHomePage = currentController.Equals("Home", StringComparison.OrdinalIgnoreCase)
+            && currentAction.Equals("Index", StringComparison.OrdinalIgnoreCase);
         var showPublicChatbot = !currentController.StartsWith("Admin", StringComparison.OrdinalIgnoreCase);
     }
     @if (showPublicChatbot)
@@ -161,6 +164,9 @@
                     </div>
                 </div>
                 <div class="ai-chat-status" aria-live="polite"></div>
+                <div class="ai-chat-quick-actions">
+                    <button type="button" class="ai-chip-btn ai-cancel-booking-action" id="ai-cancel-booking-action">Yêu cầu hủy phòng</button>
+                </div>
                 <form class="ai-chat-form">
                     <input class="ai-chat-input" type="text" maxlength="500" autocomplete="off" aria-label="Nhập nhu cầu tư vấn AI" placeholder="Nhập nhu cầu của bạn..." />
                     <button class="ai-chat-send" type="submit" aria-label="Gửi tin nhắn">
@@ -172,7 +178,7 @@
         </div>
     }
 
-    @if (Context.Session.GetString("AdminUser") != null)
+    @if (Context.Session.GetString("AdminUser") != null && !isHomePage)
     {
         <div id="admin-chat-notification" class="admin-chat-float" style="position:fixed;bottom:30px;right:30px;z-index:9999;display:none;">
             <a href="/admin/chat-monitor" class="btn btn-primary position-relative" style="width:60px;height:60px;border-radius:50%;box-shadow:0 4px 16px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;">
@@ -194,7 +200,9 @@
                         const badge = document.getElementById('admin-chat-badge');
                         const container = document.getElementById('admin-chat-notification');
                         if (!badge || !container) return;
-                        const count = list ? list.length : 0;
+                        const count = Array.isArray(list)
+                            ? list.reduce((sum, session) => sum + (Number(session.unreadCount) || 0), 0)
+                            : 0;
                         if (count > 0) {
                             badge.textContent = count;
                             badge.style.display = 'inline';
