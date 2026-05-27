@@ -1,5 +1,5 @@
 @{
-    ViewData["Title"] = "Chat Monitor";
+    ViewData["Title"] = "Giám sát hội thoại";
     Layout = "_Layout";
 }
 
@@ -7,65 +7,126 @@
     <link rel="stylesheet" href="~/css/admin-chat-monitor.css" asp-append-version="true" />
 }
 
-<div class="chat-monitor-container">
-    <aside class="chat-session-sidebar" id="session-sidebar">
+<div class="chat-monitor-shell">
+    <aside class="chat-session-sidebar" id="session-sidebar" aria-label="Danh sách hội thoại">
         <div class="sidebar-header">
-            <h5><i class="fas fa-comments me-2"></i>Hoi thoai</h5>
-            <span class="badge bg-primary" id="session-count-badge">0</span>
+            <div>
+                <span class="sidebar-kicker">Trung tâm hỗ trợ</span>
+                <h1><i class="fas fa-comments me-2"></i>Hội thoại</h1>
+            </div>
+            <span class="session-count" id="session-count-badge">0</span>
+        </div>
+        <div class="chat-filter-row">
+            <button class="btn btn-sm btn-primary" data-cancellation-filter="Pending">Yêu cầu hủy chờ xử lý</button>
+            <button class="btn btn-sm btn-outline-secondary" data-cancellation-filter="Approved">Đã chấp nhận</button>
+            <button class="btn btn-sm btn-outline-secondary" data-cancellation-filter="Rejected">Đã từ chối</button>
         </div>
         <div class="sidebar-search">
-            <input type="text" class="form-control form-control-sm" placeholder="Tim session..." id="session-search" />
+            <i class="fas fa-magnifying-glass"></i>
+            <input type="text" class="form-control" placeholder="Tìm theo tên hoặc mã phiên..." id="session-search" />
         </div>
         <div class="session-list" id="session-list">
-            <div class="text-muted text-center p-3">Dang tai...</div>
+            <div class="empty-state">Đang tải hội thoại...</div>
         </div>
     </aside>
 
-    <main class="chat-main-panel">
+    <main class="chat-main-panel" aria-label="Nội dung hội thoại">
         <div class="chat-placeholder" id="chat-placeholder">
-            <div class="text-center text-muted mt-5">
-                <i class="fas fa-comment-dots fa-4x mb-3"></i>
-                <p>Chon mot hoi thoai de xem chi tiet</p>
+            <div class="chat-placeholder-card">
+                <i class="fas fa-comment-dots"></i>
+                <h2>Chọn một hội thoại</h2>
+                <p>Chọn khách ở cột bên trái để xem tin nhắn và hỗ trợ khi cần.</p>
             </div>
         </div>
+
         <div class="chat-active-panel d-none" id="chat-active-panel">
             <div class="chat-active-header" id="chat-active-header">
-                <div class="d-flex align-items-center gap-2">
-                    <strong id="chat-customer-name">Khach</strong>
-                    <span class="badge" id="chat-status-badge">Dang theo doi</span>
+                <div class="chat-customer-block">
+                    <span class="chat-header-kicker">Đang theo dõi</span>
+                    <div class="chat-title-row">
+                        <strong id="chat-customer-name">Khách</strong>
+                        <span class="chat-session-code" id="chat-session-code">Phiên --</span>
+                    </div>
+                    <span class="badge chat-status-badge" id="chat-status-badge">Đang tải trạng thái</span>
                 </div>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-sm btn-outline-warning" id="btn-pause-ai">
-                        <i class="fas fa-pause me-1"></i>Pause AI
+                <div class="chat-action-group">
+                    <button class="btn btn-sm btn-outline-warning" id="btn-pause-ai" type="button">
+                        <i class="fas fa-pause me-1"></i>Tạm dừng AI
                     </button>
-                    <button class="btn btn-sm btn-outline-success d-none" id="btn-resume-ai">
-                        <i class="fas fa-play me-1"></i>Resume AI
+                    <button class="btn btn-sm btn-outline-success d-none" id="btn-resume-ai" type="button">
+                        <i class="fas fa-play me-1"></i>Bật lại AI
                     </button>
-                    <button class="btn btn-sm btn-outline-secondary" id="btn-config-auto-reply">
-                        <i class="fas fa-cog"></i>
+                    <button class="btn btn-sm btn-outline-secondary" id="btn-config-auto-reply" type="button">
+                        <i class="fas fa-message me-1"></i>Tin nhắn tự động
                     </button>
                 </div>
             </div>
+
             <div class="chat-messages-area" id="chat-messages-area">
-                <div class="text-center text-muted p-3">Dang tai tin nhan...</div>
+                <div class="empty-state">Đang tải tin nhắn...</div>
             </div>
+
             <div class="chat-reply-area">
-                <div class="input-group">
-                    <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-plus"></i>
+                <div class="input-group chat-reply-group">
+                    <button class="btn btn-outline-primary dropdown-toggle quick-send-button" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-plus me-1"></i>Gửi nhanh
                     </button>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item send-form-block" data-type="roomSelector" href="#">Gui danh sach phong</a></li>
-                        <li><a class="dropdown-item send-form-block" data-type="slotPicker" href="#">Gui khung gio</a></li>
-                        <li><a class="dropdown-item send-form-block" data-type="infoForm" href="#">Gui form thong tin</a></li>
-                        <li><a class="dropdown-item send-form-block" data-type="paymentQr" href="#">Gui QR thanh toan</a></li>
+                        <li><a class="dropdown-item send-form-block" data-type="roomSelector" href="#">Gửi danh sách phòng</a></li>
+                        <li><a class="dropdown-item send-form-block" data-type="slotPicker" href="#">Gửi khung giờ</a></li>
+                        <li><a class="dropdown-item send-form-block" data-type="infoForm" href="#">Gửi form thông tin</a></li>
+                        <li><a class="dropdown-item send-form-block" data-type="paymentQr" href="#">Gửi QR thanh toán</a></li>
                     </ul>
-                    <input type="text" class="form-control" id="admin-reply-input" placeholder="Nhap tin nhan..." maxlength="1000" />
-                    <button class="btn btn-primary" id="btn-send-reply"><i class="fas fa-paper-plane"></i></button>
+                    <input type="text" class="form-control" id="admin-reply-input" placeholder="Nhập tin nhắn cho khách..." maxlength="1000" />
+                    <button class="btn btn-primary send-reply-button" id="btn-send-reply" type="button" aria-label="Gửi tin nhắn">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
                 </div>
             </div>
         </div>
     </main>
+</div>
+
+<div class="modal fade cancellation-modal" id="cancellation-modal" tabindex="-1" aria-labelledby="cancellation-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <span class="modal-kicker">Duyệt yêu cầu hủy</span>
+                    <h2 class="modal-title" id="cancellation-modal-title">Chi tiết yêu cầu hủy phòng</h2>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <div id="cancellation-detail" class="cancellation-detail">
+                    <div class="empty-state">Chọn yêu cầu hủy để xem chi tiết.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade auto-reply-modal" id="auto-reply-modal" tabindex="-1" aria-labelledby="auto-reply-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <span class="modal-kicker">Cấu hình hội thoại</span>
+                    <h2 class="modal-title" id="auto-reply-modal-title">Tin nhắn tự động</h2>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <label class="auto-reply-label" for="auto-reply-message">Nội dung gửi cho khách khi AI tạm dừng</label>
+                <textarea class="form-control" id="auto-reply-message" rows="4" maxlength="500" placeholder="Ví dụ: Nhân viên đang kiểm tra thông tin và sẽ phản hồi bạn ngay."></textarea>
+                <p class="auto-reply-hint">Tin nhắn này giúp khách biết rằng nhân viên đang tiếp nhận hội thoại.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" id="btn-save-auto-reply">Lưu tin nhắn</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 @section Scripts {
