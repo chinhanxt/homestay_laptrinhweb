@@ -34,6 +34,7 @@ namespace WebHomestay.Data
         public DbSet<RolePermissionTemplate> RolePermissionTemplates { get; set; }
         public DbSet<AdminChatSession> AdminChatSessions => Set<AdminChatSession>();
         public DbSet<AdminChatMessage> AdminChatMessages => Set<AdminChatMessage>();
+        public DbSet<BookingCancellationRequest> BookingCancellationRequests => Set<BookingCancellationRequest>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -332,6 +333,41 @@ namespace WebHomestay.Data
                 entity.Property(e => e.CreatedAt).HasColumnName("created_at");
                 entity.Property(e => e.IsRead).HasColumnName("is_read");
                 entity.HasIndex(e => new { e.SessionId, e.CreatedAt });
+            });
+
+            modelBuilder.Entity<BookingCancellationRequest>(entity =>
+            {
+                entity.ToTable("booking_cancellation_requests");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.ChatSessionId).HasColumnName("chat_session_id").HasMaxLength(100);
+                entity.Property(e => e.BookingId).HasColumnName("booking_id");
+                entity.Property(e => e.SubmittedBookingCode).HasColumnName("submitted_booking_code").HasMaxLength(50);
+                entity.Property(e => e.CustomerName).HasColumnName("customer_name").HasMaxLength(200);
+                entity.Property(e => e.CustomerPhone).HasColumnName("customer_phone").HasMaxLength(20);
+                entity.Property(e => e.CustomerEmail).HasColumnName("customer_email").HasMaxLength(200);
+                entity.Property(e => e.ConfirmationEmailProofPath).HasColumnName("confirmation_email_proof_path");
+                entity.Property(e => e.RefundQrImagePath).HasColumnName("refund_qr_image_path");
+                entity.Property(e => e.RefundBankName).HasColumnName("refund_bank_name").HasMaxLength(100);
+                entity.Property(e => e.RefundBankAccountNumber).HasColumnName("refund_bank_account_number").HasMaxLength(50);
+                entity.Property(e => e.RefundBankAccountHolder).HasColumnName("refund_bank_account_holder").HasMaxLength(200);
+                entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(20);
+                entity.Property(e => e.SuggestedBookingIdsJson).HasColumnName("suggested_booking_ids_json");
+                entity.Property(e => e.PolicyNoticeHoursSnapshot).HasColumnName("policy_notice_hours_snapshot");
+                entity.Property(e => e.RefundPercentBeforeNoticeSnapshot).HasColumnName("refund_percent_before_notice_snapshot");
+                entity.Property(e => e.RefundPercentAfterNoticeSnapshot).HasColumnName("refund_percent_after_notice_snapshot");
+                entity.Property(e => e.PolicyMessageSnapshot).HasColumnName("policy_message_snapshot");
+                entity.Property(e => e.AppliedRefundPercent).HasColumnName("applied_refund_percent");
+                entity.Property(e => e.RefundStatus).HasColumnName("refund_status").HasMaxLength(20);
+                entity.Property(e => e.RefundBillProofPath).HasColumnName("refund_bill_proof_path");
+                entity.Property(e => e.StaffReason).HasColumnName("staff_reason");
+                entity.Property(e => e.ProcessedBy).HasColumnName("processed_by").HasMaxLength(100);
+                entity.Property(e => e.ProcessedAt).HasColumnName("processed_at");
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+                entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
+                entity.HasIndex(e => new { e.ChatSessionId, e.Status });
+                entity.HasIndex(e => e.BookingId);
+                entity.HasOne(e => e.Booking).WithMany().HasForeignKey(e => e.BookingId).OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<Holiday>(entity =>
