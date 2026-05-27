@@ -360,7 +360,7 @@ public class BookingCancellationServiceTests
     {
         public string EnvironmentName { get; set; } = "Development";
         public string ApplicationName { get; set; } = "WebHomestay.Tests";
-        public string WebRootPath { get; set; } = Path.GetTempPath();
+        public string WebRootPath { get; set; } = Path.Combine(Path.GetTempPath(), "webhomestay-webroot", Guid.NewGuid().ToString());
         public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
         public string ContentRootPath { get; set; } = Path.Combine(Path.GetTempPath(), "webhomestay-tests", Guid.NewGuid().ToString());
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
