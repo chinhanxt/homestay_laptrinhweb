@@ -32,6 +32,7 @@ builder.Services.AddScoped<WebHomestay.Services.IAvailabilityService, WebHomesta
 builder.Services.AddScoped<WebHomestay.Services.ISlotGenerationService, WebHomestay.Services.SlotGenerationService>();
 builder.Services.AddScoped<WebHomestay.Services.IRoomBookingViewService, WebHomestay.Services.RoomBookingViewService>();
 builder.Services.AddScoped<WebHomestay.Services.IBookingCreationService, WebHomestay.Services.BookingCreationService>();
+builder.Services.AddScoped<WebHomestay.Services.IBookingCancellationService, WebHomestay.Services.BookingCancellationService>();
 builder.Services.AddScoped<WebHomestay.Services.ISlotManagementService, WebHomestay.Services.SlotManagementService>();
 builder.Services.AddScoped<WebHomestay.Services.IMailService, WebHomestay.Services.MailService>();
 builder.Services.AddMemoryCache();

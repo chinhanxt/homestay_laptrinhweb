@@ -22,6 +22,7 @@ namespace WebHomestay.Data
         public DbSet<RoomSlotInventory> RoomSlotInventories { get; set; }
         public DbSet<RoomSlotOverride> RoomSlotOverrides { get; set; }
         public DbSet<SystemSetting> SystemSettings { get; set; }
+<<<<<<< HEAD
         public DbSet<Holiday> Holidays { get; set; }
         public DbSet<AIKnowledgeCollection> AIKnowledgeCollections { get; set; }
         public DbSet<AIKnowledgeArticle> AIKnowledgeArticles { get; set; }
@@ -35,6 +36,9 @@ namespace WebHomestay.Data
         public DbSet<AdminChatSession> AdminChatSessions => Set<AdminChatSession>();
         public DbSet<AdminChatMessage> AdminChatMessages => Set<AdminChatMessage>();
         public DbSet<BookingCancellationRequest> BookingCancellationRequests => Set<BookingCancellationRequest>();
+=======
+        public DbSet<BookingCancellationRequest> BookingCancellationRequests { get; set; }
+>>>>>>> 3a81c21 (feat: add booking cancellation service)
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -231,6 +235,7 @@ namespace WebHomestay.Data
                 entity.Property(e => e.LastUpdated).HasColumnName("last_updated");
             });
 
+<<<<<<< HEAD
 
             modelBuilder.Entity<AIBrainScope>(entity =>
             {
@@ -339,6 +344,11 @@ namespace WebHomestay.Data
             {
                 entity.ToTable("booking_cancellation_requests");
                 entity.HasKey(e => e.Id);
+=======
+            modelBuilder.Entity<BookingCancellationRequest>(entity =>
+            {
+                entity.ToTable("booking_cancellation_requests");
+>>>>>>> 3a81c21 (feat: add booking cancellation service)
                 entity.Property(e => e.Id).HasColumnName("id");
                 entity.Property(e => e.ChatSessionId).HasColumnName("chat_session_id").HasMaxLength(100);
                 entity.Property(e => e.BookingId).HasColumnName("booking_id");
@@ -369,6 +379,7 @@ namespace WebHomestay.Data
                 entity.HasIndex(e => e.BookingId);
                 entity.HasOne(e => e.Booking).WithMany().HasForeignKey(e => e.BookingId).OnDelete(DeleteBehavior.SetNull);
             });
+<<<<<<< HEAD
 
             modelBuilder.Entity<Holiday>(entity =>
             {
@@ -394,6 +405,8 @@ namespace WebHomestay.Data
                 entity.Property(e => e.PriceHolidayPerDay).HasColumnName("price_holiday_per_day");
                 entity.Property(e => e.AdditionalImages).HasColumnName("additional_images");
             });
+=======
+>>>>>>> 3a81c21 (feat: add booking cancellation service)
         }
     }
 }
