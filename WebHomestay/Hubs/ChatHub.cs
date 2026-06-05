@@ -36,7 +36,8 @@ public class ChatHub : Hub
             sessionId,
             status = "paused",
             pausedBy = adminUser,
-            lastActivityAt = DateTime.Now
+            lastActivityAt = DateTime.Now,
+            totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync()
         });
     }
 
@@ -49,7 +50,8 @@ public class ChatHub : Hub
             sessionId,
             status = "auto",
             pausedBy = (string?)null,
-            lastActivityAt = DateTime.Now
+            lastActivityAt = DateTime.Now,
+            totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync()
         });
     }
 
@@ -74,7 +76,8 @@ public class ChatHub : Hub
             sessionId,
             status = "auto",
             lastMessage = content,
-            lastActivityAt = DateTime.Now
+            lastActivityAt = DateTime.Now,
+            totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync()
         });
     }
 
@@ -86,13 +89,18 @@ public class ChatHub : Hub
     private async Task SendSessionList(string connectionId)
     {
         var activeSessions = await _adminChatService.GetActiveSessionsAsync(30);
+        var sessionIds = activeSessions.Select(s => s.SessionId).ToList();
+        var unreadCounts = await _adminChatService.GetUnreadCustomerMessageCountsAsync(sessionIds);
+        var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
         var result = activeSessions.Select(s => new
         {
             sessionId = s.SessionId,
             customerName = s.CustomerName,
             status = s.Status,
             pausedBy = s.PausedBy,
-            lastActivityAt = s.LastActivityAt
+            lastActivityAt = s.LastActivityAt,
+            unreadCount = unreadCounts.GetValueOrDefault(s.SessionId),
+            totalUnreadCount
         }).ToList();
 
         await Clients.Client(connectionId).SendAsync("sessionList", result);

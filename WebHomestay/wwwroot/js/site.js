@@ -4,11 +4,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const toggle = widget.querySelector('.ai-chat-toggle');
     const close = widget.querySelector('.ai-chat-close');
+    const zaloToggle = widget.querySelector('.ai-zalo-toggle');
+    const zaloPopover = widget.querySelector('#ai-zalo-popover');
+    const zaloClose = widget.querySelector('.ai-zalo-close');
+    const zaloList = widget.querySelector('.ai-zalo-list');
     const form = widget.querySelector('.ai-chat-form');
     const input = widget.querySelector('.ai-chat-input');
     const sendButton = widget.querySelector('.ai-chat-send');
     const messages = widget.querySelector('.ai-chat-messages');
     const status = widget.querySelector('.ai-chat-status');
+    const contextToggle = widget.querySelector('.ai-context-toggle');
+    const contextToggleHint = widget.querySelector('.ai-context-toggle-hint');
+    const contextToggleIcon = widget.querySelector('.ai-context-toggle-icon');
+    const contextForm = widget.querySelector('.ai-chat-context');
+    const bookingConsultAction = widget.querySelector('#ai-booking-consult-action');
     const nameInput = widget.querySelector('.ai-context-name');
     const branchSelect = widget.querySelector('.ai-context-branch');
     const modeSelect = widget.querySelector('.ai-context-mode');
@@ -22,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let sessionId = createSessionId();
     let bookingState = {};
     let latestBookingSummary = null;
+    let zaloContactsLoaded = false;
 
     // Connect to SignalR hub for admin chat monitor
     let chatHubConnection = null;
@@ -70,11 +80,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadBranches();
     updateContextDateTimeControls();
+    setContextExpanded(false);
     connectChatHub(sessionId);
 
-    toggle.addEventListener('click', () => setOpen(!widget.classList.contains('is-open')));
+    toggle.addEventListener('click', () => {
+        setZaloOpen(false);
+        setOpen(!widget.classList.contains('is-open'));
+    });
     close.addEventListener('click', () => setOpen(false));
-    if (cancelAction) cancelAction.addEventListener('click', () => renderCancellationForm());
+    if (zaloToggle) zaloToggle.addEventListener('click', () => setZaloOpen(zaloPopover ? zaloPopover.hidden : true));
+    if (zaloClose) zaloClose.addEventListener('click', () => setZaloOpen(false));
+    if (contextToggle) contextToggle.addEventListener('click', () => setContextExpanded(contextForm ? contextForm.hidden : true));
+    if (bookingConsultAction) bookingConsultAction.addEventListener('click', () => {
+        setContextExpanded(true);
+        if (nameInput) nameInput.focus();
+    });
+    if (cancelAction) cancelAction.addEventListener('click', () => renderCancellationPrompt());
     if (modeSelect) modeSelect.addEventListener('change', updateContextDateTimeControls);
 
     form.addEventListener('submit', async (event) => {
@@ -111,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderUiBlocks(data.uiBlocks || []);
             if (isCancellationIntent(message)) renderCancellationPrompt();
         } catch {
-            appendMessage('Xin lỗi, trợ lý AI đang tạm thời bận. Bạn thử lại sau ít phút nhé.', 'bot');
+            appendMessage('Xin lỗi, nhân viên tư vấn đang tạm thời bận. Bạn thử lại sau ít phút nhé.', 'bot');
         } finally {
             setBusy(false);
         }
@@ -214,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function setBusy(busy) {
         input.disabled = busy;
         sendButton.disabled = busy;
-        status.textContent = busy ? 'AI đang xử lý...' : '';
+        status.textContent = busy ? 'Nhân viên đang xử lý...' : '';
     }
 
     function appendMessage(text, type) {
@@ -553,18 +574,101 @@ document.addEventListener('DOMContentLoaded', () => {
         if (total) total.textContent = `Tạm tính: ${formatMoney(baseTotalPrice + extraTotal)}`;
     }
 
+    async function setZaloOpen(open) {
+        if (!zaloPopover) return;
+        zaloPopover.hidden = !open;
+        widget.classList.toggle('is-zalo-open', open);
+        if (zaloToggle) zaloToggle.setAttribute('aria-expanded', String(open));
+        if (open && !zaloContactsLoaded) await loadZaloContacts();
+    }
+
+    async function loadZaloContacts() {
+        if (!zaloList) return;
+        zaloList.textContent = 'Đang tải danh sách chi nhánh...';
+        try {
+            const response = await fetch('/admin/branches/public-contacts');
+            const branches = await response.json().catch(() => []);
+            if (!response.ok) throw new Error('Không tải được danh sách Zalo.');
+            renderZaloContacts(Array.isArray(branches) ? branches : []);
+            zaloContactsLoaded = true;
+        } catch (error) {
+            zaloList.textContent = error.message || 'Không tải được danh sách Zalo.';
+        }
+    }
+
+    function renderZaloContacts(branches) {
+        if (!zaloList) return;
+        zaloList.innerHTML = '';
+        if (branches.length === 0) {
+            zaloList.textContent = 'Hiện chưa có chi nhánh để liên hệ Zalo.';
+            return;
+        }
+
+        branches.forEach(branch => {
+            const item = document.createElement('div');
+            item.className = 'ai-zalo-item';
+
+            const name = document.createElement('div');
+            name.className = 'ai-zalo-branch-name';
+            name.textContent = branch.name || 'Chi nhánh';
+            item.appendChild(name);
+
+            const zaloPhone = String(branch.zaloPhone || '').trim();
+            if (zaloPhone) {
+                const link = document.createElement('a');
+                link.href = buildZaloLink(zaloPhone);
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.textContent = zaloPhone;
+                item.appendChild(link);
+            } else {
+                const empty = document.createElement('span');
+                empty.className = 'ai-zalo-empty';
+                empty.textContent = 'Chưa cấu hình Zalo';
+                item.appendChild(empty);
+            }
+
+            zaloList.appendChild(item);
+        });
+    }
+
+    function setContextExpanded(expanded) {
+        if (!contextForm) return;
+        contextForm.hidden = !expanded;
+        contextForm.classList.toggle('is-collapsed', !expanded);
+        if (contextToggle) contextToggle.setAttribute('aria-expanded', String(expanded));
+        if (contextToggleHint) {
+            contextToggleHint.textContent = expanded
+                ? 'Ẩn thông tin để quay lại khung chat rộng hơn'
+                : 'Tên, chi nhánh, ngày đặt, số khách';
+        }
+        if (contextToggleIcon) {
+            contextToggleIcon.classList.toggle('fa-chevron-down', !expanded);
+            contextToggleIcon.classList.toggle('fa-chevron-up', expanded);
+        }
+    }
+
     function renderCancellationPrompt() {
         const wrapper = appendBlock('ai-cancellation-prompt');
         const text = document.createElement('div');
         text.className = 'ai-payment-message';
-        text.textContent = 'AI không tự hủy phòng, nhưng bạn có thể gửi yêu cầu để nhân viên kiểm tra.';
+        text.textContent = 'Nhân viên không tự hủy phòng, nhưng bạn có thể gửi yêu cầu để nhân viên kiểm tra hoặc liên hệ trực tiếp chi nhánh đã đặt.';
         wrapper.appendChild(text);
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'ai-chip-btn';
-        button.textContent = 'Mở form yêu cầu hủy';
-        button.addEventListener('click', () => renderCancellationForm());
-        wrapper.appendChild(button);
+
+        const requestButton = document.createElement('button');
+        requestButton.type = 'button';
+        requestButton.className = 'ai-action-btn ai-action-primary';
+        requestButton.textContent = 'Gửi yêu cầu hủy';
+        requestButton.addEventListener('click', () => renderCancellationForm());
+        wrapper.appendChild(requestButton);
+
+        const contactButton = document.createElement('button');
+        contactButton.type = 'button';
+        contactButton.className = 'ai-action-btn ai-action-secondary';
+        contactButton.textContent = 'Liên hệ Zalo/email';
+        contactButton.addEventListener('click', () => renderCancellationBranchContactSelector());
+        wrapper.appendChild(contactButton);
+
         scrollMessages();
     }
 
@@ -593,6 +697,13 @@ document.addEventListener('DOMContentLoaded', () => {
             : 'Yêu cầu hủy sẽ được nhân viên kiểm tra và phản hồi qua email.';
         formElement.appendChild(policyBox);
 
+        const contactOption = document.createElement('button');
+        contactOption.type = 'button';
+        contactOption.className = 'ai-action-btn ai-action-secondary';
+        contactOption.textContent = 'Liên hệ Zalo/email chi nhánh';
+        contactOption.addEventListener('click', () => renderCancellationBranchContactSelector());
+        formElement.appendChild(contactOption);
+
         addCancellationInput(formElement, 'bookingCode', 'Mã đơn nếu có', 'text', false);
         addCancellationInput(formElement, 'customerName', 'Họ tên', 'text', true, getCustomerName());
         addCancellationInput(formElement, 'customerPhone', 'Số điện thoại', 'tel', true);
@@ -609,6 +720,105 @@ document.addEventListener('DOMContentLoaded', () => {
         submit.textContent = 'Gửi yêu cầu hủy';
         formElement.appendChild(submit);
         wrapper.appendChild(formElement);
+        scrollMessages();
+    }
+
+    async function renderCancellationBranchContactSelector() {
+        setOpen(true);
+        const wrapper = appendBlock('ai-cancellation-contact-block');
+        wrapper.textContent = 'Đang tải danh sách chi nhánh...';
+
+        try {
+            const response = await fetch('/admin/branches/public-contacts');
+            const branches = await response.json().catch(() => []);
+            if (!response.ok) throw new Error('Không tải được danh sách chi nhánh.');
+            if (!Array.isArray(branches) || branches.length === 0) {
+                wrapper.textContent = 'Hiện chưa có thông tin chi nhánh để liên hệ.';
+                scrollMessages();
+                return;
+            }
+
+            wrapper.innerHTML = '';
+            const message = document.createElement('div');
+            message.className = 'ai-payment-message';
+            message.textContent = 'Bạn chọn đúng chi nhánh đã đặt phòng để nhận Zalo/email liên hệ.';
+            wrapper.appendChild(message);
+
+            const select = document.createElement('select');
+            select.className = 'ai-booking-input';
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Chọn chi nhánh đã đặt';
+            select.appendChild(placeholder);
+
+            branches.forEach(branch => {
+                const option = document.createElement('option');
+                option.value = String(branch.id || '');
+                option.textContent = branch.address ? `${branch.name} - ${branch.address}` : branch.name;
+                select.appendChild(option);
+            });
+            wrapper.appendChild(select);
+
+            const contactBox = document.createElement('div');
+            contactBox.className = 'ai-payment-message';
+            contactBox.hidden = true;
+            wrapper.appendChild(contactBox);
+
+            select.addEventListener('change', () => {
+                const selected = branches.find(branch => String(branch.id || '') === select.value);
+                renderSelectedBranchContact(contactBox, selected);
+            });
+        } catch (error) {
+            wrapper.textContent = error.message || 'Không tải được thông tin chi nhánh.';
+        }
+
+        scrollMessages();
+    }
+
+    function renderSelectedBranchContact(contactBox, branch) {
+        contactBox.hidden = !branch;
+        contactBox.innerHTML = '';
+        if (!branch) return;
+
+        const title = document.createElement('div');
+        title.className = 'fw-bold mb-2';
+        title.textContent = branch.name || 'Chi nhánh';
+        contactBox.appendChild(title);
+
+        if (branch.address) {
+            const address = document.createElement('div');
+            address.textContent = `Địa chỉ: ${branch.address}`;
+            contactBox.appendChild(address);
+        }
+
+        const zaloPhone = String(branch.zaloPhone || '').trim();
+        const zaloLine = document.createElement('div');
+        if (zaloPhone) {
+            const zaloLink = document.createElement('a');
+            zaloLink.href = buildZaloLink(zaloPhone);
+            zaloLink.target = '_blank';
+            zaloLink.rel = 'noopener noreferrer';
+            zaloLink.textContent = zaloPhone;
+            zaloLine.appendChild(document.createTextNode('Zalo: '));
+            zaloLine.appendChild(zaloLink);
+        } else {
+            zaloLine.textContent = 'Zalo: Chi nhánh chưa cấu hình SĐT Zalo.';
+        }
+        contactBox.appendChild(zaloLine);
+
+        const email = String(branch.email || '').trim();
+        const emailLine = document.createElement('div');
+        if (email) {
+            const emailLink = document.createElement('a');
+            emailLink.href = `mailto:${email}`;
+            emailLink.textContent = email;
+            emailLine.appendChild(document.createTextNode('Email: '));
+            emailLine.appendChild(emailLink);
+        } else {
+            emailLine.textContent = 'Email: Chi nhánh chưa cấu hình email.';
+        }
+        contactBox.appendChild(emailLine);
+
         scrollMessages();
     }
 
@@ -921,6 +1131,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (field.name === 'customerEmail') return 'email@example.com';
         if (field.name === 'guestCount') return '2';
         return '';
+    }
+
+    function buildZaloLink(phone) {
+        const digits = String(phone || '').replace(/\D/g, '');
+        return digits ? `https://zalo.me/${digits}` : '#';
     }
 
     function scrollMessages() {

@@ -27,7 +27,8 @@ namespace WebHomestay.Controllers
             var rooms = await _context.Rooms
                 .Include(r => r.Amenities)
                 .Include(r => r.Branch)
-                .Take(6)
+                .OrderBy(r => r.Branch != null ? r.Branch.Name : "")
+                .ThenBy(r => r.Name)
                 .ToListAsync();
 
             ViewBag.Branches = await _context.Branches.ToListAsync();

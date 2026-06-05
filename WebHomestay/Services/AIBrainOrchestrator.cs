@@ -127,13 +127,75 @@ namespace WebHomestay.Services
                 if (match.Success && int.TryParse(match.Groups[1].Value, out var parsedGuests)) enriched.GuestCount = parsedGuests;
             }
 
-            if (!enriched.StartTime.HasValue && TryExtractDate(conversationAwareMessage, out var requestedDate))
+            if (!enriched.StartTime.HasValue)
             {
-                enriched.StartTime = requestedDate.ToDateTime(TimeOnly.MinValue);
-                enriched.EndTime = requestedDate.ToDateTime(TimeOnly.MaxValue);
+                if (TryExtractDateRange(conversationAwareMessage, out var rangeStart, out var rangeEnd))
+                {
+                    enriched.StartTime = rangeStart.ToDateTime(TimeOnly.MinValue);
+                    enriched.EndTime = rangeEnd.ToDateTime(TimeOnly.MaxValue);
+                }
+                else if (TryExtractDate(conversationAwareMessage, out var requestedDate))
+                {
+                    enriched.StartTime = requestedDate.ToDateTime(TimeOnly.MinValue);
+                    enriched.EndTime = requestedDate.ToDateTime(TimeOnly.MaxValue);
+                }
             }
 
             return enriched;
+        }
+
+        private bool TryExtractDateRange(string message, out DateOnly startDate, out DateOnly endDate)
+        {
+            var lowered = message.ToLowerInvariant();
+            var today = DateTime.Today;
+
+            var match = Regex.Match(lowered, @"(\d{1,2})\s*(?:đến|to|\-|–|—|~)\s*(\d{1,2})(?:\s*[/-]\s*(\d{1,2}))?(?:\s*[/-]\s*(\d{2,4}))?");
+            if (match.Success)
+            {
+                var day1 = int.Parse(match.Groups[1].Value);
+                var day2 = int.Parse(match.Groups[2].Value);
+                var month = match.Groups[3].Success ? int.Parse(match.Groups[3].Value) : today.Month;
+                var year = match.Groups[4].Success ? int.Parse(match.Groups[4].Value) : today.Year;
+                if (year < 100) year += 2000;
+
+                if (month < 1 || month > 12) month = today.Month;
+                if (day1 < 1 || day1 > 31 || day2 < 1 || day2 > 31) { startDate = endDate = default; return false; }
+
+                if (DateOnly.TryParse($"{year:D4}-{month:D2}-{day1:D2}", out startDate)
+                    && DateOnly.TryParse($"{year:D4}-{month:D2}-{day2:D2}", out endDate))
+                {
+                    if (startDate > endDate)
+                    {
+                        (startDate, endDate) = (endDate, startDate);
+                    }
+                    return true;
+                }
+            }
+
+            var dayRangeMatch = Regex.Match(lowered, @"(\d{1,2})\s*(?:đến|to|\-|–|—|~)\s*(\d{1,2})\s*(?:(?:tháng|t)\s*(\d{1,2}))?");
+            if (dayRangeMatch.Success)
+            {
+                var day1 = int.Parse(dayRangeMatch.Groups[1].Value);
+                var day2 = int.Parse(dayRangeMatch.Groups[2].Value);
+                var month = dayRangeMatch.Groups[3].Success ? int.Parse(dayRangeMatch.Groups[3].Value) : today.Month;
+                var year = today.Year;
+
+                if (month < 1 || month > 12) month = today.Month;
+                if (day1 < 1 || day1 > 31 || day2 < 1 || day2 > 31) { startDate = endDate = default; return false; }
+
+                if (DateOnly.TryParse($"{year:D4}-{month:D2}-{day1:D2}", out startDate)
+                    && DateOnly.TryParse($"{year:D4}-{month:D2}-{day2:D2}", out endDate))
+                {
+                    if (startDate > endDate)
+                    {
+                        (startDate, endDate) = (endDate, startDate);
+                    }
+                    return true;
+                }
+            }
+
+            startDate = endDate = default;
+            return false;
         }
 
         private bool TryExtractDate(string message, out DateOnly date)

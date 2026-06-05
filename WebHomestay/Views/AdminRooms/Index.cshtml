@@ -24,24 +24,40 @@
             </div>
         </header>
 
+        <!-- Filter Bar -->
+        <div class="staff-filter-bar mb-3">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="filter-group">
+                    <label class="filter-label">Chi nhánh</label>
+                    <select class="form-select form-select-sm room-filter" id="filterBranch">
+                        <option value="">Tất cả</option>
+                        @foreach (var branch in ViewBag.Branches as List<WebHomestay.Models.Branch> ?? new())
+                        {
+                            <option value="@branch.Id">@branch.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <div class="admin-card">
             <div class="admin-table-responsive">
-                <table class="admin-table">
+                <table class="admin-table staff-table" id="roomsTable">
                     <thead>
                         <tr>
                             <th>Ảnh</th>
-                            <th>Thông tin phòng</th>
-                            <th>Chi nhánh</th>
-                            <th>Đơn giá (Ngày/Giờ)</th>
-                            <th>Sức chứa</th>
-                            <th>Trạng thái</th>
+                            <th class="sortable" data-sort="name">Thông tin phòng <i class="fas fa-sort"></i></th>
+                            <th class="sortable" data-sort="branch">Chi nhánh <i class="fas fa-sort"></i></th>
+                            <th class="sortable" data-sort="price_day">Đơn giá (Ngày/Giờ) <i class="fas fa-sort"></i></th>
+                            <th class="sortable" data-sort="capacity">Sức chứa <i class="fas fa-sort"></i></th>
+                            <th class="sortable" data-sort="status">Trạng thái <i class="fas fa-sort"></i></th>
                             <th class="text-end">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var item in Model)
                         {
-                            <tr>
+                            <tr data-name="@item.Name" data-branch="@item.BranchId" data-status="@item.Status" data-price-day="@item.PricePerDay" data-price-hour="@item.PricePerHour" data-capacity="@item.Capacity">
                                 <td>
                                     @if (!string.IsNullOrEmpty(item.ImageUrl))
                                     {
@@ -138,6 +154,43 @@
 </div>
 
 @section Scripts {
+    <script>
+        function filterRoomTable() {
+            var branch = document.getElementById('filterBranch').value;
+            var rows = document.querySelectorAll('#roomsTable tbody tr');
+            rows.forEach(function(r) {
+                if (r.querySelectorAll('td').length < 7) return;
+                r.style.display = (branch && r.dataset.branch !== branch) ? 'none' : '';
+            });
+        }
+
+        document.getElementById('filterBranch').addEventListener('change', filterRoomTable);
+
+        // Sort
+        var roomsSortAsc = null, roomsSortField = null;
+        document.querySelectorAll('#roomsTable .sortable').forEach(function(th) {
+            th.addEventListener('click', function() {
+                var field = this.dataset.sort;
+                if (roomsSortField === field) { roomsSortAsc = !roomsSortAsc; }
+                else { roomsSortField = field; roomsSortAsc = true; }
+                document.querySelectorAll('#roomsTable .sortable i').forEach(function(i) { i.className = 'fas fa-sort'; });
+                this.querySelector('i').className = roomsSortAsc ? 'fas fa-sort-up' : 'fas fa-sort-down';
+                var tbody = document.querySelector('#roomsTable tbody');
+                var rows = Array.from(tbody.querySelectorAll('tr')).filter(function(r) { return r.dataset.name !== undefined; });
+                rows.sort(function(a, b) {
+                    var order = roomsSortAsc ? 1 : -1, va, vb;
+                    if (field === 'name') { va = (a.dataset.name || '').toLowerCase(); vb = (b.dataset.name || '').toLowerCase(); return va.localeCompare(vb) * order; }
+                    if (field === 'branch') { va = parseInt(a.dataset.branch) || 0; vb = parseInt(b.dataset.branch) || 0; return (va - vb) * order; }
+                    if (field === 'status') { va = a.dataset.status || ''; vb = b.dataset.status || ''; return va.localeCompare(vb) * order; }
+                    if (field === 'price_day') { va = parseFloat(a.dataset.priceDay) || 0; vb = parseFloat(b.dataset.priceDay) || 0; return (va - vb) * order; }
+                    if (field === 'price_hour') { va = parseFloat(a.dataset.priceHour) || 0; vb = parseFloat(b.dataset.priceHour) || 0; return (va - vb) * order; }
+                    if (field === 'capacity') { va = parseInt(a.dataset.capacity) || 0; vb = parseInt(b.dataset.capacity) || 0; return (va - vb) * order; }
+                    return 0;
+                });
+                rows.forEach(function(r) { tbody.appendChild(r); });
+            });
+        });
+    </script>
     <script>
         function showLuxToast(message, type = 'success') {
             let container = document.querySelector('.lux-toast-container');

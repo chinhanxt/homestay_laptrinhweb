@@ -32,24 +32,67 @@
             </div>
         }
 
+        <!-- Filter Bar -->
+        <div class="staff-filter-bar mb-3">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="filter-group">
+                    <label class="filter-label">Trạng thái</label>
+                    <select class="form-select form-select-sm booking-filter" id="filterStatus">
+                        <option value="">Tất cả</option>
+                        <option value="AwaitingPayment">Chờ thanh toán</option>
+                        <option value="AwaitingApproval">Cần duyệt bill</option>
+                        <option value="Confirmed">Đã xác nhận</option>
+                        <option value="CheckedIn">Check-in</option>
+                        <option value="CheckedOut">Check-out</option>
+                        <option value="Cancelled">Đã hủy</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Chi nhánh</label>
+                    <select class="form-select form-select-sm booking-filter" id="filterBranch">
+                        <option value="">Tất cả</option>
+                        @foreach (var branch in ViewBag.Branches as List<WebHomestay.Models.Branch> ?? new())
+                        {
+                            <option value="@branch.Id">@branch.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Hình thức</label>
+                    <select class="form-select form-select-sm booking-filter" id="filterMode">
+                        <option value="">Tất cả</option>
+                        <option value="Daily">Theo ngày</option>
+                        <option value="Hourly">Theo giờ</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Tìm kiếm</label>
+                    <input type="text" class="form-control form-control-sm booking-filter" id="filterSearch" placeholder="Tên khách, SĐT..." style="min-width: 180px;" />
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" id="resetFilters" title="Xoá bộ lọc">
+                    <i class="fas fa-undo"></i>
+                </button>
+            </div>
+        </div>
+
         <div class="admin-card">
             <div class="admin-table-responsive">
-                <table class="admin-table">
+                <table class="admin-table staff-table" id="bookingsTable">
                     <thead>
                         <tr>
-                            <th>Mã đơn</th>
-                            <th>Khách hàng</th>
-                            <th>Phòng</th>
-                            <th>Thời gian / Số lượng</th>
+                            <th class="sortable" data-sort="id">Mã đơn <i class="fas fa-sort"></i></th>
+                            <th class="sortable" data-sort="customer">Khách hàng <i class="fas fa-sort"></i></th>
+                            <th class="sortable" data-sort="room">Phòng <i class="fas fa-sort"></i></th>
+                            <th class="sortable" data-sort="time">Thời gian / Số lượng <i class="fas fa-sort"></i></th>
                             <th>Minh chứng</th>
-                            <th>Trạng thái</th>
+                            <th class="sortable" data-sort="status">Trạng thái <i class="fas fa-sort"></i></th>
                             <th class="text-end">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var item in Model)
                         {
-                            <tr>
+                            <tr data-status="@item.Status" data-branch="@item.Room?.BranchId" data-mode="@item.BookingMode" data-customer="@item.CustomerName" data-phone="@item.CustomerPhone" data-price="@item.TotalPrice" data-start="@item.StartTime.ToString("yyyy-MM-ddTHH:mm:ss")" data-room="@item.Room?.Name">
                                 <td>
                                     <div class="fw-bold">#@item.Id</div>
                                     <div class="small text-muted">@item.CreatedAt.AddHours(7).ToString("dd/MM HH:mm")</div>
@@ -227,7 +270,7 @@
                         @if (!Model.Any())
                         {
                             <tr>
-                                <td colspan="6" class="text-center py-5">
+                                <td colspan="7" class="text-center py-5">
                                     <div class="text-muted opacity-50">
                                         <i class="fas fa-receipt fa-3x mb-3"></i>
                                         <p>Chưa có đơn đặt phòng nào.</p>
@@ -242,11 +285,13 @@
     </div>
 </div>
 
-@if (TempData["ErrorMessage"] != null || TempData["SuccessMessage"] != null)
-{
+@{
     var isError = TempData["ErrorMessage"] != null;
     var message = isError ? TempData["ErrorMessage"] : TempData["SuccessMessage"];
+}
 
+@if (TempData["ErrorMessage"] != null || TempData["SuccessMessage"] != null)
+{
     <div class="lux-toast-container" id="toast-notif">
         <div class="lux-toast @(isError ? "is-danger" : "is-success")">
             <div class="lux-toast-accent"></div>
@@ -255,33 +300,36 @@
             </div>
         </div>
     </div>
+}
 
-    @section Scripts {
-        <script>
-            function showLuxToast(message, type = 'success') {
-                let container = document.querySelector('.lux-toast-container');
-                if (!container) {
-                    container = document.createElement('div');
-                    container.className = 'lux-toast-container';
-                    document.body.appendChild(container);
-                }
-                
-                const toast = document.createElement('div');
-                toast.className = `lux-toast ${type === 'error' ? 'is-danger' : 'is-success'}`;
-                toast.innerHTML = `
-                    <div class="lux-toast-accent"></div>
-                    <div class="lux-toast-content">${message}</div>
-                `;
-                
-                container.appendChild(toast);
-                
-                setTimeout(() => {
-                    toast.classList.add('fade-out');
-                    setTimeout(() => toast.remove(), 500);
-                }, 4000);
+@section Scripts {
+    <script>
+        function showLuxToast(message, type = 'success') {
+            let container = document.querySelector('.lux-toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'lux-toast-container';
+                document.body.appendChild(container);
             }
+            
+            const toast = document.createElement('div');
+            toast.className = `lux-toast ${type === 'error' ? 'is-danger' : 'is-success'}`;
+            toast.innerHTML = `
+                <div class="lux-toast-accent"></div>
+                <div class="lux-toast-content">${message}</div>
+            `;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('fade-out');
+                setTimeout(() => toast.remove(), 500);
+            }, 4000);
+        }
 
-            // Xử lý toast từ TempData
+        @if (TempData["ErrorMessage"] != null || TempData["SuccessMessage"] != null)
+        {
+            <text>
             setTimeout(function() {
                 const toast = document.getElementById('toast-notif');
                 if (toast) {
@@ -289,6 +337,66 @@
                     setTimeout(() => toast.remove(), 500);
                 }
             }, 4000);
-        </script>
-    }
+            </text>
+        }
+
+        // Filter
+        function filterBookingTable() {
+            var status = document.getElementById('filterStatus').value;
+            var branch = document.getElementById('filterBranch').value;
+            var mode = document.getElementById('filterMode').value;
+            var search = document.getElementById('filterSearch').value.toLowerCase().trim();
+            var rows = document.querySelectorAll('#bookingsTable tbody tr');
+            rows.forEach(function(r) {
+                if (r.querySelectorAll('td').length < 7) return;
+                var match = true;
+                if (status && r.dataset.status !== status) match = false;
+                if (branch && r.dataset.branch !== branch) match = false;
+                if (mode && r.dataset.mode !== mode) match = false;
+                if (search) {
+                    var cus = (r.dataset.customer || '').toLowerCase();
+                    var phone = (r.dataset.phone || '').toLowerCase();
+                    if (cus.indexOf(search) === -1 && phone.indexOf(search) === -1) match = false;
+                }
+                r.style.display = match ? '' : 'none';
+            });
+        }
+
+        document.querySelectorAll('.booking-filter').forEach(function(el) {
+            el.addEventListener('change', filterBookingTable);
+            el.addEventListener('input', filterBookingTable);
+        });
+        document.getElementById('resetFilters').addEventListener('click', function() {
+            document.getElementById('filterStatus').value = '';
+            document.getElementById('filterBranch').value = '';
+            document.getElementById('filterMode').value = '';
+            document.getElementById('filterSearch').value = '';
+            filterBookingTable();
+        });
+
+        // Sort
+        var bookingsSortAsc = null, bookingsSortField = null;
+        document.querySelectorAll('#bookingsTable .sortable').forEach(function(th) {
+            th.addEventListener('click', function() {
+                var field = this.dataset.sort;
+                if (bookingsSortField === field) { bookingsSortAsc = !bookingsSortAsc; }
+                else { bookingsSortField = field; bookingsSortAsc = true; }
+                document.querySelectorAll('#bookingsTable .sortable i').forEach(function(i) { i.className = 'fas fa-sort'; });
+                this.querySelector('i').className = bookingsSortAsc ? 'fas fa-sort-up' : 'fas fa-sort-down';
+                var tbody = document.querySelector('#bookingsTable tbody');
+                var rows = Array.from(tbody.querySelectorAll('tr')).filter(function(r) { return r.dataset.status !== undefined; });
+                rows.sort(function(a, b) {
+                    var order = bookingsSortAsc ? 1 : -1, va, vb;
+                    if (field === 'id') { return ((a.dataset.start || '')).localeCompare(b.dataset.start || '') * order; }
+                    if (field === 'customer') { va = (a.dataset.customer || '').toLowerCase(); vb = (b.dataset.customer || '').toLowerCase(); return va.localeCompare(vb) * order; }
+                    if (field === 'room') { va = (a.dataset.room || '').toLowerCase(); vb = (b.dataset.room || '').toLowerCase(); return va.localeCompare(vb) * order; }
+                    if (field === 'time') { return ((a.dataset.start || '')).localeCompare(b.dataset.start || '') * order; }
+                    if (field === 'price') { va = parseFloat(a.dataset.price) || 0; vb = parseFloat(b.dataset.price) || 0; return (va - vb) * order; }
+                    if (field === 'status') { va = a.dataset.status || ''; vb = b.dataset.status || ''; return va.localeCompare(vb) * order; }
+                    return 0;
+                });
+                rows.forEach(function(r) { tbody.appendChild(r); });
+            });
+        });
+    </script>
 }

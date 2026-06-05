@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using WebHomestay.Services;
@@ -16,6 +17,8 @@ namespace WebHomestay.Filters
 
         public void OnAuthorization(AuthorizationFilterContext context)
         {
+            if (context.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any()) return;
+
             var session = context.HttpContext.Session;
             var user = session.GetString("AdminUser");
             var role = session.GetString("AdminRole");

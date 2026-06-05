@@ -37,6 +37,10 @@ public class BookingActionRequest
     public string Action { get; set; } = string.Empty;
     public int? RoomId { get; set; }
     public int? SlotId { get; set; }
+    public string? BookingMode { get; set; }
+    public string? CheckInDate { get; set; }
+    public string? CheckOutDate { get; set; }
+    public string? HourlyDate { get; set; }
     public Dictionary<string, string>? FormData { get; set; }
 }
 

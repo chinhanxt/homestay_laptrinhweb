@@ -25,6 +25,7 @@ namespace WebHomestay.Controllers
         public async Task<IActionResult> Index()
         {
             var staff = await _context.AdminUsers.Include(u => u.Branch).ToListAsync();
+            ViewBag.Branches = await _context.Branches.OrderBy(b => b.Name).ToListAsync();
             return View(staff);
         }
 

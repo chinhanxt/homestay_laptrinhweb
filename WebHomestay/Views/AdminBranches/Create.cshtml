@@ -35,11 +35,17 @@
                     </div>
                     <div class="col-md-5">
                         <div class="admin-form-group">
-                            <label asp-for="Hotline" class="admin-form-label">Hotline liên hệ</label>
+                            <label asp-for="Hotline" class="admin-form-label">SĐT Zalo</label>
                             <input asp-for="Hotline" class="admin-form-input" placeholder="090..." />
                             <span asp-validation-for="Hotline" class="text-danger small"></span>
                         </div>
                     </div>
+                </div>
+
+                <div class="admin-form-group">
+                    <label asp-for="Email" class="admin-form-label">Email chi nhánh</label>
+                    <input asp-for="Email" class="admin-form-input" placeholder="chinhanh@example.com" />
+                    <span asp-validation-for="Email" class="text-danger small"></span>
                 </div>
 
                 <div class="admin-form-group">

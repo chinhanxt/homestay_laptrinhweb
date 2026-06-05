@@ -36,6 +36,7 @@ namespace WebHomestay.Controllers
                 query = query.Where(r => r.BranchId == branchId.Value);
             }
 
+            ViewBag.Branches = await _context.Branches.OrderBy(b => b.Name).ToListAsync();
             return View(await query.ToListAsync());
         }
 

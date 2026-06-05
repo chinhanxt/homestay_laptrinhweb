@@ -84,6 +84,7 @@ namespace WebHomestay.Data
                 entity.Property(e => e.Address).HasColumnName("address");
                 entity.Property(e => e.Description).HasColumnName("description");
                 entity.Property(e => e.Hotline).HasColumnName("hotline");
+                entity.Property(e => e.Email).HasColumnName("email").HasMaxLength(100);
                 entity.Property(e => e.MapUrl).HasColumnName("map_url");
                 entity.Property(e => e.BookingLeadTimeHours).HasColumnName("booking_lead_time_hours");
             });
@@ -363,6 +364,11 @@ namespace WebHomestay.Data
                 entity.Property(e => e.StaffReason).HasColumnName("staff_reason");
                 entity.Property(e => e.ProcessedBy).HasColumnName("processed_by").HasMaxLength(100);
                 entity.Property(e => e.ProcessedAt).HasColumnName("processed_at");
+                entity.Property(e => e.NotificationEmailSubject).HasColumnName("notification_email_subject").HasMaxLength(200);
+                entity.Property(e => e.NotificationEmailBody).HasColumnName("notification_email_body");
+                entity.Property(e => e.NotificationEmailSentAt).HasColumnName("notification_email_sent_at");
+                entity.Property(e => e.NotificationEmailAttachmentName).HasColumnName("notification_email_attachment_name").HasMaxLength(255);
+                entity.Property(e => e.NotificationEmailType).HasColumnName("notification_email_type").HasMaxLength(20);
                 entity.Property(e => e.CreatedAt).HasColumnName("created_at");
                 entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
                 entity.HasIndex(e => new { e.ChatSessionId, e.Status });

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
@@ -8,6 +9,14 @@ namespace WebHomestay.Services;
 public class BookingCancellationService : IBookingCancellationService
 {
     public const long MaxImageBytes = 5 * 1024 * 1024;
+    public const string ApprovalSubjectSettingKey = "CancellationApprovalEmailSubject";
+    public const string ApprovalBodySettingKey = "CancellationApprovalEmailBody";
+    public const string RejectionSubjectSettingKey = "CancellationRejectionEmailSubject";
+    public const string RejectionBodySettingKey = "CancellationRejectionEmailBody";
+    public const string DefaultApprovalSubject = "Yêu cầu hủy đặt phòng đã được duyệt";
+    public const string DefaultApprovalBody = "Xin chào {CustomerName},<br><br>Yêu cầu hủy booking #{BookingId} của quý khách đã được duyệt.<br>Phòng: {RoomName}<br>Thời gian: {StartTime} - {EndTime}<br>Tỷ lệ hoàn tiền: {RefundPercent}%<br>Ghi chú: {StaffReason}<br><br>Chính sách: {PolicyMessage}";
+    public const string DefaultRejectionSubject = "Yêu cầu hủy đặt phòng chưa được duyệt";
+    public const string DefaultRejectionBody = "Xin chào {CustomerName},<br><br>Yêu cầu hủy booking #{BookingId} của quý khách chưa được duyệt.<br>Phòng: {RoomName}<br>Thời gian: {StartTime} - {EndTime}<br>Ghi chú: {StaffReason}<br><br>Chính sách: {PolicyMessage}";
 
     private static readonly Dictionary<string, string> AllowedImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -100,6 +109,31 @@ public class BookingCancellationService : IBookingCancellationService
         return request;
     }
 
+    public async Task<CancellationEmailPreviewDto> BuildApprovalPreviewAsync(ProcessCancellationDto dto, CancellationToken cancellationToken = default)
+    {
+        if (dto.RefundBillProof is null || dto.RefundBillProof.Length == 0) throw new InvalidOperationException("Vui lòng tải lên ảnh chứng từ hoàn tiền.");
+
+        var request = await LoadPendingRequestAsync(dto.RequestId, cancellationToken);
+        if (!request.BookingId.HasValue) throw new InvalidOperationException("Yêu cầu hủy chưa được liên kết với booking.");
+
+        var staffReason = RequireTrimmed(dto.StaffReason, 2000, "Vui lòng nhập lý do xử lý.", "Lý do xử lý không được vượt quá 2000 ký tự.");
+        var refundPercent = Math.Clamp(dto.AppliedRefundPercent, 0, 100);
+        var subject = await RenderTemplateAsync(request, ApprovalSubjectSettingKey, DefaultApprovalSubject, refundPercent, staffReason, cancellationToken);
+        var body = await RenderTemplateAsync(request, ApprovalBodySettingKey, DefaultApprovalBody, refundPercent, staffReason, cancellationToken);
+
+        return new CancellationEmailPreviewDto(request.CustomerEmail, subject, body, staffReason, dto.RefundBillProof.FileName, true);
+    }
+
+    public async Task<CancellationEmailPreviewDto> BuildRejectionPreviewAsync(ProcessCancellationDto dto, CancellationToken cancellationToken = default)
+    {
+        var request = await LoadPendingRequestAsync(dto.RequestId, cancellationToken);
+        var staffReason = RequireTrimmed(dto.StaffReason, 2000, "Vui lòng nhập lý do xử lý.", "Lý do xử lý không được vượt quá 2000 ký tự.");
+        var subject = await RenderTemplateAsync(request, RejectionSubjectSettingKey, DefaultRejectionSubject, 0, staffReason, cancellationToken);
+        var body = await RenderTemplateAsync(request, RejectionBodySettingKey, DefaultRejectionBody, 0, staffReason, cancellationToken);
+
+        return new CancellationEmailPreviewDto(request.CustomerEmail, subject, body, staffReason, null, false);
+    }
+
     public async Task<BookingCancellationRequest> ApproveAsync(ProcessCancellationDto dto, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(dto.StaffReason)) throw new InvalidOperationException("Vui lòng nhập lý do xử lý.");
@@ -134,8 +168,23 @@ public class BookingCancellationService : IBookingCancellationService
             }
         }
 
+        var subject = OptionalTrimmed(dto.NotificationEmailSubject, 200, "Tiêu đề email không được vượt quá 200 ký tự.")
+            ?? await RenderTemplateAsync(request, ApprovalSubjectSettingKey, DefaultApprovalSubject, request.AppliedRefundPercent ?? 0, staffReason, cancellationToken);
+        var body = string.IsNullOrWhiteSpace(dto.NotificationEmailBody)
+            ? await RenderTemplateAsync(request, ApprovalBodySettingKey, DefaultApprovalBody, request.AppliedRefundPercent ?? 0, staffReason, cancellationToken)
+            : dto.NotificationEmailBody.Trim();
+        var attachmentName = Path.GetFileName(dto.RefundBillProof.FileName);
+        var attachment = new EmailAttachment(request.RefundBillProofPath!, attachmentName, dto.RefundBillProof.ContentType);
+
         await _context.SaveChangesAsync(cancellationToken);
-        await _mailService.SendEmailAsync(request.CustomerEmail, "Yêu cầu hủy đặt phòng đã được duyệt", BuildApprovalEmail(request));
+        await _mailService.SendEmailAsync(request.CustomerEmail, subject, body, new[] { attachment });
+
+        request.NotificationEmailSubject = subject;
+        request.NotificationEmailBody = body;
+        request.NotificationEmailSentAt = DateTime.UtcNow;
+        request.NotificationEmailAttachmentName = attachmentName;
+        request.NotificationEmailType = "Approved";
+        await _context.SaveChangesAsync(cancellationToken);
         return request;
     }
 
@@ -153,8 +202,21 @@ public class BookingCancellationService : IBookingCancellationService
         request.ProcessedAt = DateTime.UtcNow;
         request.UpdatedAt = DateTime.UtcNow;
 
+        var subject = OptionalTrimmed(dto.NotificationEmailSubject, 200, "Tiêu đề email không được vượt quá 200 ký tự.")
+            ?? await RenderTemplateAsync(request, RejectionSubjectSettingKey, DefaultRejectionSubject, 0, staffReason, cancellationToken);
+        var body = string.IsNullOrWhiteSpace(dto.NotificationEmailBody)
+            ? await RenderTemplateAsync(request, RejectionBodySettingKey, DefaultRejectionBody, 0, staffReason, cancellationToken)
+            : dto.NotificationEmailBody.Trim();
+
         await _context.SaveChangesAsync(cancellationToken);
-        await _mailService.SendEmailAsync(request.CustomerEmail, "Yêu cầu hủy đặt phòng bị từ chối", BuildRejectionEmail(request));
+        await _mailService.SendEmailAsync(request.CustomerEmail, subject, body);
+
+        request.NotificationEmailSubject = subject;
+        request.NotificationEmailBody = body;
+        request.NotificationEmailSentAt = DateTime.UtcNow;
+        request.NotificationEmailAttachmentName = null;
+        request.NotificationEmailType = "Rejected";
+        await _context.SaveChangesAsync(cancellationToken);
         return request;
     }
 
@@ -279,15 +341,33 @@ public class BookingCancellationService : IBookingCancellationService
         return int.TryParse(digits, out var id) ? id : null;
     }
 
-    private static string BuildApprovalEmail(BookingCancellationRequest request)
+    private async Task<string> RenderTemplateAsync(
+        BookingCancellationRequest request,
+        string settingKey,
+        string defaultTemplate,
+        int refundPercent,
+        string staffReason,
+        CancellationToken cancellationToken)
     {
-        var bookingLine = request.BookingId.HasValue ? $"Mã booking: {request.BookingId.Value}\n" : string.Empty;
-        return $"Yêu cầu hủy của quý khách đã được duyệt.\n{bookingLine}Lý do/ghi chú: {request.StaffReason}\nTỷ lệ hoàn tiền: {request.AppliedRefundPercent}%\nChính sách: {request.PolicyMessageSnapshot}";
-    }
+        var template = await _settingService.GetStringAsync(settingKey, defaultTemplate);
+        if (string.IsNullOrWhiteSpace(template)) template = defaultTemplate;
 
-    private static string BuildRejectionEmail(BookingCancellationRequest request)
-    {
-        var bookingLine = request.BookingId.HasValue ? $"Mã booking: {request.BookingId.Value}\n" : string.Empty;
-        return $"Yêu cầu hủy của quý khách chưa được duyệt.\n{bookingLine}Lý do/ghi chú: {request.StaffReason}\nChính sách: {request.PolicyMessageSnapshot}";
+        Booking? booking = null;
+        if (request.BookingId.HasValue)
+        {
+            booking = await _context.Bookings
+                .Include(b => b.Room)
+                .FirstOrDefaultAsync(b => b.Id == request.BookingId.Value, cancellationToken);
+        }
+
+        return template
+            .Replace("{CustomerName}", WebUtility.HtmlEncode(request.CustomerName))
+            .Replace("{BookingId}", WebUtility.HtmlEncode(request.BookingId?.ToString() ?? string.Empty))
+            .Replace("{RoomName}", WebUtility.HtmlEncode(booking?.Room?.Name ?? string.Empty))
+            .Replace("{StartTime}", WebUtility.HtmlEncode(booking?.StartTime.ToString("dd/MM/yyyy HH:mm") ?? string.Empty))
+            .Replace("{EndTime}", WebUtility.HtmlEncode(booking?.EndTime.ToString("dd/MM/yyyy HH:mm") ?? string.Empty))
+            .Replace("{RefundPercent}", WebUtility.HtmlEncode(refundPercent.ToString()))
+            .Replace("{StaffReason}", WebUtility.HtmlEncode(staffReason))
+            .Replace("{PolicyMessage}", WebUtility.HtmlEncode(request.PolicyMessageSnapshot));
     }
 }

@@ -1,3 +1,4 @@
+@using System.Text.Json
 @model IEnumerable<WebHomestay.Models.Branch>
 
 @{
@@ -24,21 +25,38 @@
             </div>
         </header>
 
+        <!-- Filter Bar -->
+        <div class="staff-filter-bar mb-3">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="filter-group">
+                    <label class="filter-label">Chi nhánh</label>
+                    <select class="form-select form-select-sm" id="filterBranch">
+                        <option value="">Tất cả</option>
+                        @foreach (var item in Model.OrderBy(b => b.Name))
+                        {
+                            <option value="@item.Name">@item.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <div class="admin-card">
             <div class="admin-table-responsive">
-                <table class="admin-table">
+                <table class="admin-table staff-table" id="branchesTable">
                     <thead>
                         <tr>
-                            <th>Tên chi nhánh</th>
-                            <th>Địa chỉ</th>
-                            <th>Hotline</th>
+                            <th class="sortable" data-sort="name">Tên chi nhánh <i class="fas fa-sort"></i></th>
+                            <th class="sortable" data-sort="address">Địa chỉ <i class="fas fa-sort"></i></th>
+                            <th class="sortable" data-sort="hotline">SĐT Zalo <i class="fas fa-sort"></i></th>
+                            <th>Email</th>
                             <th class="text-end">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var item in Model)
                         {
-                            <tr>
+                            <tr data-name="@item.Name" data-address="@item.Address" data-hotline="@item.Hotline">
                                 <td>
                                     <div class="fw-bold text-primary">@item.Name</div>
                                     <div class="small text-muted">ID: #@item.Id</div>
@@ -47,7 +65,10 @@
                                     <div class="small"><i class="fas fa-map-marker-alt me-2 text-muted"></i>@item.Address</div>
                                 </td>
                                 <td>
-                                    <div class="small"><i class="fas fa-phone me-2 text-muted"></i>@item.Hotline</div>
+                                    <div class="small"><i class="fas fa-comment-dots me-2 text-muted"></i>@item.Hotline</div>
+                                </td>
+                                <td>
+                                    <div class="small"><i class="fas fa-envelope me-2 text-muted"></i>@(string.IsNullOrWhiteSpace(item.Email) ? "Chưa cấu hình" : item.Email)</div>
                                 </td>
                                 <td class="text-end">
                                      <div class="admin-actions">
@@ -75,7 +96,7 @@
                         @if (!Model.Any())
                         {
                             <tr>
-                                <td colspan="4" class="text-center py-5">
+                                <td colspan="5" class="text-center py-5">
                                     <div class="text-muted">
                                         <i class="fas fa-building fa-3x mb-3 opacity-20"></i>
                                         <p>Chưa có chi nhánh nào trong hệ thống.</p>
@@ -92,6 +113,39 @@
 
 @section Scripts {
     <script>
+        // Sort columns
+        var branchesSortAsc = null, branchesSortField = null;
+        document.querySelectorAll('#branchesTable .sortable').forEach(function(th) {
+            th.addEventListener('click', function() {
+                var field = this.dataset.sort;
+                if (branchesSortField === field) { branchesSortAsc = !branchesSortAsc; }
+                else { branchesSortField = field; branchesSortAsc = true; }
+                document.querySelectorAll('#branchesTable .sortable i').forEach(function(i) { i.className = 'fas fa-sort'; });
+                this.querySelector('i').className = branchesSortAsc ? 'fas fa-sort-up' : 'fas fa-sort-down';
+                var tbody = document.querySelector('#branchesTable tbody');
+                var rows = Array.from(tbody.querySelectorAll('tr')).filter(function(r) { return r.dataset.name !== undefined; });
+                rows.sort(function(a, b) {
+                    var order = branchesSortAsc ? 1 : -1, va, vb;
+                    if (field === 'name') { va = (a.dataset.name || '').toLowerCase(); vb = (b.dataset.name || '').toLowerCase(); return va.localeCompare(vb) * order; }
+                    if (field === 'address') { va = (a.dataset.address || '').toLowerCase(); vb = (b.dataset.address || '').toLowerCase(); return va.localeCompare(vb) * order; }
+                    if (field === 'hotline') { va = a.dataset.hotline || ''; vb = b.dataset.hotline || ''; return va.localeCompare(vb) * order; }
+                    return 0;
+                });
+                rows.forEach(function(r) { tbody.appendChild(r); });
+            });
+        });
+
+        // Branch filter
+        document.getElementById('filterBranch').addEventListener('change', function() {
+            var selected = this.value;
+            var rows = document.querySelectorAll('#branchesTable tbody tr');
+            rows.forEach(function(r) {
+                if (r.querySelectorAll('td').length < 5) return;
+                r.style.display = (selected && r.dataset.name !== selected) ? 'none' : '';
+            });
+        });
+    </script>
+    <script>
         function showLuxToast(message, type = 'success') {
             let container = document.querySelector('.lux-toast-container');
             if (!container) {
@@ -102,11 +156,14 @@
             
             const toast = document.createElement('div');
             toast.className = `lux-toast ${type === 'error' ? 'is-danger' : 'is-success'}`;
-            toast.innerHTML = `
-                <div class="lux-toast-accent"></div>
-                <div class="lux-toast-content">${message}</div>
-            `;
-            
+            const accent = document.createElement('div');
+            accent.className = 'lux-toast-accent';
+            const content = document.createElement('div');
+            content.className = 'lux-toast-content';
+            content.textContent = message;
+            toast.appendChild(accent);
+            toast.appendChild(content);
+
             container.appendChild(toast);
             
             setTimeout(() => {
@@ -118,11 +175,11 @@
         // Tự động hiển thị TempData message nếu có
         @if (TempData["SuccessMessage"] != null)
         {
-            <text>showLuxToast('@TempData["SuccessMessage"]', 'success');</text>
+            <text>showLuxToast(@Html.Raw(JsonSerializer.Serialize(TempData["SuccessMessage"])), 'success');</text>
         }
         @if (TempData["ErrorMessage"] != null)
         {
-            <text>showLuxToast('@TempData["ErrorMessage"]', 'error');</text>
+            <text>showLuxToast(@Html.Raw(JsonSerializer.Serialize(TempData["ErrorMessage"])), 'error');</text>
         }
     </script>
 }

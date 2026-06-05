@@ -42,6 +42,8 @@ namespace WebHomestay.Controllers
                 query = query.Where(b => b.Room.BranchId == branchId.Value);
             }
 
+            ViewBag.Branches = await _context.Branches.OrderBy(b => b.Name).ToListAsync();
+
             // Auto-complete logic based on system settings
             var checkoutMode = await _settingService.GetStringAsync("CheckoutMode", "Auto");
             ViewBag.CheckoutMode = checkoutMode;

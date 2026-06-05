@@ -13,6 +13,10 @@
     var cancellationRefundBefore = Model.FirstOrDefault(s => s.SettingKey == "CancellationRefundPercentBeforeNotice")?.SettingValue ?? "50";
     var cancellationRefundAfter = Model.FirstOrDefault(s => s.SettingKey == "CancellationRefundPercentAfterNotice")?.SettingValue ?? "0";
     var cancellationPolicyMessage = Model.FirstOrDefault(s => s.SettingKey == "CancellationPolicyMessage")?.SettingValue ?? "";
+    var cancellationApprovalEmailSubject = Model.FirstOrDefault(s => s.SettingKey == "CancellationApprovalEmailSubject")?.SettingValue ?? WebHomestay.Services.BookingCancellationService.DefaultApprovalSubject;
+    var cancellationApprovalEmailBody = Model.FirstOrDefault(s => s.SettingKey == "CancellationApprovalEmailBody")?.SettingValue ?? WebHomestay.Services.BookingCancellationService.DefaultApprovalBody;
+    var cancellationRejectionEmailSubject = Model.FirstOrDefault(s => s.SettingKey == "CancellationRejectionEmailSubject")?.SettingValue ?? WebHomestay.Services.BookingCancellationService.DefaultRejectionSubject;
+    var cancellationRejectionEmailBody = Model.FirstOrDefault(s => s.SettingKey == "CancellationRejectionEmailBody")?.SettingValue ?? WebHomestay.Services.BookingCancellationService.DefaultRejectionBody;
 }
 
 <link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
@@ -163,6 +167,24 @@
                                     <div class="col-12">
                                         <label class="form-label small fw-bold text-muted">Thông báo chính sách cho khách</label>
                                         <textarea name="policyMessage" rows="3" class="form-control premium-input">@cancellationPolicyMessage</textarea>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">Tiêu đề mail chấp nhận hủy</label>
+                                        <input type="text" name="approvalEmailSubject" value="@cancellationApprovalEmailSubject" class="form-control-premium" />
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">Nội dung mail chấp nhận hủy</label>
+                                        <textarea name="approvalEmailBody" rows="5" class="form-control premium-input">@cancellationApprovalEmailBody</textarea>
+                                        <div class="form-text">Placeholder: {CustomerName}, {BookingId}, {RoomName}, {StartTime}, {EndTime}, {RefundPercent}, {StaffReason}, {PolicyMessage}</div>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">Tiêu đề mail từ chối hủy</label>
+                                        <input type="text" name="rejectionEmailSubject" value="@cancellationRejectionEmailSubject" class="form-control-premium" />
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">Nội dung mail từ chối hủy</label>
+                                        <textarea name="rejectionEmailBody" rows="5" class="form-control premium-input">@cancellationRejectionEmailBody</textarea>
+                                        <div class="form-text">Placeholder: {CustomerName}, {BookingId}, {RoomName}, {StartTime}, {EndTime}, {RefundPercent}, {StaffReason}, {PolicyMessage}</div>
                                     </div>
                                 </div>
 

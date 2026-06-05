@@ -6,45 +6,44 @@ Before making changes, read **MANDATORY_CONTEXT.md** and **docs/yeucau/TONG_QUAN
 
 | Command | Action |
 |---------|--------|
-| `dotnet build WebHomestay/WebHomestay.csproj` | Build web app |
-| `dotnet run --project WebHomestay/WebHomestay.csproj` | Run web app (localhost:5000) |
+| `dotnet build WebHomestay/WebHomestay.csproj` / `.\r.ps1 b` | Build web app |
+| `dotnet run --project WebHomestay/WebHomestay.csproj` / `.\r.ps1 r` | Run web app (localhost:5000) |
 | `dotnet test WebHomestay.Tests/WebHomestay.Tests.csproj` | Run all tests |
 | `dotnet test ... --filter FullyQualifiedName~ClassName` | Run single test class |
 | `dotnet ef migrations add <Name> --project WebHomestay/WebHomestay.csproj` | Add EF migration |
 | `dotnet ef database update --project WebHomestay/WebHomestay.csproj` | Apply EF migrations |
-| `.\r.ps1 up` | Restore + build + run |
-| `.\r.ps1 watch` or `.\w.bat` | Hot reload |
-| `make up` / `make watch` | Alternative via Makefile |
+| `.\r.ps1 up` / `.\r.ps1 u` | Restore + build + run |
+| `.\r.ps1 watch` / `.\w.bat` / `.\r.ps1 w` | Hot reload |
+| `.\r.ps1 clean` / `.\r.ps1 c` | Clean build artifacts |
+| `make up` / `make watch` | Makefile alternative (Unix-friendly) |
 
-**Note:** No `.sln` at root — run commands per-project.
+**Note:** No `.sln` at root — run commands per-project. `make clean` uses `rm -rf` (fails on PowerShell; use `.\r.ps1 clean` instead).
 
 ## Architecture essentials
 
 - **Stack:** ASP.NET Core MVC net10.0, PostgreSQL (EF Core + Npgsql 8.0.0), vanilla HTML/CSS/Bootstrap/jQuery
 - **Auth:** Session-based admin auth (no cookie auth middleware). `AdminAuthorizeAttribute` filter (in `Filters/`) checks session keys: `AdminUser`, `AdminRole`. Uses `IPermissionResolveService` for fine-grained permission checks via `[AdminAuthorize(Permission = "module.action")]`.
-- **DB:** Auto-migrates on startup via `context.Database.Migrate()` at `Program.cs:61-66`. All table names are lowercase in `OnModelCreating` (e.g. `ai_knowledge_units`). EF Core + Npgsql with `EnableLegacyTimestampBehavior`.
+- **DB:** Auto-migrates on startup via `context.Database.Migrate()` at `Program.cs:61-66`. All table names are lowercase in `OnModelCreating` (e.g. `ai_knowledge_units`). EF Core + Npgsql with `EnableLegacyTimestampBehavior`. Connection string in `WebHomestay/appsettings.json:10`.
 - **AI key:** Read from `../key.md` at startup (`Program.cs:6-16`). Always a Groq key. Listed in `.gitignore`. Never commit secrets.
 - **Mock mode removed:** `AIModelClient` now throws if provider is `"mock"` — no fallback. Provider defaults to `"groq"` but can be overridden to `"openrouter"` or `"9router"`.
 
-## AI: two shared systems (unified Brain Center)
+## AI: two shared systems
 
 ### 1. Public AI Chat — LLM-powered booking conversation
 `AIChatController` (route `/ai`) → `AIBrainOrchestrator` (with `ChatMode.PublicBooking`)
 
 - **Runs through the same multi-agent pipeline as admin**, with a **Booking Conductor** agent (context-aware, rule-based with intent classification and decision matrix) that decides when to show rooms, slots, or auto-book.
-- Booking Conductor state cached in `IMemoryCache` with 30min TTL under key `ai-booking-conductor:{sessionId}`.
-- Session state: `AIBookingSessionState` with fields like `SelectedRoomId`, `HourlyDate`, `CheckInDate`, `CheckOutDate`, `GuestCount`, etc.
-- UI blocks returned as JSON arrays (same types: `roomCards`, `hourlySlots`, `dailyRooms`, `bookingSummary`, `bookingForm`, `paymentQr`).
-- LLM (via Final Synthesizer) writes natural-language replies; Booking Conductor decides *when* to trigger booking UI blocks.
+- Booking Conductor state cached in `IMemoryCache` with 30min TTL under key `ai-booking-conductor:{sessionId}`. Session state: `AIBookingSessionState` with fields like `SelectedRoomId`, `HourlyDate`, `CheckInDate`, `CheckOutDate`, `GuestCount`, etc.
+- UI blocks returned as JSON arrays (`roomCards`, `hourlySlots`, `dailyRooms`, `bookingSummary`, `bookingForm`, `paymentQr`). LLM writes replies; Conductor decides *when* to trigger blocks.
 - Auto-booking when all mandatory fields present + clear intent; shows pre-filled form when ambiguous.
 - Booking form fields configurable via `PublicBookingFormSchema` in `SystemSettings` (GroupName = "AI").
 - Upload endpoints: `POST /ai/booking-id-card` + `POST /ai/payment-proof`.
-- Booking Conductor configurable via settings: `ProactiveMode` (balanced/proactive/conservative), `AutoShowRooms`, `MaxRoomShows`, `RoomCooldown`, `ExitKeywords`, `Personality`.
+- Booking Conductor configurable via settings: `ProactiveMode`, `AutoShowRooms`, `MaxRoomShows`, `RoomCooldown`, `ExitKeywords`, `Personality`.
 
 ### 2. Admin AI Brain Center — multi-agent/RAG/Graph
 `AdminAIController` (route `/admin/ai`) → `AIBrainOrchestrator` → `AIModelClient`
 
-- Do NOT simplify to basic chatbot. Current implementation has 5 agents orchestrated sequentially:
+- **5 agents orchestrated sequentially** (do not simplify to basic chatbot):
   - **Persona** (rule-based: price sensitivity, urgency, group signals)
   - **Live Snapshot** (queries `RoomSlotInventories` + `AvailabilityService` in real time)
   - **Knowledge RAG** (matches message terms against `AIKnowledgeUnits` ordered by priority)

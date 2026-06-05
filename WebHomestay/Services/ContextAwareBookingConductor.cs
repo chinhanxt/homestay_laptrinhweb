@@ -13,6 +13,7 @@ public class ContextAwareBookingConductor : IBookingConductor
     private readonly IMemoryCache _cache;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IBookingCreationService _bookingCreationService;
+    private readonly IAdminChatService _adminChatService;
     private const string CacheKeyPrefix = "ai-booking-conductor:";
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(30);
 
@@ -28,12 +29,14 @@ public class ContextAwareBookingConductor : IBookingConductor
         ApplicationDbContext context,
         IMemoryCache cache,
         IServiceScopeFactory scopeFactory,
-        IBookingCreationService bookingCreationService)
+        IBookingCreationService bookingCreationService,
+        IAdminChatService adminChatService)
     {
         _context = context;
         _cache = cache;
         _scopeFactory = scopeFactory;
         _bookingCreationService = bookingCreationService;
+        _adminChatService = adminChatService;
     }
 
     private string CacheKey(string sessionId) => $"{CacheKeyPrefix}{sessionId}";
@@ -63,6 +66,18 @@ public class ContextAwareBookingConductor : IBookingConductor
         {
             uiBlocks = await BuildRoomCardsAsync(container.Confirmed, cancellationToken);
             IncrementShowCount(sessionId);
+        }
+
+        if (action == ConductorAction.AskInfo
+            && container.Confirmed.BranchId.HasValue
+            && !container.Confirmed.HourlyDate.HasValue
+            && !container.Confirmed.CheckInDate.HasValue)
+        {
+            uiBlocks.Add(new
+            {
+                type = "dateSelector",
+                data = new { }
+            });
         }
 
         if (action == ConductorAction.Reply && intent == MessageIntent.Exit)
@@ -208,16 +223,144 @@ public class ContextAwareBookingConductor : IBookingConductor
             case "select-room":
                 container.Progress.SelectedRoomId = actionRequest.RoomId;
                 CacheState(actionRequest.SessionId, container);
-                if (container.Confirmed.HourlyDate.HasValue || container.Confirmed.CheckInDate.HasValue)
+
+                var hasDates = container.Confirmed.HourlyDate.HasValue || container.Confirmed.CheckInDate.HasValue;
+                if (!hasDates)
                 {
-                    return await BuildSlotsResponse(container, cancellationToken);
+                    return new BookingActionResult
+                    {
+                        Answer = "Bạn vui lòng chọn ngày đặt phòng nhé:",
+                        Action = ConductorAction.AskInfo,
+                        State = container,
+                        UiBlocks = new List<object>
+                        {
+                            new
+                            {
+                                type = "dateSelector",
+                                data = new { }
+                            }
+                        }
+                    };
                 }
-                return new BookingActionResult
+
+                var isDailyMode = container.Confirmed.CheckOutDate.HasValue;
+                if (isDailyMode)
                 {
-                    Answer = "Bạn muốn đặt phòng theo giờ hay theo ngày?",
-                    Action = ConductorAction.AskInfo,
-                    State = container
-                };
+                    var room = await _context.Rooms
+                        .Where(r => r.Id == actionRequest.RoomId)
+                        .Select(r => new { r.Name, r.PricePerDay })
+                        .FirstOrDefaultAsync(cancellationToken);
+
+                    var lines = new List<string>
+                    {
+                        $"Phòng: {room?.Name ?? "Đã chọn"}",
+                        $"Nhận: {container.Confirmed.CheckInDate:dd/MM/yyyy}",
+                        $"Trả: {container.Confirmed.CheckOutDate:dd/MM/yyyy}",
+                        $"Khách: {container.Confirmed.GuestCount}"
+                    };
+
+                    return new BookingActionResult
+                    {
+                        Answer = "Thông tin đặt phòng của bạn. Vui lòng điền thông tin liên hệ để hoàn tất.",
+                        Action = ConductorAction.ShowForm,
+                        State = container,
+                        UiBlocks = new List<object>
+                        {
+                            new
+                            {
+                                type = "bookingSummary",
+                                data = new
+                                {
+                                    title = "Xác nhận thông tin đặt phòng",
+                                    lines,
+                                    totalPrice = room?.PricePerDay ?? 0m
+                                }
+                            },
+                            new
+                            {
+                                type = "bookingForm",
+                                data = new { fields = LoadBookingFormFields() }
+                            }
+                        }
+                    };
+                }
+
+                return await BuildSlotsResponse(container, cancellationToken);
+
+            case "confirm-dates":
+                if (!string.IsNullOrEmpty(actionRequest.BookingMode))
+                    container.Confirmed.BookingMode = actionRequest.BookingMode;
+                if (!string.IsNullOrEmpty(actionRequest.CheckInDate)
+                    && DateOnly.TryParse(actionRequest.CheckInDate, out var ciDate))
+                {
+                    container.Confirmed.HourlyDate = ciDate;
+                    container.Confirmed.CheckInDate = ciDate;
+                }
+                if (!string.IsNullOrEmpty(actionRequest.CheckOutDate)
+                    && DateOnly.TryParse(actionRequest.CheckOutDate, out var coDate))
+                {
+                    container.Confirmed.CheckOutDate = coDate;
+                }
+                CacheState(actionRequest.SessionId, container);
+
+                var selectedRoomId = container.Progress?.SelectedRoomId;
+                if (!selectedRoomId.HasValue)
+                {
+                    var roomCards = await BuildRoomCardsAsync(container.Confirmed, cancellationToken);
+                    IncrementShowCount(actionRequest.SessionId);
+                    return new BookingActionResult
+                    {
+                        Answer = "Cảm ơn bạn! Dưới đây là các phòng trống. Bạn chọn phòng nhé.",
+                        Action = ConductorAction.ShowRooms,
+                        State = container,
+                        UiBlocks = roomCards
+                    };
+                }
+
+                var isDailyConfirm = container.Confirmed.CheckOutDate.HasValue
+                    || container.Confirmed.BookingMode == "daily";
+                if (isDailyConfirm)
+                {
+                    var room = await _context.Rooms
+                        .Where(r => r.Id == selectedRoomId.Value)
+                        .Select(r => new { r.Name, r.PricePerDay })
+                        .FirstOrDefaultAsync(cancellationToken);
+
+                    var lines = new List<string>
+                    {
+                        $"Phòng: {room?.Name ?? "Đã chọn"}",
+                        $"Nhận: {container.Confirmed.CheckInDate:dd/MM/yyyy}",
+                        $"Trả: {container.Confirmed.CheckOutDate:dd/MM/yyyy}",
+                        $"Khách: {container.Confirmed.GuestCount}"
+                    };
+
+                    return new BookingActionResult
+                    {
+                        Answer = "Cảm ơn bạn! Thông tin đặt phòng của bạn như sau. Vui lòng điền thông tin liên hệ để hoàn tất.",
+                        Action = ConductorAction.ShowForm,
+                        State = container,
+                        UiBlocks = new List<object>
+                        {
+                            new
+                            {
+                                type = "bookingSummary",
+                                data = new
+                                {
+                                    title = "Xác nhận thông tin đặt phòng",
+                                    lines,
+                                    totalPrice = room?.PricePerDay ?? 0m
+                                }
+                            },
+                            new
+                            {
+                                type = "bookingForm",
+                                data = new { fields = LoadBookingFormFields() }
+                            }
+                        }
+                    };
+                }
+
+                return await BuildSlotsResponse(container, cancellationToken);
 
             case "select-slot":
                 container.Progress.SelectedSlotId = actionRequest.SlotId;
@@ -246,16 +389,26 @@ public class ContextAwareBookingConductor : IBookingConductor
                         ?? actionRequest.FormData.GetValueOrDefault("customerPhone");
                     container.Progress.CustomerEmail = actionRequest.FormData.GetValueOrDefault("email")
                         ?? actionRequest.FormData.GetValueOrDefault("customerEmail");
+                    
+                    // Task 2 FIX: Update AdminChatSession.CustomerName when form is submitted
+                    if (!string.IsNullOrWhiteSpace(container.Progress.CustomerName))
+                    {
+                        await _adminChatService.UpsertSessionAsync(actionRequest.SessionId, container.Progress.CustomerName);
+                    }
                 }
                 CacheState(actionRequest.SessionId, container);
 
                 try
                 {
+                    var isDaily = container.Confirmed.CheckOutDate.HasValue;
+
                     var createReq = new CreateBookingRequest
                     {
                         RoomId = container.Progress.SelectedRoomId ?? 0,
-                        BookingMode = BookingMode.Hourly,
-                        SlotInventoryId = container.Progress.SelectedSlotId,
+                        BookingMode = isDaily ? BookingMode.Daily : BookingMode.Hourly,
+                        SlotInventoryId = isDaily ? null : container.Progress.SelectedSlotId,
+                        CheckInDate = isDaily ? container.Confirmed.CheckInDate : null,
+                        CheckOutDate = isDaily ? container.Confirmed.CheckOutDate : null,
                         CustomerName = container.Progress.CustomerName ?? "",
                         CustomerPhone = container.Progress.CustomerPhone ?? "",
                         CustomerEmail = container.Progress.CustomerEmail,
@@ -263,7 +416,9 @@ public class ContextAwareBookingConductor : IBookingConductor
                         CustomerNote = actionRequest.FormData?.GetValueOrDefault("notes")
                     };
 
-                    var booking = await _bookingCreationService.CreateHourlyBookingAsync(createReq);
+                    var booking = isDaily
+                        ? await _bookingCreationService.CreateDailyBookingAsync(createReq)
+                        : await _bookingCreationService.CreateHourlyBookingAsync(createReq);
 
                     return new BookingActionResult
                     {
@@ -345,6 +500,24 @@ public class ContextAwareBookingConductor : IBookingConductor
                 : 0m,
             status = s.Status == "Available" ? "available" : "booked"
         }).ToList();
+
+        if (slotBlocks.Count == 0)
+        {
+            return new BookingActionResult
+            {
+                Answer = "Rất tiếc, ngày này không còn khung giờ trống nào cho phòng này. Bạn vui lòng chọn ngày khác nhé.",
+                Action = ConductorAction.AskInfo,
+                State = container,
+                UiBlocks = new List<object>
+                {
+                    new
+                    {
+                        type = "dateSelector",
+                        data = new { }
+                    }
+                }
+            };
+        }
 
         return new BookingActionResult
         {

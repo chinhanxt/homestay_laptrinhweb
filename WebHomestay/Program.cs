@@ -124,7 +124,11 @@ using (var scope = app.Services.CreateScope())
         new WebHomestay.Models.SystemSetting { SettingKey = "CancellationNoticeHours", SettingValue = "24", Description = "Số giờ tối thiểu trước check-in để hủy thuận lợi", GroupName = "Cancellation" },
         new WebHomestay.Models.SystemSetting { SettingKey = "CancellationRefundPercentBeforeNotice", SettingValue = "50", Description = "Phần trăm hoàn tiền trước ngưỡng hủy", GroupName = "Cancellation" },
         new WebHomestay.Models.SystemSetting { SettingKey = "CancellationRefundPercentAfterNotice", SettingValue = "0", Description = "Phần trăm hoàn tiền sau ngưỡng hủy", GroupName = "Cancellation" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationPolicyMessage", SettingValue = "Yêu cầu hủy trước thời hạn quy định có thể được hoàn theo chính sách. Sau thời hạn quy định, yêu cầu vẫn được tiếp nhận nhưng có thể bị giảm hoặc không hoàn tiền.", Description = "Thông báo chính sách hủy đơn", GroupName = "Cancellation" }
+        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationPolicyMessage", SettingValue = "Yêu cầu hủy trước thời hạn quy định có thể được hoàn theo chính sách. Sau thời hạn quy định, yêu cầu vẫn được tiếp nhận nhưng có thể bị giảm hoặc không hoàn tiền.", Description = "Thông báo chính sách hủy đơn", GroupName = "Cancellation" },
+        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationApprovalEmailSubject", SettingValue = WebHomestay.Services.BookingCancellationService.DefaultApprovalSubject, Description = "Tiêu đề email chấp nhận hủy đơn", GroupName = "Cancellation" },
+        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationApprovalEmailBody", SettingValue = WebHomestay.Services.BookingCancellationService.DefaultApprovalBody, Description = "Nội dung email chấp nhận hủy đơn", GroupName = "Cancellation" },
+        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationRejectionEmailSubject", SettingValue = WebHomestay.Services.BookingCancellationService.DefaultRejectionSubject, Description = "Tiêu đề email từ chối hủy đơn", GroupName = "Cancellation" },
+        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationRejectionEmailBody", SettingValue = WebHomestay.Services.BookingCancellationService.DefaultRejectionBody, Description = "Nội dung email từ chối hủy đơn", GroupName = "Cancellation" }
     };
 
     foreach (var setting in cancellationDefaults)

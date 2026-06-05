@@ -19,6 +19,10 @@ namespace WebHomestay.Models
         [StringLength(20)]
         public string? Hotline { get; set; }
 
+        [StringLength(100)]
+        [EmailAddress]
+        public string? Email { get; set; }
+
         public string? MapUrl { get; set; }
         public int BookingLeadTimeHours { get; set; } = 2;
 

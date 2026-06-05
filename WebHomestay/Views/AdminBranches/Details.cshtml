@@ -35,8 +35,13 @@
                     </div>
 
                     <div class="mb-4">
-                        <label class="admin-form-label">Hotline</label>
+                        <label class="admin-form-label">SĐT Zalo</label>
                         <div class="fw-bold fs-5 text-primary">@Model.Hotline</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="admin-form-label">Email chi nhánh</label>
+                        <div class="fw-bold">@(string.IsNullOrWhiteSpace(Model.Email) ? "Chưa cấu hình" : Model.Email)</div>
                     </div>
 
                     <div class="mb-4">

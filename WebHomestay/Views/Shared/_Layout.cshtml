@@ -113,21 +113,41 @@
     @if (showPublicChatbot)
     {
         <div class="ai-widget" id="public-ai-chatbot">
-            <button class="ai-chat-toggle" type="button" aria-label="Mở trợ lý AI" aria-expanded="false">
-                <span class="ai-chat-pulse"></span>
-                <i class="fas fa-robot"></i>
-            </button>
-            <section class="ai-chat-panel" aria-label="Nhân viên tư vấn AI">
-                <div class="ai-chat-header">
-                    <div>
-                        <span class="ai-chat-kicker">StayLuxe Assistant</span>
-                        <h3>Nhân viên tư vấn AI</h3>
-                    </div>
-                    <button class="ai-chat-close" type="button" aria-label="Đóng trợ lý AI">
+            <div class="ai-zalo-popover" id="ai-zalo-popover" hidden>
+                <div class="ai-zalo-popover-header">
+                    <span>Liên hệ Zalo chi nhánh</span>
+                    <button class="ai-zalo-close" type="button" aria-label="Đóng danh sách Zalo">
                         <i class="fas fa-xmark"></i>
                     </button>
                 </div>
-                <div class="ai-chat-context" aria-label="Thông tin tư vấn ban đầu">
+                <div class="ai-zalo-list" aria-live="polite">Đang tải danh sách chi nhánh...</div>
+            </div>
+            <button class="ai-zalo-toggle" type="button" aria-label="Mở danh sách Zalo chi nhánh" aria-expanded="false" aria-controls="ai-zalo-popover">
+                <img src="~/img/zalo-logo.svg" alt="" aria-hidden="true" />
+                <span>Zalo</span>
+            </button>
+            <button class="ai-chat-toggle" type="button" aria-label="Mở nhân viên tư vấn" aria-expanded="false">
+                <span class="ai-chat-pulse"></span>
+                <i class="fas fa-comments"></i>
+            </button>
+            <section class="ai-chat-panel" aria-label="Nhân viên tư vấn">
+                <div class="ai-chat-header">
+                    <div>
+                        <span class="ai-chat-kicker">StayLuxe Assistant</span>
+                        <h3>Nhân viên tư vấn</h3>
+                    </div>
+                    <button class="ai-chat-close" type="button" aria-label="Đóng nhân viên tư vấn">
+                        <i class="fas fa-xmark"></i>
+                    </button>
+                </div>
+                <button class="ai-context-toggle" type="button" aria-expanded="false" aria-controls="ai-chat-context-form">
+                    <span class="ai-context-toggle-copy">
+                        <strong>Thông tin tư vấn</strong>
+                        <small class="ai-context-toggle-hint">Tên, chi nhánh, ngày đặt, số khách</small>
+                    </span>
+                    <i class="fas fa-chevron-down ai-context-toggle-icon" aria-hidden="true"></i>
+                </button>
+                <div class="ai-chat-context is-collapsed" id="ai-chat-context-form" aria-label="Thông tin tư vấn ban đầu" hidden>
                     <label>
                         <span>Tên khách</span>
                         <input class="ai-context-name" type="text" maxlength="120" autocomplete="name" placeholder="Tên của bạn" />
@@ -164,16 +184,17 @@
                     </div>
                 </div>
                 <div class="ai-chat-status" aria-live="polite"></div>
-                <div class="ai-chat-quick-actions">
-                    <button type="button" class="ai-chip-btn ai-cancel-booking-action" id="ai-cancel-booking-action">Yêu cầu hủy phòng</button>
+                <div class="ai-chat-quick-actions" aria-label="Thao tác tư vấn nhanh">
+                    <button type="button" class="ai-action-btn ai-action-primary" id="ai-booking-consult-action">Tư vấn đặt phòng</button>
+                    <button type="button" class="ai-action-btn ai-action-secondary ai-cancel-booking-action" id="ai-cancel-booking-action">Yêu cầu hủy phòng</button>
                 </div>
                 <form class="ai-chat-form">
-                    <input class="ai-chat-input" type="text" maxlength="500" autocomplete="off" aria-label="Nhập nhu cầu tư vấn AI" placeholder="Nhập nhu cầu của bạn..." />
+                    <input class="ai-chat-input" type="text" maxlength="500" autocomplete="off" aria-label="Nhập nhu cầu tư vấn cho nhân viên" placeholder="Nhập nhu cầu của bạn..." />
                     <button class="ai-chat-send" type="submit" aria-label="Gửi tin nhắn">
                         <i class="fas fa-paper-plane"></i>
                     </button>
                 </form>
-                <p class="ai-chat-note">AI kiểm tra phòng trống theo dữ liệu thật và có thể tạo booking chờ thanh toán.</p>
+                <p class="ai-chat-note">Nhân viên kiểm tra phòng trống theo dữ liệu thật và có thể tạo booking chờ thanh toán.</p>
             </section>
         </div>
     }

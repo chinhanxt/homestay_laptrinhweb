@@ -96,6 +96,12 @@ namespace WebHomestay.Controllers
                 // Upsert session + update activity
                 var session = await _adminChatService.UpsertSessionAsync(
                     request.SessionId, request.CustomerName);
+                await _adminChatService.AddCustomerMessageAsync(
+                    request.SessionId, request.Message, request.CustomerName);
+
+                var unreadCount = (await _adminChatService.GetUnreadCustomerMessageCountsAsync(new[] { request.SessionId }))
+                    .GetValueOrDefault(request.SessionId);
+                var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
 
                 // Check if paused
                 if (session.Status == "paused")
@@ -120,7 +126,9 @@ namespace WebHomestay.Controllers
                         {
                             sessionId = request.SessionId,
                             status = "paused",
-                            lastMessage = msg.Content,
+                            lastMessage = request.Message,
+                            unreadCount,
+                            totalUnreadCount,
                             lastActivityAt = DateTime.Now
                         }, cancellationToken);
 
@@ -156,7 +164,9 @@ namespace WebHomestay.Controllers
                     {
                         sessionId = request.SessionId,
                         status = session.Status,
-                        lastMessage = brainResponse.Answer,
+                        lastMessage = request.Message,
+                        unreadCount,
+                        totalUnreadCount,
                         lastActivityAt = DateTime.Now
                     }, cancellationToken);
 

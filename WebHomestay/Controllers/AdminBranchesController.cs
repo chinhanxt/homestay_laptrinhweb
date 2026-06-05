@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
@@ -65,7 +66,7 @@ namespace WebHomestay.Controllers
         [AdminAuthorize(Permission = "branches.create")]
         [HttpPost("create")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,Name,Address,Hotline,Description")] Branch branch)
+        public async Task<IActionResult> Create([Bind("Id,Name,Address,Hotline,Email,Description,MapUrl")] Branch branch)
         {
             if (ModelState.IsValid)
             {
@@ -98,7 +99,7 @@ namespace WebHomestay.Controllers
         [AdminAuthorize(Permission = "branches.edit")]
         [HttpPost("edit/{id}")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Address,Hotline,Description")] Branch branch)
+        public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Address,Hotline,Email,Description,MapUrl")] Branch branch)
         {
             if (id != branch.Id) return NotFound();
 
@@ -155,6 +156,17 @@ namespace WebHomestay.Controllers
             await _context.SaveChangesAsync();
             TempData["SuccessMessage"] = $"Đã xóa chi nhánh '{branch.Name}' thành công.";
             return RedirectToAction(nameof(Index));
+        }
+
+        [HttpGet("public-contacts")]
+        [AllowAnonymous]
+        public async Task<IActionResult> PublicContacts()
+        {
+            var branches = await _context.Branches
+                .OrderBy(b => b.Name)
+                .Select(b => new { id = b.Id, name = b.Name, address = b.Address, zaloPhone = b.Hotline, email = b.Email })
+                .ToListAsync();
+            return Ok(branches);
         }
 
         private bool BranchExists(int id)

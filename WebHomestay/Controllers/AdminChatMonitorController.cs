@@ -18,17 +18,20 @@ public class AdminChatMonitorController : Controller
     private readonly ApplicationDbContext _context;
     private readonly IHubContext<ChatHub> _hubContext;
     private readonly IBookingCancellationService _bookingCancellationService;
+    private readonly ISettingService _settingService;
 
     public AdminChatMonitorController(
         IAdminChatService adminChatService,
         ApplicationDbContext context,
         IHubContext<ChatHub> hubContext,
-        IBookingCancellationService bookingCancellationService)
+        IBookingCancellationService bookingCancellationService,
+        ISettingService settingService)
     {
         _adminChatService = adminChatService;
         _context = context;
         _hubContext = hubContext;
         _bookingCancellationService = bookingCancellationService;
+        _settingService = settingService;
     }
 
     [AdminAuthorize(Permission = "chats.view")]
@@ -123,12 +126,14 @@ public class AdminChatMonitorController : Controller
     {
         var readCount = await _adminChatService.MarkCustomerMessagesReadAsync(sessionId);
         var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
+        
+        // Không cập nhật lastActivityAt khi chỉ mark read để tránh card nhảy lên đầu
         await _hubContext.Clients.Group("admin_monitor").SendAsync("sessionUpdate", new
         {
             sessionId,
             unreadCount = 0,
-            totalUnreadCount,
-            lastActivityAt = DateTime.Now
+            totalUnreadCount
+            // Bỏ lastActivityAt để giữ nguyên vị trí card
         });
         return Ok(new { sessionId, readCount, unreadCount = 0, totalUnreadCount });
     }
@@ -212,15 +217,41 @@ public class AdminChatMonitorController : Controller
 
         var suggestedIds = ParseSuggestedBookingIds(request.SuggestedBookingIdsJson);
         var suggestions = suggestedIds.Count == 0
-            ? new List<object>()
+            ? []
             : await _context.Bookings
                 .Include(b => b.Room)
                 .Where(b => suggestedIds.Contains(b.Id))
-                .Select(b => new object[] { new { b.Id, b.CustomerName, b.CustomerPhone, b.CustomerEmail, roomName = b.Room.Name, b.StartTime, b.EndTime, b.Status, b.TotalPrice } })
-                .SelectMany(x => x)
+                .Select(b => new { b.Id, b.CustomerName, b.CustomerPhone, b.CustomerEmail, roomName = b.Room.Name, b.StartTime, b.EndTime, b.Status, b.TotalPrice })
                 .ToListAsync();
 
-        return Ok(new { request, booking, suggestions });
+        var handlingMode = await _settingService.GetStringAsync("CancellationHandlingMode", "Manual");
+        return Ok(new { request, booking, suggestions, handlingMode });
+    }
+
+    [AdminAuthorize(Permission = "chats.view")]
+    [HttpPost("cancellations/{id:int}/cancel-booking")]
+    public async Task<IActionResult> CancelApprovedBooking(int id)
+    {
+        var request = await _context.BookingCancellationRequests.FirstOrDefaultAsync(r => r.Id == id);
+        if (request == null) return NotFound();
+        if (!string.Equals(request.Status, "Approved", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Chỉ có thể hủy booking sau khi yêu cầu đã được chấp nhận." });
+        if (!request.BookingId.HasValue)
+            return BadRequest(new { message = "Yêu cầu hủy chưa được liên kết với booking." });
+
+        var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == request.BookingId.Value);
+        if (booking == null) return NotFound(new { message = "Không tìm thấy booking được liên kết." });
+
+        booking.Status = "Cancelled";
+        if (booking.BookingMode == Models.BookingMode.Hourly && booking.RoomSlotInventoryId.HasValue)
+        {
+            var slot = await _context.RoomSlotInventories.FirstOrDefaultAsync(s => s.Id == booking.RoomSlotInventoryId.Value);
+            if (slot is not null) slot.Status = "Available";
+        }
+
+        request.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return Ok(new { success = true, booking.Id, booking.Status });
     }
 
     [AdminAuthorize(Permission = "chats.view")]
@@ -239,14 +270,31 @@ public class AdminChatMonitorController : Controller
     }
 
     [AdminAuthorize(Permission = "chats.view")]
-    [HttpPost("cancellations/{id:int}/approve")]
+    [HttpPost("cancellations/{id:int}/approval-preview")]
     [RequestSizeLimit(10 * 1024 * 1024)]
-    public async Task<IActionResult> ApproveCancellation(int id, [FromForm] string staffReason, [FromForm] int appliedRefundPercent, [FromForm] IFormFile? refundBillProof)
+    public async Task<IActionResult> PreviewApprovalCancellation(int id, [FromForm] string staffReason, [FromForm] int appliedRefundPercent, [FromForm] IFormFile? refundBillProof)
     {
         try
         {
             var processedBy = HttpContext.Session.GetString("AdminUser") ?? "admin";
-            var request = await _bookingCancellationService.ApproveAsync(new ProcessCancellationDto(id, staffReason, appliedRefundPercent, processedBy, refundBillProof));
+            var preview = await _bookingCancellationService.BuildApprovalPreviewAsync(new ProcessCancellationDto(id, staffReason, appliedRefundPercent, processedBy, refundBillProof));
+            return Ok(preview);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [AdminAuthorize(Permission = "chats.view")]
+    [HttpPost("cancellations/{id:int}/approve")]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<IActionResult> ApproveCancellation(int id, [FromForm] string staffReason, [FromForm] int appliedRefundPercent, [FromForm] IFormFile? refundBillProof, [FromForm] string? notificationEmailSubject, [FromForm] string? notificationEmailBody)
+    {
+        try
+        {
+            var processedBy = HttpContext.Session.GetString("AdminUser") ?? "admin";
+            var request = await _bookingCancellationService.ApproveAsync(new ProcessCancellationDto(id, staffReason, appliedRefundPercent, processedBy, refundBillProof, notificationEmailSubject, notificationEmailBody));
             return Ok(new { success = true, request.Id, request.Status });
         }
         catch (InvalidOperationException ex)
@@ -256,13 +304,30 @@ public class AdminChatMonitorController : Controller
     }
 
     [AdminAuthorize(Permission = "chats.view")]
-    [HttpPost("cancellations/{id:int}/reject")]
-    public async Task<IActionResult> RejectCancellation(int id, [FromForm] string staffReason)
+    [HttpPost("cancellations/{id:int}/rejection-preview")]
+    public async Task<IActionResult> PreviewRejectionCancellation(int id, [FromForm] string staffReason)
     {
         try
         {
             var processedBy = HttpContext.Session.GetString("AdminUser") ?? "admin";
-            var request = await _bookingCancellationService.RejectAsync(new ProcessCancellationDto(id, staffReason, 0, processedBy, null));
+            var preview = await _bookingCancellationService.BuildRejectionPreviewAsync(new ProcessCancellationDto(id, staffReason, 0, processedBy, null));
+            return Ok(preview);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [AdminAuthorize(Permission = "chats.view")]
+    [HttpPost("cancellations/{id:int}/reject")]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<IActionResult> RejectCancellation(int id, [FromForm] string staffReason, [FromForm] string? notificationEmailSubject, [FromForm] string? notificationEmailBody)
+    {
+        try
+        {
+            var processedBy = HttpContext.Session.GetString("AdminUser") ?? "admin";
+            var request = await _bookingCancellationService.RejectAsync(new ProcessCancellationDto(id, staffReason, 0, processedBy, null, notificationEmailSubject, notificationEmailBody));
             return Ok(new { success = true, request.Id, request.Status });
         }
         catch (InvalidOperationException ex)

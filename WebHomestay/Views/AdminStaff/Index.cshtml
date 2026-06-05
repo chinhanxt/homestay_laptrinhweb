@@ -1,6 +1,12 @@
 @model IEnumerable<WebHomestay.Models.AdminUser>
 @{
     ViewData["Title"] = "Quản lý Nhân sự";
+    var roleDisplay = new Dictionary<string, string>
+    {
+        ["SuperAdmin"] = "Admin",
+        ["Manager"] = "Quản lý",
+        ["Staff"] = "Nhân viên"
+    };
 }
 
 <link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
@@ -11,8 +17,15 @@
             <div class="admin-hero-title">
                 <span class="admin-kicker">Đội ngũ vận hành</span>
                 <h1>Nhân sự hệ thống</h1>
+                <span class="badge bg-secondary ms-2 fs-6 align-self-start mt-2" id="staffCount">@Model.Count()</span>
             </div>
             <div class="admin-hero-actions">
+                <button class="btn-premium-outline me-2 view-toggle" data-view="table" title="Chế độ bảng">
+                    <i class="fas fa-table"></i>
+                </button>
+                <button class="btn-premium-outline me-2 view-toggle active" data-view="card" title="Chế độ thẻ">
+                    <i class="fas fa-th-large"></i>
+                </button>
                 @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "logs.view"))
                 {
                     <a asp-action="Logs" class="btn-premium-outline me-2">
@@ -36,18 +49,52 @@
             </div>
         </header>
 
-        <div class="staff-grid">
+        <!-- Filter Bar -->
+        <div class="staff-filter-bar mb-3">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="filter-group">
+                    <label class="filter-label">Vai trò</label>
+                    <select class="form-select form-select-sm staff-filter" id="filterRole">
+                        <option value="">Tất cả</option>
+                        <option value="SuperAdmin">Admin</option>
+                        <option value="Manager">Quản lý</option>
+                        <option value="Staff">Nhân viên</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Chi nhánh</label>
+                    <select class="form-select form-select-sm staff-filter" id="filterBranch">
+                        <option value="">Tất cả</option>
+                        @foreach (var branch in ViewBag.Branches as List<WebHomestay.Models.Branch> ?? new())
+                        {
+                            <option value="@branch.Id">@branch.Name</option>
+                        }
+                        <option value="__system">Toàn hệ thống</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Tìm kiếm</label>
+                    <input type="text" class="form-control form-control-sm staff-filter" id="filterSearch" placeholder="Họ tên, username..." style="min-width: 200px;" />
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" id="resetFilters" title="Xoá bộ lọc">
+                    <i class="fas fa-undo"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Card View -->
+        <div class="staff-grid" id="staffCardView">
             @foreach (var item in Model)
             {
-                <div class="staff-card">
+                <div class="staff-card" data-role="@item.Role" data-branch="@(item.BranchId?.ToString() ?? "__system")" data-name="@item.FullName" data-username="@item.Username">
                     <div class="d-flex align-items-center gap-3">
                         <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center text-white shadow-sm" style="width: 54px; height: 54px; flex-shrink: 0;">
                             <i class="fas fa-user-tie fs-4"></i>
                         </div>
                         <div class="overflow-hidden">
                             <h5 class="fw-bold mb-1 text-truncate">@item.FullName</h5>
-                            <span class="badge-premium @(item.Role == WebHomestay.Models.AdminRole.SuperAdmin ? "badge-danger-soft" : "badge-info-soft")" style="font-size: 0.65rem;">
-                                @item.Role
+                            <span class="badge-premium @(item.Role == WebHomestay.Models.AdminRole.SuperAdmin ? "badge-danger-soft" : (item.Role == WebHomestay.Models.AdminRole.Manager ? "badge-warning-soft" : "badge-info-soft"))" style="font-size: 0.65rem;">
+                                @roleDisplay[item.Role.ToString()]
                             </span>
                         </div>
                     </div>
@@ -96,5 +143,219 @@
                 </div>
             }
         </div>
+
+        <!-- Table View -->
+        <div class="staff-table-view" id="staffTableView" style="display: none;">
+            <div class="table-responsive">
+                <table class="table staff-table">
+                    <thead>
+                        <tr>
+                            <th width="50">#</th>
+                            <th>Họ tên</th>
+                            <th>Username</th>
+                            <th class="sortable" data-sort="role">Vai trò <i class="fas fa-sort"></i></th>
+                            <th class="sortable" data-sort="branch">Chi nhánh <i class="fas fa-sort"></i></th>
+                            <th>Ngày tham gia</th>
+                            <th width="160">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{
+                            var index = 1;
+                        }
+                        @foreach (var item in Model)
+                        {
+                            <tr data-role="@item.Role" data-branch="@(item.BranchId?.ToString() ?? "__system")" data-name="@item.FullName" data-username="@item.Username">
+                                <td>@index</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="staff-table-avatar">
+                                            <i class="fas fa-user-tie"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-semibold">@item.FullName</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="text-muted">@item.Username</span></td>
+                                <td>
+                                    <span class="badge-premium @(item.Role == WebHomestay.Models.AdminRole.SuperAdmin ? "badge-danger-soft" : (item.Role == WebHomestay.Models.AdminRole.Manager ? "badge-warning-soft" : "badge-info-soft"))">
+                                        @roleDisplay[item.Role.ToString()]
+                                    </span>
+                                </td>
+                                <td>@(item.Branch?.Name ?? "Toàn hệ thống")</td>
+                                <td class="text-muted">@item.CreatedAt.ToString("dd/MM/yyyy")</td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.edit"))
+                                        {
+                                            <a asp-action="Edit" asp-route-id="@item.Id" class="btn-table-action" title="Chỉnh sửa">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        }
+                                        @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.delete"))
+                                        {
+                                            <form asp-action="Delete" asp-route-id="@item.Id" method="post" onsubmit="return confirm('Xóa nhân viên này?')" class="d-inline">
+                                                <button type="submit" class="btn-table-action is-danger border-0 bg-transparent" title="Xóa">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                            index++;
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (!Model.Any())
+            {
+                <div class="text-center py-5">
+                    <div class="text-muted">
+                        <i class="fas fa-users-slash fa-3x mb-3 opacity-20"></i>
+                        <p>Chưa có nhân sự nào được đăng ký.</p>
+                    </div>
+                </div>
+            }
+        </div>
     </div>
 </div>
+
+<script>
+(function() {
+    // View toggle
+    const cardView = document.getElementById('staffCardView');
+    const tableView = document.getElementById('staffTableView');
+    const toggles = document.querySelectorAll('.view-toggle');
+    const countBadge = document.getElementById('staffCount');
+
+    function setView(view) {
+        toggles.forEach(function(t) {
+            t.classList.toggle('active', t.dataset.view === view);
+        });
+        cardView.style.display = view === 'card' ? '' : 'none';
+        tableView.style.display = view === 'table' ? '' : 'none';
+        localStorage.setItem('adminStaffView', view);
+    }
+
+    toggles.forEach(function(t) {
+        t.addEventListener('click', function() {
+            setView(this.dataset.view);
+        });
+    });
+
+    // Restore preference
+    var savedView = localStorage.getItem('adminStaffView');
+    if (savedView === 'table') setView('table');
+
+    // Filter logic
+    var filterRole = document.getElementById('filterRole');
+    var filterBranch = document.getElementById('filterBranch');
+    var filterSearch = document.getElementById('filterSearch');
+
+    function applyFilters() {
+        var role = filterRole.value;
+        var branch = filterBranch.value;
+        var search = filterSearch.value.toLowerCase().trim();
+
+        // Count visible items
+        var visible = 0;
+
+        // Filter cards
+        var cards = cardView.querySelectorAll('.staff-card');
+        cards.forEach(function(c) {
+            var match = true;
+            if (role && c.dataset.role !== role) match = false;
+            if (branch && c.dataset.branch !== branch) match = false;
+            if (search) {
+                var name = (c.dataset.name || '').toLowerCase();
+                var uname = (c.dataset.username || '').toLowerCase();
+                if (name.indexOf(search) === -1 && uname.indexOf(search) === -1) match = false;
+            }
+            c.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+
+        // Filter table rows
+        var rows = tableView.querySelectorAll('tbody tr');
+        rows.forEach(function(r) {
+            var match = true;
+            if (role && r.dataset.role !== role) match = false;
+            if (branch && r.dataset.branch !== branch) match = false;
+            if (search) {
+                var name = (r.dataset.name || '').toLowerCase();
+                var uname = (r.dataset.username || '').toLowerCase();
+                if (name.indexOf(search) === -1 && uname.indexOf(search) === -1) match = false;
+            }
+            r.style.display = match ? '' : 'none';
+        });
+
+        // Update count
+        countBadge.textContent = visible;
+    }
+
+    filterRole.addEventListener('change', applyFilters);
+    filterBranch.addEventListener('change', applyFilters);
+    filterSearch.addEventListener('input', applyFilters);
+
+    document.getElementById('resetFilters').addEventListener('click', function() {
+        filterRole.value = '';
+        filterBranch.value = '';
+        filterSearch.value = '';
+        applyFilters();
+    });
+
+    // Sort logic for table
+    var sortAsc = null;
+    var sortField = null;
+
+    document.querySelectorAll('.sortable').forEach(function(th) {
+        th.addEventListener('click', function() {
+            var field = this.dataset.sort;
+            if (sortField === field) {
+                sortAsc = !sortAsc;
+            } else {
+                sortField = field;
+                sortAsc = true;
+            }
+
+            // Update icons
+            document.querySelectorAll('.sortable i').forEach(function(i) {
+                i.className = 'fas fa-sort';
+            });
+            this.querySelector('i').className = sortAsc ? 'fas fa-sort-up' : 'fas fa-sort-down';
+
+            var tbody = tableView.querySelector('tbody');
+            var rows = Array.from(tbody.querySelectorAll('tr'));
+
+            rows.sort(function(a, b) {
+                var order = sortAsc ? 1 : -1;
+                if (field === 'role') {
+                    var map = { SuperAdmin: 0, Manager: 1, Staff: 2 };
+                    var va = map[a.dataset.role] ?? 99;
+                    var vb = map[b.dataset.role] ?? 99;
+                    return (va - vb) * order;
+                }
+                if (field === 'branch') {
+                    var va = a.dataset.branch || '';
+                    var vb = b.dataset.branch || '';
+                    if (va === '__system') va = '';
+                    if (vb === '__system') vb = '';
+                    return va.localeCompare(vb) * order;
+                }
+                return 0;
+            });
+
+            rows.forEach(function(r) {
+                tbody.appendChild(r);
+            });
+
+            // Re-index
+            rows.forEach(function(r, i) {
+                r.cells[0].textContent = i + 1;
+            });
+        });
+    });
+})();
+</script>

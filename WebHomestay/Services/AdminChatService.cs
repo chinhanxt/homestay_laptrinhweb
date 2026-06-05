@@ -99,6 +99,27 @@ public class AdminChatService : IAdminChatService
         return msg;
     }
 
+    public async Task AddCustomerMessageAsync(string sessionId, string content, string? customerName)
+    {
+        var msg = new AdminChatMessage
+        {
+            SessionId = sessionId,
+            Role = "user",
+            Content = content,
+            CreatedBy = customerName,
+            CreatedAt = DateTime.Now,
+            IsRead = false
+        };
+        _db.AdminChatMessages.Add(msg);
+
+        var session = await _db.AdminChatSessions
+            .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        if (session != null)
+            session.LastActivityAt = DateTime.Now;
+
+        await _db.SaveChangesAsync();
+    }
+
     public async Task AddSystemAutoReplyAsync(string sessionId)
     {
         var session = await _db.AdminChatSessions
@@ -137,5 +158,38 @@ public class AdminChatService : IAdminChatService
             .Where(m => m.SessionId == sessionId)
             .OrderBy(m => m.CreatedAt)
             .ToListAsync();
+    }
+
+    public async Task<int> GetUnreadCustomerMessageCountAsync()
+    {
+        return await _db.AdminChatMessages
+            .CountAsync(m => m.Role == "user" && !m.IsRead);
+    }
+
+    public async Task<Dictionary<string, int>> GetUnreadCustomerMessageCountsAsync(IEnumerable<string> sessionIds)
+    {
+        var ids = sessionIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<string, int>();
+
+        return await _db.AdminChatMessages
+            .Where(m => ids.Contains(m.SessionId) && m.Role == "user" && !m.IsRead)
+            .GroupBy(m => m.SessionId)
+            .Select(g => new { SessionId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.SessionId, x => x.Count);
+    }
+
+    public async Task<int> MarkCustomerMessagesReadAsync(string sessionId)
+    {
+        var unread = await _db.AdminChatMessages
+            .Where(m => m.SessionId == sessionId && m.Role == "user" && !m.IsRead)
+            .ToListAsync();
+
+        foreach (var message in unread)
+            message.IsRead = true;
+
+        if (unread.Count > 0)
+            await _db.SaveChangesAsync();
+
+        return unread.Count;
     }
 }

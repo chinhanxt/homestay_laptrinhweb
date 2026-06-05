@@ -717,6 +717,29 @@ namespace WebHomestay.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("customer_phone");
 
+                    b.Property<string>("NotificationEmailAttachmentName")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("notification_email_attachment_name");
+
+                    b.Property<string>("NotificationEmailBody")
+                        .HasColumnType("text")
+                        .HasColumnName("notification_email_body");
+
+                    b.Property<DateTime?>("NotificationEmailSentAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("notification_email_sent_at");
+
+                    b.Property<string>("NotificationEmailSubject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("notification_email_subject");
+
+                    b.Property<string>("NotificationEmailType")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("notification_email_type");
+
                     b.Property<string>("PolicyMessageSnapshot")
                         .IsRequired()
                         .HasColumnType("text")
@@ -826,6 +849,11 @@ namespace WebHomestay.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("email");
 
                     b.Property<string>("Hotline")
                         .HasMaxLength(20)

@@ -64,7 +64,7 @@ namespace WebHomestay.Controllers
         [AdminAuthorize(Permission = "settings.update")]
         [HttpPost("cancellation-policy")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateCancellationPolicy(string handlingMode, int noticeHours, int refundBefore, int refundAfter, string policyMessage)
+        public async Task<IActionResult> UpdateCancellationPolicy(string handlingMode, int noticeHours, int refundBefore, int refundAfter, string policyMessage, string approvalEmailSubject, string approvalEmailBody, string rejectionEmailSubject, string rejectionEmailBody)
         {
             handlingMode = handlingMode == "Auto" ? "Auto" : "Manual";
             noticeHours = Math.Max(0, noticeHours);
@@ -79,6 +79,10 @@ namespace WebHomestay.Controllers
             await _settingService.UpdateSettingAsync("CancellationRefundPercentBeforeNotice", refundBefore.ToString());
             await _settingService.UpdateSettingAsync("CancellationRefundPercentAfterNotice", refundAfter.ToString());
             await _settingService.UpdateSettingAsync("CancellationPolicyMessage", policyMessage);
+            await _settingService.UpdateSettingAsync("CancellationApprovalEmailSubject", string.IsNullOrWhiteSpace(approvalEmailSubject) ? BookingCancellationService.DefaultApprovalSubject : approvalEmailSubject.Trim());
+            await _settingService.UpdateSettingAsync("CancellationApprovalEmailBody", string.IsNullOrWhiteSpace(approvalEmailBody) ? BookingCancellationService.DefaultApprovalBody : approvalEmailBody.Trim());
+            await _settingService.UpdateSettingAsync("CancellationRejectionEmailSubject", string.IsNullOrWhiteSpace(rejectionEmailSubject) ? BookingCancellationService.DefaultRejectionSubject : rejectionEmailSubject.Trim());
+            await _settingService.UpdateSettingAsync("CancellationRejectionEmailBody", string.IsNullOrWhiteSpace(rejectionEmailBody) ? BookingCancellationService.DefaultRejectionBody : rejectionEmailBody.Trim());
 
             TempData["SuccessMessage"] = "Cập nhật chính sách hủy đơn thành công.";
             return RedirectToAction(nameof(Index));

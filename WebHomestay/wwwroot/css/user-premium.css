@@ -845,6 +845,125 @@ h1, h2, h3, h4, h5, h6 {
     font-family: var(--luxury-font-body);
 }
 
+.ai-zalo-toggle {
+    width: 64px;
+    height: 64px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #0068ff;
+    box-shadow: 0 16px 36px rgba(37, 99, 235, 0.24);
+    display: grid;
+    place-items: center;
+    margin: 0 0 12px auto;
+    padding: 0;
+    overflow: hidden;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.ai-zalo-toggle img {
+    width: 64px;
+    height: 64px;
+    display: block;
+}
+
+.ai-zalo-toggle span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
+.ai-zalo-toggle:hover,
+.ai-zalo-toggle:focus-visible,
+.ai-widget.is-zalo-open .ai-zalo-toggle {
+    transform: translateY(-3px);
+    box-shadow: 0 20px 42px rgba(37, 99, 235, 0.32);
+    outline: none;
+}
+
+.ai-zalo-popover {
+    position: absolute;
+    right: 0;
+    bottom: 152px;
+    width: min(330px, calc(100vw - 32px));
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid rgba(37, 99, 235, 0.18);
+    border-radius: 18px;
+    box-shadow: 0 24px 56px rgba(15, 23, 42, 0.16);
+    overflow: hidden;
+    backdrop-filter: blur(14px);
+}
+
+.ai-zalo-popover-header {
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: linear-gradient(135deg, #eff6ff, #fff);
+    color: var(--luxury-primary);
+    font-family: var(--luxury-font-heading);
+    font-size: 0.88rem;
+    font-weight: 800;
+}
+
+.ai-zalo-close {
+    width: 28px;
+    height: 28px;
+    border: 1px solid rgba(37, 99, 235, 0.16);
+    border-radius: 50%;
+    background: #fff;
+    color: #2563eb;
+}
+
+.ai-zalo-list {
+    display: grid;
+    gap: 8px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 12px;
+    color: var(--luxury-text-muted);
+    font-size: 0.88rem;
+}
+
+.ai-zalo-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    border-radius: 14px;
+    background: #fff;
+}
+
+.ai-zalo-branch-name {
+    color: var(--luxury-primary);
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.ai-zalo-item a {
+    color: #2563eb;
+    font-weight: 900;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.ai-zalo-item a:hover {
+    color: #0ea5e9;
+}
+
+.ai-zalo-empty {
+    color: #94a3b8;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 .ai-chat-toggle {
     width: 64px;
     height: 64px;
@@ -881,7 +1000,7 @@ h1, h2, h3, h4, h5, h6 {
 .ai-chat-panel {
     position: absolute;
     right: 0;
-    bottom: 82px;
+    bottom: 104px;
     width: min(640px, calc(100vw - 32px));
     max-width: calc(100vw - 32px);
     height: min(760px, calc(100vh - 110px));
@@ -976,6 +1095,104 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 500;
 }
 
+.ai-context-toggle {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+    background: linear-gradient(180deg, #fff, #fdfaf5);
+    color: var(--luxury-primary);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: left;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.ai-context-toggle:hover,
+.ai-context-toggle:focus-visible {
+    background: #fdf5e9;
+    color: var(--luxury-accent);
+    outline: none;
+}
+
+.ai-context-toggle-copy {
+    display: grid;
+    gap: 2px;
+}
+
+.ai-context-toggle-copy strong {
+    font-family: var(--luxury-font-heading);
+    font-size: 0.9rem;
+    letter-spacing: 0.02em;
+}
+
+.ai-context-toggle-copy small {
+    color: var(--luxury-text-muted);
+    font-size: 0.76rem;
+}
+
+.ai-context-toggle-icon {
+    color: var(--luxury-accent);
+    flex-shrink: 0;
+}
+
+.ai-chat-context.is-collapsed {
+    display: none;
+}
+
+.ai-chat-quick-actions {
+    padding: 12px 14px 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    background: #fff;
+}
+
+.ai-action-btn {
+    border: 1px solid var(--luxury-border);
+    border-radius: 999px;
+    padding: 10px 12px;
+    font-family: var(--luxury-font-heading);
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.ai-action-btn:hover,
+.ai-action-btn:focus-visible {
+    transform: translateY(-1px);
+    outline: none;
+}
+
+.ai-action-primary {
+    background: var(--luxury-primary);
+    color: #fff;
+    border-color: var(--luxury-primary);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+.ai-action-primary:hover,
+.ai-action-primary:focus-visible {
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #fff;
+}
+
+.ai-action-secondary {
+    background: #fdf5e9;
+    color: #8a5f2f;
+    border-color: rgba(194, 155, 97, 0.4);
+}
+
+.ai-action-secondary:hover,
+.ai-action-secondary:focus-visible {
+    background: #f8ead3;
+    border-color: var(--luxury-accent);
+    color: #6f481f;
+}
 
 .ai-chat-messages {
     flex: 1;
@@ -1099,6 +1316,58 @@ h1, h2, h3, h4, h5, h6 {
 .ai-booking-total { margin-top: 8px; font-weight: 800; color: var(--luxury-primary); }
 .ai-booking-form { display: grid; gap: 10px; }
 .ai-booking-form input, .ai-booking-form textarea { border: 1px solid var(--luxury-border); padding: 10px 12px; text-transform: none; letter-spacing: normal; font-weight: 500; }
+.ai-cancellation-prompt,
+.ai-cancellation-form-block,
+.ai-cancellation-contact-block {
+    border: 1px solid rgba(194, 155, 97, 0.34);
+    background: linear-gradient(180deg, #fffaf2, #fff);
+    box-shadow: 0 12px 28px rgba(138, 95, 47, 0.08);
+    border-radius: 16px;
+    padding: 14px;
+    display: grid;
+    gap: 10px;
+}
+.ai-cancellation-prompt .ai-payment-message,
+.ai-cancellation-contact-block .ai-payment-message,
+.ai-cancellation-form .ai-payment-message {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(194, 155, 97, 0.2);
+    border-radius: 12px;
+    padding: 10px 12px;
+}
+.ai-cancellation-form {
+    gap: 12px;
+}
+.ai-cancellation-form h4 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--luxury-primary);
+}
+.ai-cancellation-form label {
+    gap: 6px;
+}
+.ai-cancellation-form input {
+    border-radius: 10px;
+    background: #fff;
+}
+.ai-cancellation-form input:focus {
+    outline: none;
+    border-color: var(--luxury-accent);
+    box-shadow: 0 0 0 3px rgba(194, 155, 97, 0.14);
+}
+.ai-cancellation-form .ai-booking-submit {
+    border-radius: 999px;
+    background: var(--luxury-primary);
+    color: #fff;
+    border-color: var(--luxury-primary);
+}
+.ai-cancellation-contact-block select {
+    border: 1px solid rgba(194, 155, 97, 0.35);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: #fff;
+    color: var(--luxury-text);
+}
 .ai-payment-block { display: grid; gap: 8px; color: var(--luxury-text); }
 .ai-payment-message { color: var(--luxury-text-muted); font-size: .88rem; line-height: 1.45; }
 .ai-payment-amount { color: var(--luxury-accent); font-size: 1rem; }
@@ -1117,10 +1386,35 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 0.9rem;
 }
 
+.ai-date-selector { border: 1px solid var(--luxury-border); background: #fff; padding: 14px; margin-bottom: 10px; }
+.ai-date-mode-group { display: flex; gap: 12px; margin-bottom: 12px; }
+.ai-date-mode-option { display: flex; align-items: center; gap: 4px; font-weight: 600; color: var(--luxury-primary); cursor: pointer; padding: 6px 10px; border: 1px solid var(--luxury-border); border-radius: 6px; background: #f8fafc; font-size: .86rem; }
+.ai-date-mode-option:has(input:checked) { border-color: var(--luxury-accent); color: var(--luxury-accent); background: #fff; }
+.ai-date-inputs { display: grid; gap: 8px; margin-bottom: 12px; }
+.ai-date-field { display: grid; gap: 4px; }
+.ai-date-field span { font-weight: 600; color: var(--luxury-text); font-size: .82rem; }
+.ai-date-field input { border: 1px solid var(--luxury-border); padding: 9px 12px; text-transform: none; letter-spacing: normal; font-weight: 500; }
+
 @media (max-width: 575.98px) {
     .ai-widget {
         right: 16px;
         bottom: 16px;
+    }
+
+    .ai-zalo-toggle,
+    .ai-zalo-toggle img {
+        width: 58px;
+        height: 58px;
+    }
+
+    .ai-zalo-toggle {
+        margin-bottom: 10px;
+    }
+
+    .ai-zalo-popover {
+        right: 0;
+        bottom: 136px;
+        width: calc(100vw - 32px);
     }
 
     .ai-chat-panel {
@@ -1137,8 +1431,87 @@ h1, h2, h3, h4, h5, h6 {
         grid-template-columns: 1fr;
     }
 
+    .ai-chat-quick-actions {
+        grid-template-columns: 1fr;
+    }
+
     .ai-chat-toggle {
         width: 58px;
         height: 58px;
+    }
+}
+
+/* Home search + chatbot spacing */
+body:has(.ai-widget) main {
+    padding-bottom: 150px;
+}
+
+body:has(.ai-widget) .footer {
+    padding-bottom: 150px !important;
+}
+
+.editorial-search {
+    gap: 0;
+}
+
+.btn-search-luxury {
+    min-height: 94px;
+    white-space: nowrap;
+}
+
+.ai-widget {
+    right: max(28px, env(safe-area-inset-right));
+    bottom: max(28px, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 1199.98px) {
+    .editorial-search {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .editorial-search .search-field {
+        border-bottom: 1px solid var(--luxury-border);
+    }
+
+    .editorial-search .search-field:nth-child(2n) {
+        border-right: none;
+    }
+
+    .btn-search-luxury {
+        grid-column: 1 / -1;
+        min-height: 64px;
+        width: 100%;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .editorial-search {
+        grid-template-columns: 1fr;
+        margin-top: 0;
+    }
+
+    .search-field {
+        min-width: 0;
+        border-right: none;
+        border-bottom: 1px solid var(--luxury-border);
+    }
+
+    .btn-search-luxury {
+        min-height: 58px;
+        padding: 16px 24px;
+    }
+
+    .ai-widget {
+        right: 18px;
+        bottom: 18px;
+    }
+
+    body:has(.ai-widget) main {
+        padding-bottom: 130px;
+    }
+
+    body:has(.ai-widget) .footer {
+        padding-bottom: 130px !important;
     }
 }

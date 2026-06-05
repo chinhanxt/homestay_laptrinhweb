@@ -1,0 +1,73 @@
+<h2>Chọn hướng bố cục cho botchat</h2>
+<p class="subtitle">Mục tiêu: form thông tin không chiếm nhiều diện tích, vẫn dễ mở khi khách muốn tư vấn đặt phòng; nút hủy phòng nhìn đẹp và rõ hơn.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="width:360px;max-width:100%;border:1px solid #d9e2ef;background:#fff;box-shadow:0 18px 40px rgba(15,23,42,.12);font-family:Arial,sans-serif;overflow:hidden">
+        <div style="background:#1f2b3d;color:#fff;padding:14px 16px">
+          <div style="font-size:10px;letter-spacing:3px;color:#c59b5f;font-weight:700">STAYLUXE ASSISTANT</div>
+          <div style="font-weight:800;margin-top:4px">Nhân viên tư vấn AI</div>
+        </div>
+        <div style="padding:10px 14px;border-bottom:1px solid #e5eaf2;display:flex;align-items:center;justify-content:space-between;background:#fafafa">
+          <strong style="font-size:13px;color:#1f2b3d">Thông tin tư vấn</strong>
+          <span style="font-size:12px;color:#c59b5f">Mở rộng ˅</span>
+        </div>
+        <div style="padding:14px;background:#f8fafc;min-height:150px">
+          <div style="background:#fff;border:1px solid #d9e2ef;border-radius:18px 18px 18px 4px;padding:14px;line-height:1.45;color:#1f2b3d">Chào bạn, mình có thể tư vấn phòng...</div>
+        </div>
+        <div style="display:flex;border-top:1px solid #e5eaf2;border-bottom:1px solid #e5eaf2">
+          <div style="flex:1;padding:12px;text-align:center;background:#fff;color:#1f2b3d;font-weight:800;border-right:1px solid #e5eaf2">Tư vấn đặt phòng</div>
+          <div style="flex:1;padding:12px;text-align:center;background:#fff7ed;color:#9a5b13;font-weight:800">Yêu cầu hủy</div>
+        </div>
+        <div style="padding:12px;display:flex;gap:8px"><div style="flex:1;border:1px solid #d9e2ef;border-radius:999px;padding:10px;color:#94a3b8">Nhập nhu cầu...</div><div style="width:42px;height:42px;border-radius:50%;background:#c59b5f"></div></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. Gọn mặc định + accordion</h3>
+      <p>Form thông tin thu gọn thành một thanh “Thông tin tư vấn”; bấm “Tư vấn đặt phòng” hoặc mũi tên sẽ xổ form xuống.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="width:360px;max-width:100%;border:1px solid #d9e2ef;background:#fff;box-shadow:0 18px 40px rgba(15,23,42,.12);font-family:Arial,sans-serif;overflow:hidden">
+        <div style="background:#1f2b3d;color:#fff;padding:14px 16px"><div style="font-size:10px;letter-spacing:3px;color:#c59b5f;font-weight:700">STAYLUXE ASSISTANT</div><div style="font-weight:800;margin-top:4px">Nhân viên tư vấn AI</div></div>
+        <div style="display:flex;padding:10px;gap:8px;background:#fff;border-bottom:1px solid #e5eaf2">
+          <div style="flex:1;background:#1f2b3d;color:#fff;text-align:center;border-radius:999px;padding:9px;font-size:12px;font-weight:800">Đặt phòng</div>
+          <div style="flex:1;background:#fff7ed;color:#9a5b13;text-align:center;border-radius:999px;padding:9px;font-size:12px;font-weight:800;border:1px solid #f4c78b">Hủy phòng</div>
+        </div>
+        <div style="padding:12px;background:#fafafa;border-bottom:1px solid #e5eaf2;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="height:34px;border:1px solid #d9e2ef;background:#fff"></div><div style="height:34px;border:1px solid #d9e2ef;background:#fff"></div>
+          <div style="height:34px;border:1px solid #d9e2ef;background:#fff"></div><div style="height:34px;border:1px solid #d9e2ef;background:#fff"></div>
+        </div>
+        <div style="padding:14px;background:#f8fafc;min-height:130px"><div style="background:#fff;border:1px solid #d9e2ef;border-radius:18px 18px 18px 4px;padding:14px;color:#1f2b3d">Form luôn hiện khi ở tab đặt phòng.</div></div>
+        <div style="padding:12px;display:flex;gap:8px"><div style="flex:1;border:1px solid #d9e2ef;border-radius:999px;padding:10px;color:#94a3b8">Nhập nhu cầu...</div><div style="width:42px;height:42px;border-radius:50%;background:#c59b5f"></div></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. Tab điều hướng ở trên</h3>
+      <p>Đặt phòng / hủy phòng là hai tab chính; form hiện theo tab đặt phòng. Rõ chức năng nhưng vẫn chiếm cao khi tab đặt phòng mở.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="width:360px;max-width:100%;border:1px solid #d9e2ef;background:#fff;box-shadow:0 18px 40px rgba(15,23,42,.12);font-family:Arial,sans-serif;overflow:hidden">
+        <div style="background:#1f2b3d;color:#fff;padding:14px 16px"><div style="font-size:10px;letter-spacing:3px;color:#c59b5f;font-weight:700">STAYLUXE ASSISTANT</div><div style="font-weight:800;margin-top:4px">Nhân viên tư vấn AI</div></div>
+        <div style="padding:12px;background:#fff;border-bottom:1px solid #e5eaf2;display:flex;gap:8px;overflow:hidden">
+          <div style="padding:8px 12px;border-radius:999px;background:#1f2b3d;color:#fff;font-size:12px;font-weight:800;white-space:nowrap">Tư vấn đặt phòng</div>
+          <div style="padding:8px 12px;border-radius:999px;background:#fff7ed;color:#9a5b13;border:1px solid #f4c78b;font-size:12px;font-weight:800;white-space:nowrap">Yêu cầu hủy</div>
+        </div>
+        <div style="padding:14px;background:#f8fafc;min-height:190px"><div style="background:#fff;border:1px solid #d9e2ef;border-radius:18px 18px 18px 4px;padding:14px;color:#1f2b3d">Không có form cố định. AI hỏi từng thông tin trong chat.</div></div>
+        <div style="padding:12px;display:flex;gap:8px"><div style="flex:1;border:1px solid #d9e2ef;border-radius:999px;padding:10px;color:#94a3b8">Nhập nhu cầu...</div><div style="width:42px;height:42px;border-radius:50%;background:#c59b5f"></div></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Chat-first tối giản</h3>
+      <p>Ẩn hẳn form mặc định, chỉ dùng chip hành động. Gọn nhất nhưng khách phải nhập nhiều hơn nếu muốn lọc phòng nhanh.</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle"><strong>Đề xuất của mình:</strong> chọn A vì đúng ý bạn nhất: tiết kiệm diện tích, có mũi tên thu/mở, và nút “Tư vấn đặt phòng” có thể kéo form xuống khi cần.</p>

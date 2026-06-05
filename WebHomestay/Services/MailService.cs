@@ -14,7 +14,12 @@ namespace WebHomestay.Services
             _config = config;
         }
 
-        public async Task SendEmailAsync(string toEmail, string subject, string body)
+        public Task SendEmailAsync(string toEmail, string subject, string body)
+        {
+            return SendEmailAsync(toEmail, subject, body, Array.Empty<EmailAttachment>());
+        }
+
+        public async Task SendEmailAsync(string toEmail, string subject, string body, IReadOnlyCollection<EmailAttachment> attachments)
         {
             var email = new MimeMessage();
             email.From.Add(new MailboxAddress(_config["MailSettings:DisplayName"], _config["MailSettings:Mail"]));
@@ -22,6 +27,13 @@ namespace WebHomestay.Services
             email.Subject = subject;
 
             var builder = new BodyBuilder { HtmlBody = body };
+            foreach (var attachment in attachments)
+            {
+                if (File.Exists(attachment.FilePath))
+                {
+                    builder.Attachments.Add(attachment.FileName, await File.ReadAllBytesAsync(attachment.FilePath), ContentType.Parse(attachment.ContentType));
+                }
+            }
             email.Body = builder.ToMessageBody();
 
             using var smtp = new SmtpClient();

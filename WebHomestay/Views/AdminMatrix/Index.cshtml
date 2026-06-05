@@ -171,6 +171,20 @@
                         </select>
                     </span>
                 </label>
+
+                <label class="admin-field">
+                    <span class="admin-field-label">Chi nhánh</span>
+                    <span class="admin-field-box is-select">
+                        <i class="fas fa-building"></i>
+                        <select id="matrix-branch-filter" name="matrixBranch" autocomplete="off">
+                            <option value="">Tất cả</option>
+                            @foreach (var branch in branches)
+                            {
+                                <option value="@branch.Name">@branch.Name</option>
+                            }
+                        </select>
+                    </span>
+                </label>
             </div>
 
             <div class="admin-matrix-toolbar-group is-compact">
@@ -1766,6 +1780,20 @@
 
             searchInput?.addEventListener('input', applyFilters);
             filterSelect?.addEventListener('change', applyFilters);
+
+            // Branch filter
+            var branchFilter = document.getElementById('matrix-branch-filter');
+            if (branchFilter) {
+                branchFilter.addEventListener('change', function() {
+                    var selected = this.value;
+                    var blocks = document.querySelectorAll('[data-branch-block]');
+                    blocks.forEach(function(block) {
+                        var name = block.querySelector('.branch-divider-inner strong')?.textContent?.trim() || '';
+                        block.classList.toggle('d-none', selected && name !== selected);
+                    });
+                });
+            }
+
             drawerClose?.addEventListener('click', closeDrawer);
             scrim?.addEventListener('click', closeDrawer);
             document.addEventListener('keydown', event => {

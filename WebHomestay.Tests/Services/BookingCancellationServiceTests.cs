@@ -246,6 +246,120 @@ public class BookingCancellationServiceTests
             service.ApproveAsync(new ProcessCancellationDto(47, "Hợp lệ", 50, new string('a', 101), CreateImage())));
     }
 
+    [Fact]
+    public async Task BuildApprovalPreviewAsync_RendersTemplateAndAttachmentName()
+    {
+        await using var context = CreateContext();
+        context.Bookings.Add(CreateBooking(37, "Khach Preview", "090", "preview@example.com"));
+        context.BookingCancellationRequests.Add(CreateRequest(48, 37, "preview@example.com", "Khach Preview"));
+        await context.SaveChangesAsync();
+        var service = CreateService(context, new FakeSettingService
+        {
+            Strings =
+            {
+                [BookingCancellationService.ApprovalSubjectSettingKey] = "Duyệt {BookingId}",
+                [BookingCancellationService.ApprovalBodySettingKey] = "Chào {CustomerName}, hoàn {RefundPercent}%, lý do {StaffReason}"
+            }
+        });
+
+        var preview = await service.BuildApprovalPreviewAsync(new ProcessCancellationDto(48, " Đủ điều kiện ", 60, "admin", CreateImage()));
+
+        Assert.Equal("preview@example.com", preview.RecipientEmail);
+        Assert.Equal("Duyệt 37", preview.Subject);
+        Assert.Contains("Khach Preview", preview.Body);
+        Assert.Contains("60", preview.Body);
+        Assert.Contains("Đủ điều kiện", preview.Body);
+        Assert.Equal("Đủ điều kiện", preview.EditableReason);
+        Assert.Equal("test.png", preview.AttachmentName);
+        Assert.True(preview.RequiresAttachment);
+    }
+
+    [Fact]
+    public async Task BuildRejectionPreviewAsync_RendersTemplateWithoutAttachment()
+    {
+        await using var context = CreateContext();
+        context.Bookings.Add(CreateBooking(38, "Khach Reject", "090", "reject@example.com"));
+        context.BookingCancellationRequests.Add(CreateRequest(49, 38, "reject@example.com", "Khach Reject"));
+        await context.SaveChangesAsync();
+        var service = CreateService(context, new FakeSettingService
+        {
+            Strings =
+            {
+                [BookingCancellationService.RejectionSubjectSettingKey] = "Từ chối {BookingId}",
+                [BookingCancellationService.RejectionBodySettingKey] = "Chào {CustomerName}, lý do {StaffReason}"
+            }
+        });
+
+        var preview = await service.BuildRejectionPreviewAsync(new ProcessCancellationDto(49, " Không hợp lệ ", 0, "admin", null));
+
+        Assert.Equal("reject@example.com", preview.RecipientEmail);
+        Assert.Equal("Từ chối 38", preview.Subject);
+        Assert.Contains("Khach Reject", preview.Body);
+        Assert.Contains("Kh&#244;ng hợp lệ", preview.Body);
+        Assert.Equal("Không hợp lệ", preview.EditableReason);
+        Assert.Null(preview.AttachmentName);
+        Assert.False(preview.RequiresAttachment);
+    }
+
+    [Fact]
+    public async Task ApproveAsync_SendsAttachmentAndSavesNotificationAudit()
+    {
+        await using var context = CreateContext();
+        context.Bookings.Add(CreateBooking(39, "Khach Mail", "090", "mail@example.com"));
+        context.BookingCancellationRequests.Add(CreateRequest(50, 39, "mail@example.com"));
+        await context.SaveChangesAsync();
+        var mail = new FakeMailService();
+        var service = CreateService(context, mail: mail);
+
+        var request = await service.ApproveAsync(new ProcessCancellationDto(
+            50, "Hoàn tiền hợp lệ", 75, "admin", CreateImage(), "Tiêu đề duyệt", "Nội dung duyệt"));
+
+        var message = Assert.Single(mail.Sent);
+        Assert.Equal("mail@example.com", message.ToEmail);
+        Assert.Equal("Tiêu đề duyệt", message.Subject);
+        Assert.Equal("Nội dung duyệt", message.Body);
+        var attachment = Assert.Single(message.Attachments);
+        Assert.Equal("test.png", attachment.FileName);
+        Assert.Equal("image/png", attachment.ContentType);
+        Assert.Equal(request.RefundBillProofPath, attachment.FilePath);
+
+        context.ChangeTracker.Clear();
+        var saved = await context.BookingCancellationRequests.SingleAsync(r => r.Id == request.Id);
+        Assert.Equal("Tiêu đề duyệt", saved.NotificationEmailSubject);
+        Assert.Equal("Nội dung duyệt", saved.NotificationEmailBody);
+        Assert.NotNull(saved.NotificationEmailSentAt);
+        Assert.Equal("test.png", saved.NotificationEmailAttachmentName);
+        Assert.Equal("Approved", saved.NotificationEmailType);
+    }
+
+    [Fact]
+    public async Task RejectAsync_SendsEmailWithoutAttachmentAndSavesNotificationAudit()
+    {
+        await using var context = CreateContext();
+        context.Bookings.Add(CreateBooking(40, "Khach Reject Mail", "090", "reject-mail@example.com"));
+        context.BookingCancellationRequests.Add(CreateRequest(51, 40, "reject-mail@example.com"));
+        await context.SaveChangesAsync();
+        var mail = new FakeMailService();
+        var service = CreateService(context, mail: mail);
+
+        var request = await service.RejectAsync(new ProcessCancellationDto(
+            51, "Không đủ điều kiện", 0, "admin", null, "Tiêu đề từ chối", "Nội dung từ chối"));
+
+        var message = Assert.Single(mail.Sent);
+        Assert.Equal("reject-mail@example.com", message.ToEmail);
+        Assert.Equal("Tiêu đề từ chối", message.Subject);
+        Assert.Equal("Nội dung từ chối", message.Body);
+        Assert.Empty(message.Attachments);
+
+        context.ChangeTracker.Clear();
+        var saved = await context.BookingCancellationRequests.SingleAsync(r => r.Id == request.Id);
+        Assert.Equal("Tiêu đề từ chối", saved.NotificationEmailSubject);
+        Assert.Equal("Nội dung từ chối", saved.NotificationEmailBody);
+        Assert.NotNull(saved.NotificationEmailSentAt);
+        Assert.Null(saved.NotificationEmailAttachmentName);
+        Assert.Equal("Rejected", saved.NotificationEmailType);
+    }
+
     private static ApplicationDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -254,9 +368,9 @@ public class BookingCancellationServiceTests
         return new ApplicationDbContext(options);
     }
 
-    private static BookingCancellationService CreateService(ApplicationDbContext context, FakeSettingService? settings = null, FakeWebHostEnvironment? env = null)
+    private static BookingCancellationService CreateService(ApplicationDbContext context, FakeSettingService? settings = null, FakeWebHostEnvironment? env = null, FakeMailService? mail = null)
     {
-        return new BookingCancellationService(context, settings ?? new FakeSettingService(), new FakeMailService(), env ?? new FakeWebHostEnvironment());
+        return new BookingCancellationService(context, settings ?? new FakeSettingService(), mail ?? new FakeMailService(), env ?? new FakeWebHostEnvironment());
     }
 
     private static FormFile CreateImage()
@@ -320,16 +434,16 @@ public class BookingCancellationServiceTests
         };
     }
 
-    private static BookingCancellationRequest CreateRequest(int id, int bookingId)
+    private static BookingCancellationRequest CreateRequest(int id, int bookingId, string customerEmail = "k@example.com", string customerName = "Khach")
     {
         return new BookingCancellationRequest
         {
             Id = id,
             ChatSessionId = $"chat-{id}",
             BookingId = bookingId,
-            CustomerName = "Khach",
+            CustomerName = customerName,
             CustomerPhone = "090",
-            CustomerEmail = "k@example.com",
+            CustomerEmail = customerEmail,
             ConfirmationEmailProofPath = "proof.png",
             Status = "Pending",
             RefundStatus = "NotRefunded",
@@ -353,7 +467,19 @@ public class BookingCancellationServiceTests
 
     private class FakeMailService : IMailService
     {
-        public Task SendEmailAsync(string toEmail, string subject, string body) => Task.CompletedTask;
+        public List<(string ToEmail, string Subject, string Body, IReadOnlyCollection<EmailAttachment> Attachments)> Sent { get; } = new();
+
+        public Task SendEmailAsync(string toEmail, string subject, string body)
+        {
+            Sent.Add((toEmail, subject, body, Array.Empty<EmailAttachment>()));
+            return Task.CompletedTask;
+        }
+
+        public Task SendEmailAsync(string toEmail, string subject, string body, IReadOnlyCollection<EmailAttachment> attachments)
+        {
+            Sent.Add((toEmail, subject, body, attachments));
+            return Task.CompletedTask;
+        }
     }
 
     private class FakeWebHostEnvironment : IWebHostEnvironment
