@@ -49,3 +49,24 @@ key.md
 
 # Agent workspace files
 .claude/
+.superpowers/
+.kiro/
+
+# Local helper apps and scratch outputs
+artifacts/
+CleanupApp/bin/
+CleanupApp/obj/
+TestGemini/bin/
+TestGemini/obj/
+
+# One-off local scratch files
+admin_ai_diff.patch
+clean_ui.py
+patch_js.js
+patch_mock_preview.js
+patch_preview.js
+patch_site_js.js
+restore_auth.py
+temp_fix.js
+test-api.cs
+test-chat.cs
