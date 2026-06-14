@@ -220,6 +220,49 @@ public class BookingCancellationService : IBookingCancellationService
         return request;
     }
 
+    public async Task<BookingCancellationRequest> CreateManualAsync(CreateManualCancellationDto dto, CancellationToken cancellationToken = default)
+    {
+        var bookingCode = OptionalTrimmed(dto.BookingCode, 50, "Mã booking không được vượt quá 50 ký tự.");
+        if (string.IsNullOrWhiteSpace(bookingCode))
+            throw new InvalidOperationException("Vui lòng nhập mã booking.");
+
+        var bookingId = ParseBookingId(bookingCode);
+        if (!bookingId.HasValue)
+            throw new InvalidOperationException("Mã booking không hợp lệ.");
+
+        var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId.Value, cancellationToken)
+            ?? throw new InvalidOperationException("Không tìm thấy booking với mã này.");
+
+        if (string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Booking này đã bị huỷ trước đó.");
+
+        var imagePath = await SaveProtectedImageAsync(dto.ManualProofImage, "Manual", cancellationToken);
+        var processedBy = OptionalTrimmed(dto.ProcessedBy, 100, "Người xử lý không được vượt quá 100 ký tự.");
+        var policy = await GetPolicyAsync(cancellationToken);
+
+        var request = new BookingCancellationRequest
+        {
+            BookingId = booking.Id,
+            SubmittedBookingCode = bookingCode,
+            CustomerName = booking.CustomerName,
+            CustomerPhone = booking.CustomerPhone,
+            CustomerEmail = booking.CustomerEmail ?? string.Empty,
+            ConfirmationEmailProofPath = imagePath,
+            IsManual = true,
+            PolicyNoticeHoursSnapshot = policy.NoticeHours,
+            RefundPercentBeforeNoticeSnapshot = policy.RefundPercentBeforeNotice,
+            RefundPercentAfterNoticeSnapshot = policy.RefundPercentAfterNotice,
+            PolicyMessageSnapshot = policy.PolicyMessage,
+            ProcessedBy = processedBy,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.BookingCancellationRequests.Add(request);
+        await _context.SaveChangesAsync(cancellationToken);
+        return request;
+    }
+
     public async Task<string> GetProtectedFilePathAsync(int requestId, string kind, CancellationToken cancellationToken = default)
     {
         var request = await _context.BookingCancellationRequests.FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken)

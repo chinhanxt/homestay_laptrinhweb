@@ -33,6 +33,11 @@ public record CancellationEmailPreviewDto(
     string? AttachmentName,
     bool RequiresAttachment);
 
+public record CreateManualCancellationDto(
+    string BookingCode,
+    IFormFile ManualProofImage,
+    string? ProcessedBy);
+
 public interface IBookingCancellationService
 {
     Task<CancellationPolicyDto> GetPolicyAsync(CancellationToken cancellationToken = default);
@@ -42,4 +47,5 @@ public interface IBookingCancellationService
     Task<BookingCancellationRequest> ApproveAsync(ProcessCancellationDto dto, CancellationToken cancellationToken = default);
     Task<BookingCancellationRequest> RejectAsync(ProcessCancellationDto dto, CancellationToken cancellationToken = default);
     Task<string> GetProtectedFilePathAsync(int requestId, string kind, CancellationToken cancellationToken = default);
+    Task<BookingCancellationRequest> CreateManualAsync(CreateManualCancellationDto dto, CancellationToken cancellationToken = default);
 }
