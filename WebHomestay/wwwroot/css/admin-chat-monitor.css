@@ -813,3 +813,29 @@
         border-bottom: 1px solid #e5e7eb !important;
     }
 }
+
+.btn-manual-cancellation {
+    border-color: #f59e0b;
+    color: #f59e0b;
+}
+.btn-manual-cancellation:hover {
+    background: #f59e0b;
+    color: #fff;
+}
+.manual-preview-card {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+}
+.manual-preview-row {
+    display: flex;
+    gap: 12px;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    color: #cbd5e1;
+}
+.manual-preview-row strong {
+    color: #f1f5f9;
+}
