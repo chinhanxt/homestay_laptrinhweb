@@ -63,6 +63,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const openButton = e.target.closest('[data-open-cancellation]');
         if (openButton) openCancellation(openButton.dataset.openCancellation);
     });
+    document.getElementById('btn-manual-cancellation')?.addEventListener('click', openManualCancellationModal);
+    document.getElementById('btn-lookup-booking')?.addEventListener('click', lookupBookingForCancellation);
+    document.getElementById('btn-submit-manual-cancellation')?.addEventListener('click', submitManualCancellation);
+    document.getElementById('manual-zalo-image')?.addEventListener('change', checkManualFormReady);
+    document.getElementById('manual-cancellation-modal')?.addEventListener('hidden.bs.modal', resetManualCancellationForm);
 });
 
 function initializeSignalR() {
@@ -860,6 +865,94 @@ async function permanentlyDeleteCurrentSession() {
             premiumToast('Đã xóa vĩnh viễn phiên chat.', 'success');
         })
         .catch(err => premiumToast(err?.message || 'Không xóa vĩnh viễn được phiên chat.', 'error'));
+}
+
+function openManualCancellationModal() {
+    const modalEl = document.getElementById('manual-cancellation-modal');
+    if (!modalEl) return;
+    resetManualCancellationForm();
+    if (typeof bootstrap !== 'undefined') bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+function resetManualCancellationForm() {
+    document.getElementById('manual-booking-code').value = '';
+    document.getElementById('manual-zalo-image').value = '';
+    document.getElementById('manual-booking-preview').classList.add('d-none');
+    document.getElementById('btn-submit-manual-cancellation').disabled = true;
+    document.getElementById('manual-cancellation-message').textContent = '';
+}
+
+function lookupBookingForCancellation() {
+    const code = document.getElementById('manual-booking-code').value.trim();
+    const message = document.getElementById('manual-cancellation-message');
+    const preview = document.getElementById('manual-booking-preview');
+    if (!code) {
+        if (message) message.textContent = 'Vui lòng nhập mã booking.';
+        return;
+    }
+    if (message) message.textContent = 'Đang tra cứu...';
+    preview.classList.add('d-none');
+    document.getElementById('btn-submit-manual-cancellation').disabled = true;
+
+    fetch('/chinhan/hethong/chat-monitor/cancellations/lookup-booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingCode: code })
+    })
+        .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+        .then(data => {
+            if (message) message.textContent = '';
+            document.getElementById('manual-customer-name').textContent = data.customerName || '';
+            document.getElementById('manual-customer-phone').textContent = data.customerPhone || '';
+            document.getElementById('manual-customer-email').textContent = data.customerEmail || '';
+            document.getElementById('manual-room-name').textContent = data.roomName ? 'Phòng: ' + data.roomName : '';
+            const checkIn = data.checkIn ? new Date(data.checkIn).toLocaleDateString('vi-VN') : '';
+            const checkOut = data.checkOut ? new Date(data.checkOut).toLocaleDateString('vi-VN') : '';
+            document.getElementById('manual-checkin-dates').textContent = checkIn && checkOut ? checkIn + ' → ' + checkOut : '';
+            preview.classList.remove('d-none');
+            checkManualFormReady();
+        })
+        .catch(err => {
+            if (message) message.textContent = err?.error || 'Không tìm thấy booking.';
+            preview.classList.add('d-none');
+        });
+}
+
+function checkManualFormReady() {
+    const hasImage = document.getElementById('manual-zalo-image').files.length > 0;
+    const hasPreview = !document.getElementById('manual-booking-preview').classList.contains('d-none');
+    document.getElementById('btn-submit-manual-cancellation').disabled = !(hasImage && hasPreview);
+}
+
+function submitManualCancellation() {
+    const code = document.getElementById('manual-booking-code').value.trim();
+    const image = document.getElementById('manual-zalo-image').files[0];
+    const message = document.getElementById('manual-cancellation-message');
+    if (!code || !image) {
+        if (message) message.textContent = 'Vui lòng nhập mã booking và chọn ảnh.';
+        return;
+    }
+    if (message) message.textContent = 'Đang tạo đơn hủy...';
+
+    const formData = new FormData();
+    formData.append('bookingCode', code);
+    formData.append('image', image);
+
+    fetch('/chinhan/hethong/chat-monitor/cancellations/create-manual', {
+        method: 'POST',
+        body: formData
+    })
+        .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+        .then(data => {
+            if (message) message.textContent = 'Đã tạo đơn hủy thành công.';
+            const modalEl = document.getElementById('manual-cancellation-modal');
+            if (modalEl && typeof bootstrap !== 'undefined') bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            openCancellation(data.requestId);
+            loadSessionsFallback();
+        })
+        .catch(err => {
+            if (message) message.textContent = err?.error || 'Không tạo được đơn hủy.';
+        });
 }
 
 function loadCancellationList(status) {

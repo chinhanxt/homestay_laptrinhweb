@@ -24,6 +24,9 @@
             <button class="btn btn-sm btn-outline-secondary" data-cancellation-filter="Approved">Đã chấp nhận</button>
             <button class="btn btn-sm btn-outline-secondary" data-cancellation-filter="Rejected">Đã từ chối</button>
         </div>
+            <button class="btn btn-sm btn-outline-warning w-100 mt-1" id="btn-manual-cancellation" type="button">
+                <i class="fas fa-file-pen me-1"></i>Hủy thủ công (Zalo)
+            </button>
         <div class="chat-scope-row">
             <button class="btn btn-sm btn-primary" type="button" data-session-scope="active">Đang theo dõi</button>
             <button class="btn btn-sm btn-outline-secondary" type="button" data-session-scope="deleted">Thùng rác</button>
@@ -145,6 +148,58 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
                 <button type="button" class="btn btn-primary" id="btn-save-auto-reply">Lưu tin nhắn</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="manual-cancellation-modal" tabindex="-1" aria-labelledby="manual-cancellation-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <span class="modal-kicker">Hủy thủ công</span>
+                    <h2 class="modal-title" id="manual-cancellation-title">Hủy đơn từ Zalo</h2>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label" for="manual-booking-code">Mã đặt phòng</label>
+                    <div class="input-group">
+                        <input class="form-control" id="manual-booking-code" type="text" placeholder="Nhập mã booking..." />
+                        <button class="btn btn-outline-primary" type="button" id="btn-lookup-booking">
+                            <i class="fas fa-search me-1"></i>Tra cứu
+                        </button>
+                    </div>
+                </div>
+                <div id="manual-booking-preview" class="d-none">
+                    <div class="manual-preview-card">
+                        <div class="manual-preview-row">
+                            <strong id="manual-customer-name"></strong>
+                            <span id="manual-customer-phone"></span>
+                        </div>
+                        <div class="manual-preview-row">
+                            <span id="manual-customer-email"></span>
+                        </div>
+                        <div class="manual-preview-row">
+                            <span id="manual-room-name"></span>
+                            <span id="manual-checkin-dates"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="manual-zalo-image">Ảnh chụp Zalo</label>
+                    <input class="form-control" id="manual-zalo-image" type="file" accept="image/png,image/jpeg,image/gif,image/webp" />
+                    <div class="form-text">Chụp màn hình tin nhắn Zalo khách yêu cầu hủy (PNG/JPG, tối đa 5MB).</div>
+                </div>
+                <div id="manual-cancellation-message" class="cancellation-action-message"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-warning" id="btn-submit-manual-cancellation" disabled>
+                    <i class="fas fa-file-pen me-1"></i>Tạo đơn hủy
+                </button>
             </div>
         </div>
     </div>
