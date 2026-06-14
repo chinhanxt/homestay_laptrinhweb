@@ -51,6 +51,8 @@ public class BookingCancellationRequest
     public int RefundPercentAfterNoticeSnapshot { get; set; }
     public string PolicyMessageSnapshot { get; set; } = string.Empty;
 
+    public bool IsManual { get; set; }
+
     public int? AppliedRefundPercent { get; set; }
 
     [Required, StringLength(20)]

@@ -377,6 +377,7 @@ namespace WebHomestay.Data
                 entity.Property(e => e.RefundPercentBeforeNoticeSnapshot).HasColumnName("refund_percent_before_notice_snapshot");
                 entity.Property(e => e.RefundPercentAfterNoticeSnapshot).HasColumnName("refund_percent_after_notice_snapshot");
                 entity.Property(e => e.PolicyMessageSnapshot).HasColumnName("policy_message_snapshot");
+                entity.Property(e => e.IsManual).HasColumnName("is_manual");
                 entity.Property(e => e.AppliedRefundPercent).HasColumnName("applied_refund_percent");
                 entity.Property(e => e.RefundStatus).HasColumnName("refund_status").HasMaxLength(20);
                 entity.Property(e => e.RefundBillProofPath).HasColumnName("refund_bill_proof_path");
