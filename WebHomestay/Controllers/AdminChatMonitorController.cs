@@ -524,6 +524,64 @@ public class AdminChatMonitorController : Controller
     }
 
     [AdminAuthorize(Permission = "chats.view")]
+    [HttpPost("cancellations/lookup-booking")]
+    public async Task<IActionResult> LookupBookingForCancellation([FromBody] LookupBookingRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.BookingCode))
+            return BadRequest(new { error = "Vui lòng nhập mã booking." });
+
+        var bookingId = ParseBookingIdInt(request.BookingCode.Trim());
+        if (!bookingId.HasValue)
+            return BadRequest(new { error = "Mã booking không hợp lệ." });
+
+        var booking = await _context.Bookings
+            .Include(b => b.Room)
+            .FirstOrDefaultAsync(b => b.Id == bookingId.Value);
+
+        if (booking == null)
+            return NotFound(new { error = "Không tìm thấy booking với mã này." });
+
+        if (string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { error = "Booking này đã bị huỷ trước đó." });
+
+        return Ok(new
+        {
+            bookingId = booking.Id,
+            customerName = booking.CustomerName,
+            customerPhone = booking.CustomerPhone,
+            customerEmail = booking.CustomerEmail ?? "",
+            roomName = booking.Room?.Name ?? "",
+            checkIn = booking.StartTime,
+            checkOut = booking.EndTime,
+            status = booking.Status
+        });
+    }
+
+    [AdminAuthorize(Permission = "chats.view")]
+    [HttpPost("cancellations/create-manual")]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<IActionResult> CreateManualCancellation([FromForm] string bookingCode, [FromForm] IFormFile? image)
+    {
+        if (string.IsNullOrWhiteSpace(bookingCode))
+            return BadRequest(new { error = "Vui lòng nhập mã booking." });
+
+        if (image == null || image.Length == 0)
+            return BadRequest(new { error = "Vui lòng chọn ảnh chụp Zalo." });
+
+        try
+        {
+            var processedBy = HttpContext.Session.GetString("AdminUser") ?? "admin";
+            var request = await _bookingCancellationService.CreateManualAsync(
+                new CreateManualCancellationDto(bookingCode.Trim(), image, processedBy));
+            return Ok(new { requestId = request.Id });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [AdminAuthorize(Permission = "chats.view")]
     [HttpGet("cancellations/{id:int}")]
     public async Task<IActionResult> GetCancellationDetail(int id)
     {
@@ -680,6 +738,12 @@ public class AdminChatMonitorController : Controller
             .Where(b => b.Id == bookingId)
             .Select(b => new { b.Id, b.CustomerName, b.CustomerPhone, b.CustomerEmail, roomName = b.Room.Name, b.StartTime, b.EndTime, b.Status, b.TotalPrice })
             .FirstOrDefaultAsync();
+    }
+
+    private static int? ParseBookingIdInt(string code)
+    {
+        var digits = new string(code.Where(char.IsDigit).ToArray());
+        return int.TryParse(digits, out var id) ? id : null;
     }
 
     private static List<int> ParseSuggestedBookingIds(string? json)
@@ -913,4 +977,9 @@ public class AdminChatReplyRequest
 public class AdminChatQuickSendRequest
 {
     public JsonElement Payload { get; set; }
+}
+
+public class LookupBookingRequest
+{
+    public string BookingCode { get; set; } = string.Empty;
 }
