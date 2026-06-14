@@ -9,6 +9,14 @@ namespace WebHomestay.Services
         public List<AIUiBlock> UiBlocks { get; set; } = new();
     }
 
+    public class ConversationTurn
+    {
+        public DateTime Timestamp { get; set; }
+        public string UserMessage { get; set; } = string.Empty;
+        public string AIResponse { get; set; } = string.Empty;
+        public Dictionary<string, object>? ExtractedEntities { get; set; }
+    }
+
     public class AIBookingSessionState
     {
         public string? CustomerName { get; set; }
@@ -26,6 +34,32 @@ namespace WebHomestay.Services
         public string? SelectedSlotLabel { get; set; }
         public int? BookingId { get; set; }
         public string PaymentStatus { get; set; } = string.Empty;
+
+        // Conversation tracking properties (Requirement 5.1, 5.2)
+        public List<ConversationTurn> ConversationHistory { get; set; } = new();
+        public int MessagesSinceLastRoomDisplay { get; set; }
+        public int RoomDisplayCount { get; set; }
+        public DateTime? LastRoomDisplayTime { get; set; }
+
+        // Intent tracking properties (Requirement 5.5)
+        public string? LastClassifiedIntent { get; set; }
+        public decimal LastIntentConfidence { get; set; }
+        public int ClarificationAttempts { get; set; }
+
+        // User preference properties (Requirement 6.1)
+        public decimal? BudgetMax { get; set; }
+        public List<string> PreferredAmenities { get; set; } = new();
+        public string? LanguagePreference { get; set; }
+        public string? RequestedTimeStart { get; set; }
+        public string? RequestedTimeEnd { get; set; }
+        public string? RequestedTimeLabel { get; set; }
+        public decimal? BranchConfidence { get; set; }
+        public bool NeedsWeekendPricingExplanation { get; set; }
+        public bool NeedsHolidayPricingExplanation { get; set; }
+        public bool HasExtraGuestSurcharge { get; set; }
+        public List<string> MissingRequiredFields { get; set; } = new();
+        public string? LastRecommendationReason { get; set; }
+        public int? ActiveRoomContextId { get; set; }
     }
 
     public class AIUiBlock
@@ -138,6 +172,14 @@ namespace WebHomestay.Services
         public DateOnly? CheckOutDate { get; set; }
         public int GuestCount { get; set; }
         public string BookingMode { get; set; } = "hourly";
+        public TimeOnly? RequestedTimeStart { get; set; }
+        public TimeOnly? RequestedTimeEnd { get; set; }
+        public string? RequestedTimeLabel { get; set; }
+        public List<string> MissingRequiredFields { get; set; } = new();
+        public bool HasExtraGuestSurcharge { get; set; }
+        public bool NeedsWeekendPricingExplanation { get; set; }
+        public bool NeedsHolidayPricingExplanation { get; set; }
+        public string? LastRecommendationReason { get; set; }
     }
 
     public class BookingProgressState
@@ -149,6 +191,7 @@ namespace WebHomestay.Services
         public string? CustomerPhone { get; set; }
         public string? CustomerEmail { get; set; }
         public int? BookingId { get; set; }
+        public int? ActiveRoomContextId { get; set; }
     }
 
     public class BookingSessionContainer

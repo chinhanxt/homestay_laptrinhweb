@@ -9,7 +9,7 @@ namespace WebHomestay.Models.ViewModels
         public string BankCode { get; set; } = string.Empty;
         public string BankAccountNumber { get; set; } = string.Empty;
         public string BankAccountName { get; set; } = string.Empty;
-        public string TransferContentTemplate { get; set; } = "STAYLUXE {BookingId}";
+        public string TransferContentTemplate { get; set; } = "chinhan {BookingId}";
         public int CountdownMinutes { get; set; } = 5;
         public string BeforeBillMessage { get; set; } = "Vui lòng tải lên ảnh chụp màn hình bill thanh toán thành công để chúng tôi xác nhận nhanh nhất.";
         public string AfterBillMessage { get; set; } = "Chúng tôi đã nhận được Bill của bạn. Nhân viên sẽ đối soát và gửi mã phòng qua Email sớm nhất.";

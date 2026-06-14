@@ -29,7 +29,7 @@ namespace WebHomestay.Controllers
             var role = HttpContext.Session.GetString("AdminRole");
             var branchId = HttpContext.Session.GetInt32("AdminBranchId");
 
-            var query = _context.Rooms.Include(r => r.Branch).AsQueryable();
+            var query = _context.Rooms.Include(r => r.Branch).Where(r => !r.IsDeleted).AsQueryable();
 
             if (role != "SuperAdmin" && branchId.HasValue)
             {
@@ -244,6 +244,75 @@ namespace WebHomestay.Controllers
             if (room != null) _context.Rooms.Remove(room);
             await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
+        }
+
+        [AdminAuthorize(Permission = "rooms.delete")]
+        [HttpPost("soft-delete/{id}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SoftDelete(int id)
+        {
+            var room = await _context.Rooms.FindAsync(id);
+            if (room == null) return NotFound();
+
+            room.IsDeleted = true;
+            room.DeletedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Phòng '{room.Name}' đã được chuyển vào thùng rác.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        [AdminAuthorize(Permission = "rooms.view")]
+        [HttpGet("trash")]
+        public async Task<IActionResult> Trash()
+        {
+            var role = HttpContext.Session.GetString("AdminRole");
+            var branchId = HttpContext.Session.GetInt32("AdminBranchId");
+
+            var query = _context.Rooms
+                .Include(r => r.Branch)
+                .Where(r => r.IsDeleted);
+
+            if (role != "SuperAdmin" && branchId.HasValue)
+            {
+                query = query.Where(r => r.BranchId == branchId.Value);
+            }
+
+            var rooms = await query
+                .OrderByDescending(r => r.DeletedAt)
+                .ToListAsync();
+            return View(rooms);
+        }
+
+        [AdminAuthorize(Permission = "rooms.edit")]
+        [HttpPost("restore/{id}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Restore(int id)
+        {
+            var room = await _context.Rooms.FindAsync(id);
+            if (room == null) return NotFound();
+
+            room.IsDeleted = false;
+            room.DeletedAt = null;
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Phòng '{room.Name}' đã được khôi phục.";
+            return RedirectToAction(nameof(Trash));
+        }
+
+        [AdminAuthorize(Permission = "rooms.delete")]
+        [HttpPost("permanent-delete/{id}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PermanentDelete(int id)
+        {
+            var room = await _context.Rooms.FindAsync(id);
+            if (room == null) return NotFound();
+
+            _context.Rooms.Remove(room);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Phòng '{room.Name}' đã bị xóa vĩnh viễn.";
+            return RedirectToAction(nameof(Trash));
         }
 
         private bool RoomExists(int id)

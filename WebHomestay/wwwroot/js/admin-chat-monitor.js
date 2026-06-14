@@ -3,6 +3,8 @@ let currentSessionId = null;
 let sessions = {};
 let totalUnreadCount = 0;
 let cancellationMailPreviewState = null;
+let quickSendModalState = null;
+let currentSessionScope = 'active';
 
 const statusLabels = {
     paused: 'AI đã tạm dừng',
@@ -14,7 +16,21 @@ const formBlockLabels = {
     roomSelector: 'Danh sách phòng',
     slotPicker: 'Khung giờ',
     infoForm: 'Form thông tin',
-    paymentQr: 'QR thanh toán'
+    bookingCta: 'CTA đặt phòng',
+    handoffContact: 'Liên hệ chi nhánh',
+    AskInfo: 'Yêu cầu thông tin',
+    askInfo: 'Yêu cầu thông tin',
+    reply: 'Phản hồi',
+    retry: 'Thử lại',
+    'start-booking': 'Bắt đầu đặt phòng',
+    startBooking: 'Bắt đầu đặt phòng',
+    showRooms: 'Hiển thị phòng trống',
+    selectSlot: 'Chọn khung giờ',
+    autoBook: 'Đặt phòng tự động',
+    bookingForm: 'Biểu mẫu đặt phòng',
+    paymentQr: 'Yêu cầu thanh toán',
+    uiBlocks: 'Khối tương tác',
+    error: 'Lỗi'
 };
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -29,11 +45,17 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.send-form-block').forEach(el => {
         el.addEventListener('click', (e) => {
             e.preventDefault();
-            sendFormBlock(el.dataset.type);
+            openQuickSendComposer(el.dataset.type);
         });
+    });
+    document.querySelectorAll('[data-session-scope]').forEach(button => {
+        button.addEventListener('click', () => switchSessionScope(button.dataset.sessionScope || 'active'));
     });
     document.getElementById('btn-config-auto-reply')?.addEventListener('click', showAutoReplyConfig);
     document.getElementById('btn-save-auto-reply')?.addEventListener('click', saveAutoReplyConfig);
+    document.getElementById('btn-soft-delete-session')?.addEventListener('click', () => softDeleteCurrentSession());
+    document.getElementById('btn-restore-session')?.addEventListener('click', () => restoreCurrentSession());
+    document.getElementById('btn-permanent-delete-session')?.addEventListener('click', () => permanentlyDeleteCurrentSession());
     document.querySelectorAll('[data-cancellation-filter]').forEach(button => {
         button.addEventListener('click', () => loadCancellationList(button.dataset.cancellationFilter || 'Pending'));
     });
@@ -57,12 +79,74 @@ function initializeSignalR() {
         if (currentSessionId === data.sessionId) updateChatHeader(data);
     });
 
+    connection.on('newMessage', function (data) {
+        if (currentSessionId === data.sessionId) {
+            const area = document.getElementById('chat-messages-area');
+            if (area) {
+                const emptyState = area.querySelector('.empty-state');
+                if (emptyState) emptyState.remove();
+
+                const lastBubble = area.querySelector('.chat-bubble:last-child');
+                if (lastBubble) {
+                    const isSameRole = lastBubble.classList.contains(`chat-bubble-${data.role}`);
+                    const contentEl = lastBubble.querySelector('.chat-bubble-content');
+                    const isSameContent = contentEl && contentEl.textContent.trim() === (data.content || '').trim();
+                    if (isSameRole && isSameContent) {
+                        return;
+                    }
+                }
+
+                area.appendChild(createMsgBubble(data.role, data.content, data.createdAt, data.formBlockType, data.formBlockJson));
+                area.scrollTop = area.scrollHeight;
+            }
+        }
+    });
+
+
+
     connection.on('sessionList', function (list) {
         sessions = {};
         list.forEach(s => { sessions[s.sessionId] = s; });
-        totalUnreadCount = list.reduce((sum, s) => sum + (Number(s.unreadCount) || 0), 0);
+        totalUnreadCount = list.length > 0 && typeof list[0].totalUnreadCount === 'number'
+            ? list[0].totalUnreadCount
+            : 0;
         renderSessionList();
         updateBadge();
+    });
+
+    connection.on('sessionDeleted', function (data) {
+        if (currentSessionScope === 'active') {
+            delete sessions[data.sessionId];
+        } else {
+            loadSessionsFallback();
+            return;
+        }
+
+        if (currentSessionId === data.sessionId) {
+            currentSessionId = null;
+            document.getElementById('chat-active-panel')?.classList.add('d-none');
+            document.getElementById('chat-placeholder')?.classList.remove('d-none');
+        }
+        renderSessionList();
+    });
+
+    connection.on('sessionRestored', function (data) {
+        if (currentSessionScope === 'deleted') {
+            delete sessions[data.sessionId];
+        } else {
+            sessions[data.sessionId] = { ...sessions[data.sessionId], ...data };
+        }
+        renderSessionList();
+    });
+
+    connection.on('sessionPurged', function (data) {
+        delete sessions[data.sessionId];
+        if (currentSessionId === data.sessionId) {
+            currentSessionId = null;
+            document.getElementById('chat-active-panel')?.classList.add('d-none');
+            document.getElementById('chat-placeholder')?.classList.remove('d-none');
+        }
+        renderSessionList();
     });
 
     connection.start().then(function () {
@@ -74,11 +158,14 @@ function initializeSignalR() {
 }
 
 function loadSessionsFallback() {
-    fetch('/admin/chat-monitor/sessions')
+    fetch(`/chinhan/hethong/chat-monitor/sessions?scope=${encodeURIComponent(currentSessionScope)}`)
         .then(r => r.json())
         .then(list => {
+            sessions = {};
             list.forEach(s => { sessions[s.sessionId] = { ...sessions[s.sessionId], ...s }; });
-            totalUnreadCount = list.reduce((sum, s) => sum + (Number(s.unreadCount) || 0), 0);
+            totalUnreadCount = list.length > 0 && typeof list[0].totalUnreadCount === 'number'
+                ? list[0].totalUnreadCount
+                : 0;
             renderSessionList();
             updateBadge();
         });
@@ -105,6 +192,9 @@ function renderSessionList() {
     visibleSessions.forEach(s => {
         const div = document.createElement('div');
         const isPaused = s.status === 'paused';
+        const deletedMeta = s.isDeleted && s.deletedBy
+            ? `<span class="session-deleted-note">Đã xóa bởi ${escapeHtml(s.deletedBy)}</span>`
+            : '';
         div.className = `session-card ${currentSessionId === s.sessionId ? 'active' : ''}`;
         div.dataset.sessionId = s.sessionId;
         div.innerHTML = `
@@ -116,9 +206,10 @@ function renderSessionList() {
             </div>
             <div class="session-card-preview">${escapeHtml((s.lastMessage || 'Chưa có tin nhắn gần đây').slice(0, 70))}</div>
             <div class="session-card-meta">
-                <span class="session-status ${isPaused ? 'paused' : 'auto'}">${isPaused ? 'Đã tạm dừng AI' : 'Tự động'}</span>
+                <span class="session-status ${s.isDeleted ? 'deleted' : isPaused ? 'paused' : 'auto'}">${s.isDeleted ? 'Đã xóa mềm' : isPaused ? 'Đã tạm dừng AI' : 'Tự động'}</span>
                 <span class="session-code">#${shortSessionId(s.sessionId)}</span>
             </div>
+            ${deletedMeta}
         `;
         div.addEventListener('click', () => selectSession(s.sessionId));
         container.appendChild(div);
@@ -153,11 +244,13 @@ function selectSession(sessionId) {
     renderSessionList();
     loadChatMessages(sessionId);
     updateChatHeader(sessions[sessionId] || {});
-    markSessionRead(sessionId);
+    if (!sessions[sessionId]?.isDeleted) {
+        markSessionRead(sessionId);
+    }
 }
 
 function markSessionRead(sessionId) {
-    fetch(`/admin/chat-monitor/session/${encodeURIComponent(sessionId)}/mark-read`, { method: 'POST' })
+    fetch(`/chinhan/hethong/chat-monitor/session/${encodeURIComponent(sessionId)}/mark-read`, { method: 'POST' })
         .then(r => r.ok ? r.json() : null)
         .then(data => {
             if (!data) return;
@@ -175,23 +268,37 @@ function updateChatHeader(data) {
     const badge = document.getElementById('chat-status-badge');
     const pauseBtn = document.getElementById('btn-pause-ai');
     const resumeBtn = document.getElementById('btn-resume-ai');
+    const autoReplyBtn = document.getElementById('btn-config-auto-reply');
+    const softDeleteBtn = document.getElementById('btn-soft-delete-session');
+    const restoreBtn = document.getElementById('btn-restore-session');
+    const permanentDeleteBtn = document.getElementById('btn-permanent-delete-session');
     const isPaused = data.status === 'paused';
+    const isDeleted = data.isDeleted === true;
 
     if (name) name.textContent = data.customerName || 'Khách ' + shortSessionId(currentSessionId);
     if (code) code.textContent = 'Phiên #' + shortSessionId(currentSessionId);
     if (badge) {
-        badge.textContent = statusLabels[data.status] || 'AI đang trả lời';
-        badge.className = `badge chat-status-badge ${isPaused ? 'paused' : 'auto'}`;
+        badge.textContent = isDeleted ? 'Phiên đang nằm trong thùng rác' : (statusLabels[data.status] || 'AI đang trả lời');
+        badge.className = `badge chat-status-badge ${isDeleted ? 'deleted' : isPaused ? 'paused' : 'auto'}`;
     }
-    if (pauseBtn) pauseBtn.classList.toggle('d-none', isPaused);
-    if (resumeBtn) resumeBtn.classList.toggle('d-none', !isPaused);
+    if (pauseBtn) pauseBtn.classList.toggle('d-none', isPaused || isDeleted);
+    if (resumeBtn) resumeBtn.classList.toggle('d-none', !isPaused || isDeleted);
+    if (autoReplyBtn) autoReplyBtn.classList.toggle('d-none', isDeleted);
+    if (softDeleteBtn) softDeleteBtn.classList.toggle('d-none', isDeleted);
+    if (restoreBtn) restoreBtn.classList.toggle('d-none', !isDeleted);
+    if (permanentDeleteBtn) permanentDeleteBtn.classList.toggle('d-none', !isDeleted);
+
+    const input = document.getElementById('admin-reply-input');
+    const sendBtn = document.getElementById('btn-send-reply');
+    if (input) input.disabled = isDeleted;
+    if (sendBtn) sendBtn.disabled = isDeleted;
 }
 
 function loadChatMessages(sessionId) {
     const area = document.getElementById('chat-messages-area');
     area.innerHTML = '<div class="empty-state">Đang tải tin nhắn...</div>';
 
-    fetch(`/admin/chat-monitor/session/${encodeURIComponent(sessionId)}`)
+    fetch(`/chinhan/hethong/chat-monitor/session/${encodeURIComponent(sessionId)}`)
         .then(r => r.json())
         .then(data => {
             area.innerHTML = '';
@@ -200,7 +307,7 @@ function loadChatMessages(sessionId) {
             // data.messages chứa tất cả messages từ AdminChatMessages (bao gồm cả user/ai/admin/system)
             // => Chỉ cần render data.messages
             data.messages?.forEach(m => {
-                area.appendChild(createMsgBubble(m.role, m.content, m.createdAt, m.formBlockType));
+                area.appendChild(createMsgBubble(m.role, m.content, m.createdAt, m.formBlockType, m.formBlockJson));
             });
             renderCancellations(area, data.cancellations || []);
             if (!area.children.length) {
@@ -238,18 +345,142 @@ function createCancellationCard(item) {
     return card;
 }
 
-function createMsgBubble(role, content, createdAt, formBlockType) {
+function createMsgBubble(role, content, createdAt, formBlockType, formBlockJson) {
     const div = document.createElement('div');
     div.className = `chat-bubble chat-bubble-${role}`;
     const label = role === 'user' ? 'Khách' : role === 'ai' ? 'AI' : role === 'admin' ? 'Nhân viên' : 'Hệ thống';
     const time = createdAt ? new Date(createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
     const formLabel = formBlockLabels[formBlockType] || formBlockType;
+
+    let displayContent = content || '';
+    const actionPrefix = 'Thực hiện hành động: ';
+    if (displayContent.startsWith(actionPrefix)) {
+        const actionPart = displayContent.substring(actionPrefix.length).trim();
+        const actionTranslations = {
+            'start-booking': 'Bắt đầu đặt phòng',
+            'startBooking': 'Bắt đầu đặt phòng',
+            'select-booking-mode': 'Chọn hình thức đặt phòng',
+            'select-branch': 'Chọn chi nhánh',
+            'select-room': 'Chọn phòng',
+            'commit-room': 'Xác nhận chọn phòng',
+            'confirm-dates': 'Xác nhận ngày đặt',
+            'select-slot': 'Chọn khung giờ',
+            'submit-booking-form': 'Gửi form đặt phòng',
+            'submit-form': 'Gửi form đặt phòng',
+            'submit-contact-phone': 'Gửi thông tin liên hệ',
+            'reply': 'Phản hồi',
+            'retry': 'Thử lại',
+            'AskInfo': 'Yêu cầu thông tin',
+            'askInfo': 'Yêu cầu thông tin',
+            'showRooms': 'Hiển thị phòng trống',
+            'selectSlot': 'Chọn khung giờ',
+            'autoBook': 'Đặt phòng tự động',
+            'bookingForm': 'Biểu mẫu đặt phòng',
+            'paymentQr': 'Mã QR thanh toán',
+            'uiBlocks': 'Khối tương tác'
+        };
+        const translatedAction = actionTranslations[actionPart] || actionPart;
+        displayContent = `Thực hiện hành động: ${translatedAction}`;
+    }
+
+    let formHtml = '';
+    if (formBlockJson) {
+        try {
+            const parsed = JSON.parse(formBlockJson);
+            const blocks = parsed.uiBlocks || [];
+            blocks.forEach(block => {
+                if (block.type === 'roomCards' || block.type === 'dailyRooms') {
+                    const rooms = block.data?.rooms || [];
+                    if (rooms.length > 0) {
+                        formHtml += '<div class="chat-bubble-rooms mt-2 d-grid gap-2">';
+                        rooms.forEach(room => {
+                            const amenitiesHtml = Array.isArray(room.amenities) && room.amenities.length > 0
+                                ? `<div class="mt-1 d-flex flex-wrap gap-1">${room.amenities.map(a => `<span class="badge bg-secondary" style="font-size:0.75em; color: #fff;">${escapeHtml(a)}</span>`).join('')}</div>`
+                                : '';
+                            formHtml += `
+                                <div class="chat-bubble-room-card p-3 border rounded bg-white text-dark shadow-sm" style="font-size: 0.9em; max-width: 400px; line-height: 1.4; border-left: 4px solid #0d6efd !important;">
+                                    <div class="fw-bold text-primary fs-6 mb-1">${escapeHtml(room.name || 'Phòng')}</div>
+                                    ${room.description ? `<div class="text-muted mb-2" style="font-size: 0.85em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(room.description)}</div>` : ''}
+                                    <div class="mb-1" style="font-size: 0.88em;">
+                                        Giờ: <span class="text-danger fw-bold">${formatMoney(room.pricePerHour)}</span>/h · 
+                                        Ngày: <span class="text-danger fw-bold">${formatMoney(room.pricePerDay || room.totalPrice)}</span>/ngày
+                                    </div>
+                                    <div class="text-muted" style="font-size: 0.85em;">
+                                        Chuẩn: ${room.capacity} khách · Tối đa: ${room.maxGuests} khách
+                                        ${room.extraGuestFee > 0 ? ` · Phụ thu: ${formatMoney(room.extraGuestFee)}` : ''}
+                                    </div>
+                                    ${amenitiesHtml}
+                                    <div class="mt-2 d-flex gap-2">
+                                        ${room.detailsUrl ? `<a href="${escapeHtml(room.detailsUrl)}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:0.8em; line-height: 1.8;">Xem chi tiết</a>` : ''}
+                                        <button class="btn btn-sm btn-primary py-0 px-2" disabled style="font-size:0.8em; line-height: 1.8;">Chọn phòng này</button>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        formHtml += '</div>';
+                    }
+                } else if (block.type === 'hourlySlots') {
+                    const slots = block.data?.slots || [];
+                    if (slots.length > 0) {
+                        formHtml += '<div class="chat-bubble-slots mt-2 d-flex flex-wrap gap-1" style="max-width:400px;">';
+                        slots.forEach(slot => {
+                            formHtml += `
+                                <span class="badge bg-info text-dark p-2 border" style="font-size: 0.85em;">
+                                    ${escapeHtml(slot.label)} · ${formatMoney(slot.totalPrice)}
+                                </span>
+                            `;
+                        });
+                        formHtml += '</div>';
+                    }
+                } else if (block.type === 'bookingForm') {
+                    const fields = block.data?.fields || [];
+                    if (fields.length > 0) {
+                        formHtml += '<div class="chat-bubble-form-fields mt-2 p-2 border rounded bg-white text-dark text-start" style="font-size:0.85em; max-width: 400px; line-height: 1.4;">';
+                        formHtml += '<div class="fw-bold mb-1 border-bottom pb-1 text-secondary">Form thông tin đặt phòng:</div>';
+                        fields.forEach(f => {
+                            const req = f.required ? ' <span class="text-danger">*</span>' : '';
+                            formHtml += `<div class="mb-1"><strong>${escapeHtml(f.label)}:</strong> <span class="text-muted">[Khách nhập]</span>${req}</div>`;
+                        });
+                        formHtml += '</div>';
+                    }
+                } else if (block.type === 'bookingSummary') {
+                    const lines = block.data?.lines || [];
+                    const totalPrice = block.data?.totalPrice;
+                    if (lines.length > 0) {
+                        formHtml += '<div class="chat-bubble-summary mt-2 p-2 border rounded bg-white text-dark text-start" style="font-size:0.85em; max-width: 400px; border-left: 4px solid #198754 !important; line-height: 1.4;">';
+                        formHtml += '<div class="fw-bold mb-1 border-bottom pb-1 text-success">Tóm tắt đặt phòng:</div>';
+                        lines.forEach(line => {
+                            formHtml += `<div class="mb-1">${escapeHtml(line)}</div>`;
+                        });
+                        if (totalPrice) {
+                            formHtml += `<div class="fw-bold mt-1 text-success fs-6">Tạm tính: ${formatMoney(totalPrice)}</div>`;
+                        }
+                        formHtml += '</div>';
+                    }
+                } else if (block.type === 'paymentQr') {
+                    formHtml += '<div class="chat-bubble-payment mt-2 p-2 border rounded bg-white text-dark text-start" style="font-size:0.85em; max-width: 400px; border-left: 4px solid #ffc107 !important; line-height: 1.4;">';
+                    formHtml += '<div class="fw-bold mb-1 text-warning text-uppercase">Yêu cầu thanh toán</div>';
+                    formHtml += `<div class="text-muted">Đã tạo link/QR thanh toán cho khách hàng.</div>`;
+                    formHtml += '</div>';
+                }
+            });
+        } catch (e) {
+            console.error('Error parsing UI blocks JSON:', e);
+        }
+    }
+
     div.innerHTML = `
         <div class="chat-bubble-label">${label}${time ? ' · ' + time : ''}</div>
-        <div class="chat-bubble-content">${escapeHtml(content)}</div>
+        <div class="chat-bubble-content">${escapeHtml(displayContent)}</div>
         ${formBlockType ? `<div class="chat-bubble-form">${escapeHtml(formLabel)}</div>` : ''}
+        ${formHtml}
     `;
     return div;
+}
+
+function formatMoney(amount) {
+    if (amount == null) return '0đ';
+    return Number(amount).toLocaleString('vi-VN') + 'đ';
 }
 
 function pauseAI() {
@@ -262,52 +493,259 @@ function resumeAI() {
     connection.invoke('adminResume', currentSessionId).catch(console.error);
 }
 
-function sendReply() {
+async function sendReply() {
     const input = document.getElementById('admin-reply-input');
     const content = input.value.trim();
-    if (!content || !currentSessionId || !connection) return;
-    
-    // Task 3 FIX: Hiển thị tin nhắn ngay lập tức trên UI admin monitor trước khi gửi SignalR
-    const area = document.getElementById('chat-messages-area');
-    if (area) {
-        area.appendChild(createMsgBubble('admin', content, new Date().toISOString(), null));
-        area.scrollTop = area.scrollHeight;
-    }
-    
-    connection.invoke('adminReply', currentSessionId, content).catch(console.error);
-    input.value = '';
+    if (!content || !currentSessionId) return;
+
+    const takenOver = await ensureManualTakeover();
+    if (!takenOver) return;
+
+    fetch(`/chinhan/hethong/chat-monitor/session/${encodeURIComponent(currentSessionId)}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+    })
+        .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+        .then(() => {
+            input.value = '';
+        })
+        .catch(err => {
+            premiumToast(err?.message || 'Không gửi được tin nhắn cho khách.', 'error');
+        });
 }
 
-function sendFormBlock(type) {
-    if (!currentSessionId || !connection) return;
-    fetch(`/admin/chat-monitor/session/${encodeURIComponent(currentSessionId)}/quick-block/${encodeURIComponent(type)}`)
-        .then(r => r.ok ? r.json() : Promise.reject(new Error('Không tạo được form gửi nhanh.')))
-        .then(block => {
-            const formBlockJson = JSON.stringify({ uiBlocks: block.uiBlocks || [] });
-            const messageContent = block.message || 'Mình gửi bạn thông tin để thao tác nhé.';
-            const blockType = block.formBlockType || 'uiBlocks';
-            
-            // Task 3 FIX: Hiển thị tin nhắn ngay lập tức trên UI admin monitor trước khi gửi SignalR
-            const area = document.getElementById('chat-messages-area');
-            if (area) {
-                area.appendChild(createMsgBubble('admin', messageContent, new Date().toISOString(), type));
-                area.scrollTop = area.scrollHeight;
+async function openQuickSendComposer(type) {
+    if (!currentSessionId) return;
+
+    const takenOver = await ensureManualTakeover();
+    if (!takenOver) return;
+
+    fetch(`/chinhan/hethong/chat-monitor/session/${encodeURIComponent(currentSessionId)}/quick-send/${encodeURIComponent(type)}/schema`)
+        .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+        .then(schema => showQuickSendModal(type, schema))
+        .catch(err => {
+            premiumToast(err?.message || 'Không tải được điều kiện gửi nhanh.', 'error');
+        });
+}
+
+async function ensureManualTakeover() {
+    if (!currentSessionId) return false;
+    const current = sessions[currentSessionId];
+    if (current?.status === 'paused') return true;
+
+    const accepted = await premiumConfirm('Sẽ tạm dừng AI để nhân viên tiếp quản. Bạn có muốn tiếp tục không?', {
+        title: 'Tiếp quản hội thoại',
+        confirmText: 'Tiếp quản',
+        cancelText: 'Hủy',
+        isDanger: false,
+        type: 'info'
+    });
+    if (!accepted) return false;
+
+    const response = await fetch(`/chinhan/hethong/chat-monitor/session/${encodeURIComponent(currentSessionId)}/takeover`, {
+        method: 'POST'
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        premiumAlert(data?.message || 'Không thể tạm dừng AI để tiếp quản phiên chat.', {
+            title: 'Lỗi tiếp quản',
+            type: 'error'
+        });
+        return false;
+    }
+
+    sessions[currentSessionId] = { ...sessions[currentSessionId], ...data };
+    renderSessionList();
+    updateChatHeader(sessions[currentSessionId]);
+    return true;
+}
+
+function ensureQuickSendModal() {
+    let modalEl = document.getElementById('quick-send-modal');
+    if (modalEl) return modalEl;
+
+    modalEl = document.createElement('div');
+    modalEl.className = 'modal fade';
+    modalEl.id = 'quick-send-modal';
+    modalEl.tabIndex = -1;
+    modalEl.setAttribute('aria-hidden', 'true');
+    modalEl.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <span class="modal-kicker">Gửi nhanh</span>
+                        <h2 class="modal-title" id="quick-send-modal-title">Điều kiện gửi nhanh</h2>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="quick-send-form" class="d-grid gap-3"></form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-primary" id="btn-submit-quick-send">Gửi cho khách</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modalEl);
+    document.getElementById('btn-submit-quick-send')?.addEventListener('click', submitQuickSendModal);
+    return modalEl;
+}
+
+function showQuickSendModal(type, schema) {
+    quickSendModalState = { type, schema };
+    const modalEl = ensureQuickSendModal();
+    const title = document.getElementById('quick-send-modal-title');
+    const form = document.getElementById('quick-send-form');
+    if (!form || !modalEl) return;
+
+    if (title) title.textContent = schema?.title || 'Điều kiện gửi nhanh';
+    form.innerHTML = '';
+
+    const fields = Array.isArray(schema?.fields) ? schema.fields : [];
+    fields.forEach(field => {
+        form.appendChild(buildQuickSendField(field));
+    });
+
+    form.oninput = syncQuickSendFieldVisibility;
+    form.onchange = syncQuickSendFieldVisibility;
+    syncQuickSendFieldVisibility();
+
+    const submitButton = document.getElementById('btn-submit-quick-send');
+    if (submitButton) submitButton.textContent = schema?.submitLabel || 'Gửi cho khách';
+
+    if (typeof bootstrap !== 'undefined') {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+}
+
+function buildQuickSendField(field) {
+    const wrapper = document.createElement('label');
+    wrapper.className = 'd-grid gap-2';
+    wrapper.dataset.quickField = field.key || '';
+    if (field.showWhen) wrapper.dataset.showWhen = JSON.stringify(field.showWhen);
+
+    const caption = document.createElement('span');
+    caption.textContent = field.label || field.key || 'Trường';
+    wrapper.appendChild(caption);
+
+    let input;
+    if (field.type === 'select') {
+        input = document.createElement('select');
+        input.className = 'form-select';
+        input.innerHTML = '<option value="">Chọn</option>';
+        (Array.isArray(field.options) ? field.options : []).forEach(option => {
+            const optionEl = document.createElement('option');
+            optionEl.value = option.value || '';
+            optionEl.textContent = option.label || option.value || '';
+            if (option.branchId) optionEl.dataset.branchId = option.branchId;
+            if (option.maxGuests) optionEl.dataset.maxGuests = option.maxGuests;
+            input.appendChild(optionEl);
+        });
+    } else {
+        input = document.createElement('input');
+        input.className = 'form-control';
+        input.type = field.type || 'text';
+        if (field.min != null) input.min = String(field.min);
+        if (field.max != null) input.max = String(field.max);
+        if (field.placeholder) input.placeholder = field.placeholder;
+    }
+
+    input.name = field.key || '';
+    input.dataset.key = field.key || '';
+    input.dataset.label = field.label || field.key || 'trường này';
+    input.dataset.required = field.required ? 'true' : 'false';
+    wrapper.appendChild(input);
+    return wrapper;
+}
+
+function syncQuickSendFieldVisibility() {
+    const form = document.getElementById('quick-send-form');
+    if (!form) return;
+
+    const branchId = form.querySelector('[data-key="branchId"]')?.value || '';
+    const guestCount = Number(form.querySelector('[data-key="guestCount"]')?.value || '0');
+    const bookingMode = form.querySelector('[data-key="bookingMode"]')?.value || '';
+
+    form.querySelectorAll('[data-quick-field]').forEach(wrapper => {
+        const showWhenRaw = wrapper.dataset.showWhen;
+        let visible = true;
+        if (showWhenRaw) {
+            try {
+                const showWhen = JSON.parse(showWhenRaw);
+                if (showWhen.bookingMode) visible = bookingMode === showWhen.bookingMode;
+            } catch {}
+        }
+        wrapper.hidden = !visible;
+    });
+
+    const roomSelect = form.querySelector('[data-key="roomId"]');
+    if (roomSelect) {
+        Array.from(roomSelect.options).forEach((option, index) => {
+            if (index === 0) {
+                option.hidden = false;
+                return;
             }
-            
-            connection.invoke('adminReply', currentSessionId, messageContent, formBlockJson, blockType).catch(console.error);
+            const matchesBranch = !branchId || option.dataset.branchId === branchId;
+            const maxGuests = Number(option.dataset.maxGuests || '0');
+            const matchesGuests = !guestCount || !maxGuests || maxGuests >= guestCount;
+            option.hidden = !(matchesBranch && matchesGuests);
+        });
+        if (roomSelect.selectedOptions[0]?.hidden) roomSelect.value = '';
+    }
+}
+
+function collectQuickSendPayload() {
+    const form = document.getElementById('quick-send-form');
+    if (!form) return null;
+
+    const payload = {};
+    const inputs = form.querySelectorAll('[data-key]');
+    for (const input of inputs) {
+        const wrapper = input.closest('[data-quick-field]');
+        if (wrapper?.hidden) continue;
+
+        const key = input.dataset.key;
+        const label = input.dataset.label || key;
+        const required = input.dataset.required === 'true';
+        const value = (input.value || '').trim();
+        if (required && !value) {
+            throw new Error(`Vui lòng nhập ${label}.`);
+        }
+        if (value) payload[key] = input.type === 'number' ? Number(value) : value;
+    }
+    return payload;
+}
+
+function submitQuickSendModal() {
+    if (!currentSessionId || !quickSendModalState) return;
+
+    let payload;
+    try {
+        payload = collectQuickSendPayload();
+    } catch (error) {
+        premiumToast(error.message || 'Vui lòng điền đủ điều kiện gửi nhanh.', 'warning');
+        return;
+    }
+
+    fetch(`/chinhan/hethong/chat-monitor/session/${encodeURIComponent(currentSessionId)}/quick-send/${encodeURIComponent(quickSendModalState.type)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload })
+    })
+        .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+        .then(data => {
+            const modalEl = document.getElementById('quick-send-modal');
+            if (modalEl && typeof bootstrap !== 'undefined') {
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            }
+            premiumToast('Gửi khối tương tác thành công.', 'success');
         })
-        .catch(error => {
-            console.error(error);
-            const fallbackMessage = 'Hiện chưa tạo được form này, bạn nhắn lại nhu cầu để mình hỗ trợ nhé.';
-            
-            // Task 3 FIX: Hiển thị fallback message ngay lập tức
-            const area = document.getElementById('chat-messages-area');
-            if (area) {
-                area.appendChild(createMsgBubble('admin', fallbackMessage, new Date().toISOString(), null));
-                area.scrollTop = area.scrollHeight;
-            }
-            
-            connection.invoke('adminReply', currentSessionId, fallbackMessage).catch(console.error);
+        .catch(err => {
+            premiumToast(err?.message || 'Không gửi được block nhanh.', 'error');
         });
 }
 
@@ -326,7 +764,7 @@ function saveAutoReplyConfig() {
     const textarea = document.getElementById('auto-reply-message');
     const modalEl = document.getElementById('auto-reply-modal');
     const msg = textarea?.value || '';
-    fetch(`/admin/chat-monitor/session/${encodeURIComponent(currentSessionId)}/auto-reply`, {
+    fetch(`/chinhan/hethong/chat-monitor/session/${encodeURIComponent(currentSessionId)}/auto-reply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ autoReplyMessage: msg })
@@ -340,6 +778,88 @@ function saveAutoReplyConfig() {
 
 function filterSessions() {
     renderSessionList();
+}
+
+function switchSessionScope(scope) {
+    currentSessionScope = scope === 'deleted' ? 'deleted' : 'active';
+    currentSessionId = null;
+    sessions = {};
+    document.querySelectorAll('[data-session-scope]').forEach(button => {
+        const active = button.dataset.sessionScope === currentSessionScope;
+        button.classList.toggle('btn-primary', active);
+        button.classList.toggle('btn-outline-secondary', !active);
+    });
+    document.getElementById('trash-retention-info')?.classList.toggle('d-none', currentSessionScope !== 'deleted');
+    document.getElementById('chat-active-panel')?.classList.add('d-none');
+    document.getElementById('chat-placeholder')?.classList.remove('d-none');
+    loadSessionsFallback();
+}
+
+async function softDeleteCurrentSession() {
+    if (!currentSessionId) return;
+    const confirmed = await premiumConfirm('Xóa phiên chat này vào thùng rác?', {
+        title: 'Xóa phiên chat',
+        confirmText: 'Xóa',
+        cancelText: 'Hủy',
+        isDanger: true,
+        type: 'warning'
+    });
+    if (!confirmed) return;
+
+    fetch(`/chinhan/hethong/chat-monitor/session/${encodeURIComponent(currentSessionId)}/delete`, { method: 'POST' })
+        .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+        .then(() => {
+            delete sessions[currentSessionId];
+            currentSessionId = null;
+            document.getElementById('chat-active-panel')?.classList.add('d-none');
+            document.getElementById('chat-placeholder')?.classList.remove('d-none');
+            renderSessionList();
+            if (currentSessionScope === 'deleted') {
+                loadSessionsFallback();
+            }
+            premiumToast('Đã chuyển phiên chat vào thùng rác.', 'success');
+        })
+        .catch(err => premiumToast(err?.message || 'Không xóa được phiên chat.', 'error'));
+}
+
+async function restoreCurrentSession() {
+    if (!currentSessionId) return;
+    fetch(`/chinhan/hethong/chat-monitor/session/${encodeURIComponent(currentSessionId)}/restore`, { method: 'POST' })
+        .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+        .then(() => {
+            delete sessions[currentSessionId];
+            currentSessionId = null;
+            document.getElementById('chat-active-panel')?.classList.add('d-none');
+            document.getElementById('chat-placeholder')?.classList.remove('d-none');
+            renderSessionList();
+            loadSessionsFallback();
+            premiumToast('Khôi phục phiên chat thành công.', 'success');
+        })
+        .catch(err => premiumToast(err?.message || 'Không khôi phục được phiên chat.', 'error'));
+}
+
+async function permanentlyDeleteCurrentSession() {
+    if (!currentSessionId) return;
+    const confirmed = await premiumConfirm('Xóa vĩnh viễn phiên chat này và toàn bộ tin nhắn? Thao tác này không thể khôi phục.', {
+        title: 'Xóa vĩnh viễn',
+        confirmText: 'Xóa vĩnh viễn',
+        cancelText: 'Hủy',
+        isDanger: true,
+        type: 'danger'
+    });
+    if (!confirmed) return;
+
+    fetch(`/chinhan/hethong/chat-monitor/session/${encodeURIComponent(currentSessionId)}/delete-permanent`, { method: 'POST' })
+        .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+        .then(() => {
+            delete sessions[currentSessionId];
+            currentSessionId = null;
+            document.getElementById('chat-active-panel')?.classList.add('d-none');
+            document.getElementById('chat-placeholder')?.classList.remove('d-none');
+            renderSessionList();
+            premiumToast('Đã xóa vĩnh viễn phiên chat.', 'success');
+        })
+        .catch(err => premiumToast(err?.message || 'Không xóa vĩnh viễn được phiên chat.', 'error'));
 }
 
 function loadCancellationList(status) {
@@ -367,7 +887,7 @@ function loadCancellationList(status) {
     
     if (!area) return;
     area.innerHTML = '<div class="empty-state">Đang tải yêu cầu hủy...</div>';
-    fetch(`/admin/chat-monitor/cancellations?status=${encodeURIComponent(status)}`)
+    fetch(`/chinhan/hethong/chat-monitor/cancellations?status=${encodeURIComponent(status)}`)
         .then(r => r.ok ? r.json() : Promise.reject(new Error('Không tải được yêu cầu hủy.')))
         .then(items => {
             area.innerHTML = `<div class="cancellation-list-title">${escapeHtml(cancellationStatusLabel(status))}</div>`;
@@ -389,7 +909,7 @@ function openCancellation(id) {
     detail.innerHTML = '<div class="empty-state">Đang tải chi tiết yêu cầu hủy...</div>';
     if (typeof bootstrap !== 'undefined') bootstrap.Modal.getOrCreateInstance(modalEl).show();
 
-    fetch(`/admin/chat-monitor/cancellations/${encodeURIComponent(id)}`)
+    fetch(`/chinhan/hethong/chat-monitor/cancellations/${encodeURIComponent(id)}`)
         .then(r => r.ok ? r.json() : Promise.reject(new Error('Không tải được chi tiết.')))
         .then(data => renderCancellationDetail(data))
         .catch(() => {
@@ -423,9 +943,9 @@ function renderCancellationDetail(data) {
             <section class="cancellation-section">
                 <h3>Minh chứng bảo vệ</h3>
                 <div class="protected-file-links">
-                    <a class="btn btn-sm btn-outline-secondary" href="/admin/chat-monitor/cancellations/${request.id}/file/confirmation" target="_blank" rel="noopener">Ảnh email xác nhận</a>
-                    ${request.refundQrImagePath ? `<a class="btn btn-sm btn-outline-secondary" href="/admin/chat-monitor/cancellations/${request.id}/file/refundQr" target="_blank" rel="noopener">QR nhận hoàn tiền</a>` : ''}
-                    ${request.refundBillProofPath ? `<a class="btn btn-sm btn-outline-secondary" href="/admin/chat-monitor/cancellations/${request.id}/file/refundBill" target="_blank" rel="noopener">Bill hoàn tiền</a>` : ''}
+                    <a class="btn btn-sm btn-outline-secondary" href="/chinhan/hethong/chat-monitor/cancellations/${request.id}/file/confirmation" target="_blank" rel="noopener">Ảnh email xác nhận</a>
+                    ${request.refundQrImagePath ? `<a class="btn btn-sm btn-outline-secondary" href="/chinhan/hethong/chat-monitor/cancellations/${request.id}/file/refundQr" target="_blank" rel="noopener">QR nhận hoàn tiền</a>` : ''}
+                    ${request.refundBillProofPath ? `<a class="btn btn-sm btn-outline-secondary" href="/chinhan/hethong/chat-monitor/cancellations/${request.id}/file/refundBill" target="_blank" rel="noopener">Bill hoàn tiền</a>` : ''}
                 </div>
             </section>
         </div>
@@ -498,7 +1018,7 @@ function requestCancellationPreview(id, action) {
         if (file) formData.append('refundBillProof', file);
     }
     if (message) message.textContent = 'Đang tạo bản xem trước email...';
-    fetch(`/admin/chat-monitor/cancellations/${encodeURIComponent(id)}/${isApprove ? 'approval-preview' : 'rejection-preview'}`, { method: 'POST', body: formData })
+    fetch(`/chinhan/hethong/chat-monitor/cancellations/${encodeURIComponent(id)}/${isApprove ? 'approval-preview' : 'rejection-preview'}`, { method: 'POST', body: formData })
         .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
         .then(preview => {
             if (message) message.textContent = '';
@@ -643,12 +1163,12 @@ function finalizeCancellationFromPreview() {
     }
     const modalEl = document.getElementById('cancellation-mail-preview-modal');
     if (modalEl && typeof bootstrap !== 'undefined') bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-    postCancellationAction(`/admin/chat-monitor/cancellations/${encodeURIComponent(state.id)}/${state.action === 'approve' ? 'approve' : 'reject'}`, formData, state.id);
+    postCancellationAction(`/chinhan/hethong/chat-monitor/cancellations/${encodeURIComponent(state.id)}/${state.action === 'approve' ? 'approve' : 'reject'}`, formData, state.id);
 }
 
 function cancelApprovedBooking(id) {
     const formData = new FormData();
-    postCancellationAction(`/admin/chat-monitor/cancellations/${encodeURIComponent(id)}/cancel-booking`, formData, id);
+    postCancellationAction(`/chinhan/hethong/chat-monitor/cancellations/${encodeURIComponent(id)}/cancel-booking`, formData, id);
 }
 
 function postCancellationAction(url, formData, id) {

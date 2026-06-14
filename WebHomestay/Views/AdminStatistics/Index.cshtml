@@ -1,5 +1,5 @@
 @{
-    ViewData["Title"] = "Thống Kê Doanh Thu - STAYLUXE";
+    ViewData["Title"] = "Thống Kê Doanh Thu - chinhan";
 }
 
 @section Styles {
@@ -208,7 +208,7 @@
         document.getElementById('endDate').valueAsDate = today;
 
         async function fetchBranches() {
-            const resp = await fetch('/admin/Statistics/GetBranches');
+            const resp = await fetch('/chinhan/hethong/statistics/GetBranches');
             const data = await resp.json();
             const select = document.getElementById('branchFilter');
             data.forEach(b => {
@@ -222,7 +222,7 @@
             const end = document.getElementById('endDate').value;
             const branchId = document.getElementById('branchFilter').value;
             
-            const resp = await fetch(`/admin/Statistics/GetStats?start=${start}&end=${end}&branchId=${branchId}`);
+            const resp = await fetch(`/chinhan/hethong/statistics/GetStats?start=${start}&end=${end}&branchId=${branchId}`);
             const data = await resp.json();
             window.lastData = data;
             updateUI(data);
@@ -413,7 +413,7 @@
             const start = document.getElementById('startDate').value;
             const end = document.getElementById('endDate').value;
             const branchId = document.getElementById('branchFilter').value;
-            window.location.href = `/admin/Statistics/Export?type=${type}&start=${start}&end=${end}&branchId=${branchId}`;
+            window.location.href = `/chinhan/hethong/statistics/Export?type=${type}&start=${start}&end=${end}&branchId=${branchId}`;
         }
 
         function renderRoomTable() {

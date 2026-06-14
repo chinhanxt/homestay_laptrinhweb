@@ -4,10 +4,13 @@
     ViewData["Title"] = "Trung tâm Điều hành Hệ thống";
     var branches = ViewBag.Branches as List<WebHomestay.Models.Branch> ?? new List<WebHomestay.Models.Branch>();
     var holidays = ViewBag.Holidays as List<WebHomestay.Models.Holiday> ?? new List<WebHomestay.Models.Holiday>();
+    var trashedHolidays = ViewBag.TrashedHolidays as List<WebHomestay.Models.Holiday> ?? new List<WebHomestay.Models.Holiday>();
     var templates = ViewBag.Templates as List<WebHomestay.Models.RoomSlotTemplate> ?? new List<WebHomestay.Models.RoomSlotTemplate>();
+    var trashedTemplates = ViewBag.TrashedTemplates as List<WebHomestay.Models.RoomSlotTemplate> ?? new List<WebHomestay.Models.RoomSlotTemplate>();
     var paymentQrSettings = ViewBag.PaymentQrSettings as Dictionary<int, WebHomestay.Models.ViewModels.PaymentQrSettingsViewModel> ?? new Dictionary<int, WebHomestay.Models.ViewModels.PaymentQrSettingsViewModel>();
 
     var checkoutMode = Model.FirstOrDefault(s => s.SettingKey == "CheckoutMode")?.SettingValue ?? "Auto";
+    var trashRetentionDays = Model.FirstOrDefault(s => s.SettingKey == "BookingTrashRetentionDays")?.SettingValue ?? "7";
     var cancellationMode = Model.FirstOrDefault(s => s.SettingKey == "CancellationHandlingMode")?.SettingValue ?? "Manual";
     var cancellationNoticeHours = Model.FirstOrDefault(s => s.SettingKey == "CancellationNoticeHours")?.SettingValue ?? "24";
     var cancellationRefundBefore = Model.FirstOrDefault(s => s.SettingKey == "CancellationRefundPercentBeforeNotice")?.SettingValue ?? "50";
@@ -52,7 +55,7 @@
         
         <div class="sidebar-footer">
             <div class="small text-muted mb-1 text-uppercase fw-bold" style="font-size: 0.65rem;">Hệ thống lõi</div>
-            <div class="fw-bold text-dark" style="font-size: 0.8rem;">StayLuxe v4.2.0</div>
+            <div class="fw-bold text-dark" style="font-size: 0.8rem;">chinhan v4.2.0</div>
         </div>
     </div>
 
@@ -168,27 +171,204 @@
                                         <label class="form-label small fw-bold text-muted">Thông báo chính sách cho khách</label>
                                         <textarea name="policyMessage" rows="3" class="form-control premium-input">@cancellationPolicyMessage</textarea>
                                     </div>
-                                    <div class="col-12">
-                                        <label class="form-label small fw-bold text-muted">Tiêu đề mail chấp nhận hủy</label>
-                                        <input type="text" name="approvalEmailSubject" value="@cancellationApprovalEmailSubject" class="form-control-premium" />
-                                    </div>
-                                    <div class="col-12">
-                                        <label class="form-label small fw-bold text-muted">Nội dung mail chấp nhận hủy</label>
-                                        <textarea name="approvalEmailBody" rows="5" class="form-control premium-input">@cancellationApprovalEmailBody</textarea>
-                                        <div class="form-text">Placeholder: {CustomerName}, {BookingId}, {RoomName}, {StartTime}, {EndTime}, {RefundPercent}, {StaffReason}, {PolicyMessage}</div>
-                                    </div>
-                                    <div class="col-12">
-                                        <label class="form-label small fw-bold text-muted">Tiêu đề mail từ chối hủy</label>
-                                        <input type="text" name="rejectionEmailSubject" value="@cancellationRejectionEmailSubject" class="form-control-premium" />
-                                    </div>
-                                    <div class="col-12">
-                                        <label class="form-label small fw-bold text-muted">Nội dung mail từ chối hủy</label>
-                                        <textarea name="rejectionEmailBody" rows="5" class="form-control premium-input">@cancellationRejectionEmailBody</textarea>
-                                        <div class="form-text">Placeholder: {CustomerName}, {BookingId}, {RoomName}, {StartTime}, {EndTime}, {RefundPercent}, {StaffReason}, {PolicyMessage}</div>
-                                    </div>
+                                     <div class="col-12 mt-3">
+                                         <div class="card border-0 shadow-sm rounded-4 overflow-hidden email-config-card-premium">
+                                             <div class="card-header bg-light border-bottom py-3 px-4">
+                                                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                                                     <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-envelope-open-text me-2 text-primary"></i>Cấu hình Mẫu Email Thông báo</h6>
+                                                     <ul class="nav nav-pills card-header-pills border-0 gap-2" id="email-template-tabs" role="tablist">
+                                                         <li class="nav-item" role="presentation">
+                                                             <button class="nav-link active fw-bold px-3 py-1-5 border-0 rounded-3 text-success bg-success-light" id="email-approval-tab" data-bs-toggle="tab" data-bs-target="#email-approval-pane" type="button" role="tab" aria-controls="email-approval-pane" aria-selected="true">
+                                                                 <i class="fas fa-check-circle me-1"></i> Chấp nhận hủy
+                                                             </button>
+                                                         </li>
+                                                         <li class="nav-item" role="presentation">
+                                                             <button class="nav-link fw-bold px-3 py-1-5 border-0 rounded-3 text-danger bg-danger-light" id="email-rejection-tab" data-bs-toggle="tab" data-bs-target="#email-rejection-pane" type="button" role="tab" aria-controls="email-rejection-pane" aria-selected="false">
+                                                                 <i class="fas fa-times-circle me-1"></i> Từ chối hủy
+                                                             </button>
+                                                         </li>
+                                                     </ul>
+                                                 </div>
+                                             </div>
+                                             <div class="card-body p-4 bg-white">
+                                                 <div class="tab-content" id="email-template-tabs-content">
+                                                     <!-- TAB 1: CHẤP NHẬN HỦY -->
+                                                     <div class="tab-pane fade show active" id="email-approval-pane" role="tabpanel" aria-labelledby="email-approval-tab">
+                                                         <div class="row g-4">
+                                                             <!-- Cột soạn thảo -->
+                                                             <div class="col-lg-7">
+                                                                 <div class="email-composer-card">
+                                                                     <div class="email-composer-header">
+                                                                         <h6 class="text-success"><i class="fas fa-pen me-2"></i>Soạn thảo Email Chấp nhận</h6>
+                                                                     </div>
+                                                                     <div class="email-composer-body">
+                                                                         <div class="mb-3">
+                                                                             <label class="form-label small fw-bold text-muted mb-2">Tiêu đề Email</label>
+                                                                             <div class="input-group">
+                                                                                 <span class="input-group-text bg-light border-end-0 rounded-3"><i class="fas fa-heading text-muted"></i></span>
+                                                                                 <input type="text" id="approval-email-subject" name="approvalEmailSubject" value="@cancellationApprovalEmailSubject" class="form-control-premium border-start-0 ps-0" placeholder="Nhập tiêu đề email..." required />
+                                                                             </div>
+                                                                         </div>
+                                                                         
+                                                                         <div class="mb-2">
+                                                                             <div class="email-badge-title">Chèn nhanh biến động (Click để chèn)</div>
+                                                                             <div class="email-badges-grid">
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-approval-body', '{CustomerName}')" title="Tên khách đặt phòng"><i class="fas fa-user"></i> Tên khách</button>
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-approval-body', '{BookingId}')" title="Mã đơn hàng/Booking"><i class="fas fa-hashtag"></i> Mã đơn</button>
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-approval-body', '{RoomName}')" title="Tên phòng đặt"><i class="fas fa-bed"></i> Tên phòng</button>
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-approval-body', '{StartTime}')" title="Ngày nhận phòng"><i class="fas fa-calendar-alt"></i> Ngày nhận</button>
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-approval-body', '{EndTime}')" title="Ngày trả phòng"><i class="fas fa-calendar-check"></i> Ngày trả</button>
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-approval-body', '{RefundPercent}')" title="Phần trăm tiền hoàn lại"><i class="fas fa-percentage"></i> % Hoàn trả</button>
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-approval-body', '{StaffReason}')" title="Lý do từ nhân viên"><i class="fas fa-comment-dots"></i> Lý do duyệt</button>
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-approval-body', '{PolicyMessage}')" title="Nội dung điều khoản hoàn trả"><i class="fas fa-shield-alt"></i> Chính sách</button>
+                                                                             </div>
+                                                                         </div>
+                                                                         
+                                                                         <div>
+                                                                             <label class="form-label small fw-bold text-muted mb-2">Nội dung thư điện tử (Văn bản thuần, không dùng HTML)</label>
+                                                                             <div class="email-textarea-wrapper">
+                                                                                 <textarea id="editor-approval-body" class="form-control email-editor-textarea" rows="8" placeholder="Soạn nội dung thư ở đây..."></textarea>
+                                                                                 <textarea name="approvalEmailBody" id="real-approval-body" style="display:none;">@cancellationApprovalEmailBody</textarea>
+                                                                             </div>
+                                                                         </div>
+                                                                     </div>
+                                                                 </div>
+                                                             </div>
+                                                             
+                                                             <!-- Cột Preview -->
+                                                             <div class="col-lg-5">
+                                                                 <div class="email-preview-card">
+                                                                     <div class="email-preview-title text-success">
+                                                                         <i class="fas fa-eye me-2"></i>Xem trước thư gửi thực tế
+                                                                     </div>
+                                                                     <div class="email-preview-envelope">
+                                                                         <div class="email-preview-meta">
+                                                                             <div class="email-preview-meta-row">
+                                                                                 <span class="email-preview-meta-label">Người gửi:</span>
+                                                                                 <span class="email-preview-meta-val fw-bold text-primary">Hệ thống Homestay &lt;noreply@@webhomestay.vn&gt;</span>
+                                                                             </div>
+                                                                             <div class="email-preview-meta-row">
+                                                                                 <span class="email-preview-meta-label">Người nhận:</span>
+                                                                                 <span class="email-preview-meta-val">&lt;khachhang@@email.com&gt;</span>
+                                                                             </div>
+                                                                             <div class="email-preview-meta-row mt-1">
+                                                                                 <span class="email-preview-meta-label">Tiêu đề:</span>
+                                                                                 <span id="preview-approval-subject" class="email-preview-meta-val fw-bold text-dark"></span>
+                                                                             </div>
+                                                                         </div>
+                                                                         <div id="preview-approval-body" class="email-preview-body-container">
+                                                                             <!-- Render dynamic content via JS -->
+                                                                         </div>
+                                                                     </div>
+                                                                 </div>
+                                                             </div>
+                                                         </div>
+                                                     </div>
+
+                                                     <!-- TAB 2: TỪ CHỐI HỦY -->
+                                                     <div class="tab-pane fade" id="email-rejection-pane" role="tabpanel" aria-labelledby="email-rejection-tab">
+                                                         <div class="row g-4">
+                                                             <!-- Cột soạn thảo -->
+                                                             <div class="col-lg-7">
+                                                                 <div class="email-composer-card">
+                                                                     <div class="email-composer-header">
+                                                                         <h6 class="text-danger"><i class="fas fa-pen me-2"></i>Soạn thảo Email Từ chối</h6>
+                                                                     </div>
+                                                                     <div class="email-composer-body">
+                                                                         <div class="mb-3">
+                                                                             <label class="form-label small fw-bold text-muted mb-2">Tiêu đề Email</label>
+                                                                             <div class="input-group">
+                                                                                 <span class="input-group-text bg-light border-end-0 rounded-3"><i class="fas fa-heading text-muted"></i></span>
+                                                                                 <input type="text" id="rejection-email-subject" name="rejectionEmailSubject" value="@cancellationRejectionEmailSubject" class="form-control-premium border-start-0 ps-0" placeholder="Nhập tiêu đề email..." required />
+                                                                             </div>
+                                                                         </div>
+                                                                         
+                                                                         <div class="mb-2">
+                                                                             <div class="email-badge-title">Chèn nhanh biến động (Click để chèn)</div>
+                                                                             <div class="email-badges-grid">
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-rejection-body', '{CustomerName}')" title="Tên khách đặt phòng"><i class="fas fa-user"></i> Tên khách</button>
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-rejection-body', '{BookingId}')" title="Mã đơn hàng/Booking"><i class="fas fa-hashtag"></i> Mã đơn</button>
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-rejection-body', '{RoomName}')" title="Tên phòng đặt"><i class="fas fa-bed"></i> Tên phòng</button>
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-rejection-body', '{StartTime}')" title="Ngày nhận phòng"><i class="fas fa-calendar-alt"></i> Ngày nhận</button>
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-rejection-body', '{EndTime}')" title="Ngày trả phòng"><i class="fas fa-calendar-check"></i> Ngày trả</button>
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-rejection-body', '{RefundPercent}')" title="Phần trăm tiền hoàn lại"><i class="fas fa-percentage"></i> % Hoàn trả</button>
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-rejection-body', '{StaffReason}')" title="Lý do từ nhân viên"><i class="fas fa-comment-dots"></i> Lý do từ chối</button>
+                                                                                 <button type="button" class="email-placeholder-badge" onclick="insertPlaceholder('editor-rejection-body', '{PolicyMessage}')" title="Nội dung điều khoản hoàn trả"><i class="fas fa-shield-alt"></i> Chính sách</button>
+                                                                             </div>
+                                                                         </div>
+                                                                         
+                                                                         <div>
+                                                                             <label class="form-label small fw-bold text-muted mb-2">Nội dung thư điện tử (Văn bản thuần, không dùng HTML)</label>
+                                                                             <div class="email-textarea-wrapper">
+                                                                                 <textarea id="editor-rejection-body" class="form-control email-editor-textarea" rows="8" placeholder="Soạn nội dung thư ở đây..."></textarea>
+                                                                                 <textarea name="rejectionEmailBody" id="real-rejection-body" style="display:none;">@cancellationRejectionEmailBody</textarea>
+                                                                             </div>
+                                                                         </div>
+                                                                     </div>
+                                                                 </div>
+                                                             </div>
+                                                             
+                                                             <!-- Cột Preview -->
+                                                             <div class="col-lg-5">
+                                                                 <div class="email-preview-card">
+                                                                     <div class="email-preview-title text-danger">
+                                                                         <i class="fas fa-eye me-2"></i>Xem trước thư gửi thực tế
+                                                                     </div>
+                                                                     <div class="email-preview-envelope">
+                                                                         <div class="email-preview-meta">
+                                                                             <div class="email-preview-meta-row">
+                                                                                 <span class="email-preview-meta-label">Người gửi:</span>
+                                                                                 <span class="email-preview-meta-val fw-bold text-primary">Hệ thống Homestay &lt;noreply@@webhomestay.vn&gt;</span>
+                                                                             </div>
+                                                                             <div class="email-preview-meta-row">
+                                                                                 <span class="email-preview-meta-label">Người nhận:</span>
+                                                                                 <span class="email-preview-meta-val">&lt;khachhang@@email.com&gt;</span>
+                                                                             </div>
+                                                                             <div class="email-preview-meta-row mt-1">
+                                                                                 <span class="email-preview-meta-label">Tiêu đề:</span>
+                                                                                 <span id="preview-rejection-subject" class="email-preview-meta-val fw-bold text-dark"></span>
+                                                                             </div>
+                                                                         </div>
+                                                                         <div id="preview-rejection-body" class="email-preview-body-container">
+                                                                             <!-- Render dynamic content via JS -->
+                                                                         </div>
+                                                                     </div>
+                                                                 </div>
+                                                             </div>
+                                                         </div>
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
                                 </div>
 
                                 <button type="submit" class="btn-config-lux mt-4">Lưu chính sách hủy</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="bento-item full-width">
+                        <div class="bento-inner">
+                            <h5 class="bento-title"><i class="fas fa-trash-restore me-2 text-warning"></i>Dọn dẹp Thùng rác Đơn hàng</h5>
+                            <p class="text-muted small mb-4">Cấu hình số ngày tối đa đơn hàng bị xóa mềm được lưu trong thùng rác trước khi hệ thống tự động xóa vĩnh viễn.</p>
+                            <form asp-action="Update" method="post">
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-bold text-muted">Số ngày giữ lại</label>
+                                        <div class="input-group-premium">
+                                            <i class="fas fa-calendar-alt text-muted"></i>
+                                            <input type="number" name="value" value="@trashRetentionDays" min="1" max="365" class="form-control-premium" />
+                                            <span class="suffix">ngày</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-8 d-flex align-items-end">
+                                        <input type="hidden" name="key" value="BookingTrashRetentionDays" />
+                                        <button type="submit" class="btn-config-lux">
+                                            <i class="fas fa-check me-2"></i> Lưu cấu hình
+                                        </button>
+                                    </div>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -202,16 +382,30 @@
                         <h2>Thời gian & Khung giờ</h2>
                         <p>Thiết lập các mẫu khung giờ cố định và quy tắc thời gian đặt phòng.</p>
                     </div>
-                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.create"))
-                    {
-                        <button type="button" class="btn-premium btn-sm rounded-pill px-4 mb-2" data-bs-toggle="modal" data-bs-target="#createTemplateModal">
-                            <i class="fas fa-plus me-2"></i> Thêm mẫu mới
-                        </button>
-                    }
+                    <div class="d-flex gap-2 align-items-center">
+                        @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.create"))
+                        {
+                            <button type="button" class="btn-premium btn-sm rounded-pill px-4 mb-2" data-bs-toggle="modal" data-bs-target="#createTemplateModal">
+                                <i class="fas fa-plus me-2"></i> Thêm mẫu mới
+                            </button>
+                        }
+                        @if (trashedTemplates.Any())
+                        {
+                            <button type="button" class="btn-premium-outline btn-sm rounded-pill px-3 mb-2 trash-toggle-btn" data-panel="time" onclick="toggleTrashPanel('time')">
+                                <i class="fas fa-trash-alt me-1"></i> <span>Thùng rác</span> <span class="badge bg-danger ms-1">@trashedTemplates.Count</span>
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                <div class="trash-retention-info settings-trash-info d-none" id="trash-info-time">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Các mẫu khung giờ trong này sẽ tự động bị xóa vĩnh viễn sau @trashRetentionDays ngày.
                 </div>
 
                 <div class="settings-bento-grid">
-                    <div class="bento-item full-width">
+                    <!-- Active templates -->
+                    <div class="bento-item full-width" id="active-templates-section">
                         <div class="bento-inner p-0">
                             <div class="admin-table-responsive">
                                 <table class="admin-table mb-0">
@@ -244,9 +438,68 @@
                                                                 onclick="openEditTemplateModal(@t.Id, '@t.Name', '@t.Code', @t.DurationMinutes, @t.CleanupMinutes, '@t.SeedStartTime', @(t.IsActive.ToString().ToLower()))">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
-                                                        <form action="/AdminSlots/DeleteTemplate" method="post" class="d-inline" onsubmit="return confirm('Xóa mẫu này?')">
-    <input type="hidden" name="id" value="@t.Id" />
+                                                        <form asp-controller="AdminSlots" asp-action="DeleteTemplate" method="post" class="d-inline" data-premium-confirm="Bạn có chắc chắn muốn xóa mẫu khung giờ '@t.Name' này không?" data-premium-title="Xóa mẫu khung giờ" data-premium-ok="Xóa" data-premium-danger="true">
+                                                            <input type="hidden" name="id" value="@t.Id" />
                                                             <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent"><i class="fas fa-trash"></i></button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Trashed templates -->
+                    <div class="bento-item full-width d-none" id="trash-templates-section">
+                        <div class="bento-inner p-0">
+                            <div class="admin-table-responsive">
+                                <table class="admin-table mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Mẫu khung giờ</th>
+                                            <th>Mã</th>
+                                            <th>Thời lượng</th>
+                                            <th>Trạng thái</th>
+                                            <th>Thời điểm xóa</th>
+                                            <th>Hết hạn trong</th>
+                                            <th class="text-end">Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var t in trashedTemplates)
+                                        {
+                                            var daysInTrash = t.DeletedAt.HasValue ? (DateTime.UtcNow - t.DeletedAt.Value).Days : 0;
+                                            var daysLeft = int.Parse(trashRetentionDays) - daysInTrash;
+                                            <tr>
+                                                <td><span class="fw-bold text-muted">@t.Name</span></td>
+                                                <td><code>@t.Code</code></td>
+                                                <td>@t.DurationMinutes phút</td>
+                                                <td>
+                                                    <span class="badge-premium badge-secondary-soft">Đã xóa</span>
+                                                </td>
+                                                <td><span class="small text-muted">@(t.DeletedAt?.ToString("dd/MM/yyyy HH:mm") ?? "-")</span></td>
+                                                <td>
+                                                    @if (daysLeft > 0)
+                                                    {
+                                                        <span class="small text-danger fw-semibold">@daysLeft ngày</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="small text-muted">@Math.Abs(daysLeft) ngày trước</span>
+                                                    }
+                                                </td>
+                                                <td class="text-end">
+                                                    <div class="admin-actions">
+                                                        <form asp-controller="AdminSlots" asp-action="RestoreTemplate" method="post" class="d-inline" data-premium-confirm="Khôi phục mẫu khung giờ '@t.Name'?" data-premium-title="Khôi phục" data-premium-ok="Khôi phục">
+                                                            <input type="hidden" name="id" value="@t.Id" />
+                                                            <button type="submit" class="admin-btn-icon border-0 bg-transparent text-success"><i class="fas fa-rotate-left"></i></button>
+                                                        </form>
+                                                        <form asp-controller="AdminSlots" asp-action="PermanentDeleteTemplate" method="post" class="d-inline" data-premium-confirm="Xóa vĩnh viễn mẫu khung giờ '@t.Name'? Hành động này không thể hoàn tác." data-premium-title="Xóa vĩnh viễn" data-premium-ok="Xóa" data-premium-danger="true">
+                                                            <input type="hidden" name="id" value="@t.Id" />
+                                                            <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent"><i class="fas fa-trash-can"></i></button>
                                                         </form>
                                                     </div>
                                                 </td>
@@ -262,12 +515,25 @@
 
             <!-- PANEL: MA TRẬN NGÀY LỄ -->
             <div class="tab-pane fade" id="panel-holiday" role="tabpanel">
-                <div class="panel-header">
-                    <h2>Ma trận Ngày Lễ</h2>
-                    <p>Cấu hình các dịp đặc biệt để hệ thống tự động điều chỉnh biểu giá.</p>
+                <div class="panel-header d-flex justify-content-between">
+                    <div>
+                        <h2>Ma trận Ngày Lễ</h2>
+                        <p>Cấu hình các dịp đặc biệt để hệ thống tự động điều chỉnh biểu giá.</p>
+                    </div>
+                    @if (trashedHolidays.Any())
+                    {
+                        <button type="button" class="btn-premium-outline btn-sm rounded-pill px-3 trash-toggle-btn" data-panel="holiday" onclick="toggleTrashPanel('holiday')">
+                            <i class="fas fa-trash-alt me-1"></i> <span>Thùng rác</span> <span class="badge bg-danger ms-1">@trashedHolidays.Count</span>
+                        </button>
+                    }
                 </div>
 
+                <div class="trash-retention-info settings-trash-info d-none" id="trash-info-holiday">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Các ngày lễ trong này sẽ tự động bị xóa vĩnh viễn sau @trashRetentionDays ngày.
+                </div>
 
+                <div id="active-holidays-section">
                 <div class="row g-4">
                     <!-- Cột trái: Quản lý cụm ngày lễ -->
                     <div class="col-lg-4">
@@ -315,7 +581,7 @@
                                                             <div class="dot me-2"></div>
                                                             <span class="small fw-semibold">@h.Date.ToString("dd/MM/yyyy")</span>
                                                         </div>
-                                                        <form action="/admin/holidays/delete/@h.Id" method="post" onsubmit="return confirm('Xóa ngày lễ này?')">
+                                                        <form action="/chinhan/hethong/holidays/delete/@h.Id" method="post" data-premium-confirm="Bạn có chắc chắn muốn xóa ngày lễ '@h.Date.ToString("dd/MM/yyyy")' này không?" data-premium-title="Xóa ngày lễ" data-premium-ok="Xóa" data-premium-danger="true">
                                                             @Html.AntiForgeryToken()
                                                             <button type="submit" class="btn-delete-item"><i class="fas fa-trash-alt"></i></button>
                                                         </form>
@@ -375,6 +641,66 @@
                                     <div class="cal-header">T5</div><div class="cal-header">T6</div><div class="cal-header text-warning">T7</div>
                                     <div class="cal-header text-warning">CN</div>
                                     <div id="calendarDays" style="display: contents;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </div> <!-- /active-holidays-section -->
+
+                <!-- Trashed holidays -->
+                <div class="d-none" id="trash-holidays-section">
+                    <div class="row g-4">
+                        <div class="col-12">
+                            <div class="bento-item full-width">
+                                <div class="bento-inner p-0">
+                                    <div class="admin-table-responsive">
+                                        <table class="admin-table mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Ngày</th>
+                                                    <th>Dịp lễ</th>
+                                                    <th>Thời điểm xóa</th>
+                                                    <th>Hết hạn trong</th>
+                                                    <th class="text-end">Thao tác</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var h in trashedHolidays)
+                                                {
+                                                    var daysInTrash = h.DeletedAt.HasValue ? (DateTime.UtcNow - h.DeletedAt.Value).Days : 0;
+                                                    var daysLeft = int.Parse(trashRetentionDays) - daysInTrash;
+                                                    <tr>
+                                                        <td><span class="fw-semibold">@h.Date.ToString("dd/MM/yyyy")</span></td>
+                                                        <td><span class="text-muted">@h.Description</span></td>
+                                                        <td><span class="small text-muted">@(h.DeletedAt?.ToString("dd/MM/yyyy HH:mm") ?? "-")</span></td>
+                                                        <td>
+                                                            @if (daysLeft > 0)
+                                                            {
+                                                                <span class="small text-danger fw-semibold">@daysLeft ngày</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="small text-muted">@Math.Abs(daysLeft) ngày trước</span>
+                                                            }
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <div class="admin-actions">
+                                                                <form action="/chinhan/hethong/holidays/restore/@h.Id" method="post" class="d-inline" data-premium-confirm="Khôi phục ngày lễ '@h.Date.ToString("dd/MM/yyyy")'?" data-premium-title="Khôi phục" data-premium-ok="Khôi phục">
+                                                                    @Html.AntiForgeryToken()
+                                                                    <button type="submit" class="admin-btn-icon border-0 bg-transparent text-success"><i class="fas fa-rotate-left"></i></button>
+                                                                </form>
+                                                                <form action="/chinhan/hethong/holidays/permanent-delete/@h.Id" method="post" class="d-inline" data-premium-confirm="Xóa vĩnh viễn ngày lễ '@h.Date.ToString("dd/MM/yyyy")'? Hành động này không thể hoàn tác." data-premium-title="Xóa vĩnh viễn" data-premium-ok="Xóa" data-premium-danger="true">
+                                                                    @Html.AntiForgeryToken()
+                                                                    <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent"><i class="fas fa-trash-can"></i></button>
+                                                                </form>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -648,7 +974,7 @@
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form action="/AdminSlots/CreateTemplate" method="post">
+            <form asp-controller="AdminSlots" asp-action="CreateTemplate" method="post">
                 @Html.AntiForgeryToken()
                 <div class="modal-body px-4 py-4">
 
@@ -754,7 +1080,7 @@
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form action="/AdminSlots/EditTemplate" method="post">
+            <form asp-controller="AdminSlots" asp-action="EditTemplate" method="post">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="Id" id="edit-id" />
 
@@ -868,7 +1194,7 @@
                 <h5 class="modal-title fw-bold">Thiết lập Dịp Lễ</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form action="/admin/holidays/create-range" method="post">
+            <form action="/chinhan/hethong/holidays/create-range" method="post">
                 @Html.AntiForgeryToken()
                 <div class="modal-body py-4">
 
@@ -1566,6 +1892,234 @@
     .status-value { font-size: 0.95rem; font-weight: 600; color: #1e40af; }
     .btn-config-lux { background: #1e293b; color: white; border: none; padding: 0.6rem 1.5rem; border-radius: 12px; font-weight: 700; transition: all 0.2s; }
     .btn-config-lux:hover { background: #0f172a; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+    /* Email Configuration Redesign styles */
+    .bg-success-light { background-color: rgba(16, 185, 129, 0.1) !important; }
+    .bg-danger-light { background-color: rgba(239, 68, 68, 0.1) !important; }
+    .py-1-5 { padding-top: 0.375rem !important; padding-bottom: 0.375rem !important; }
+    
+    .email-config-card-premium {
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+    }
+
+    .email-template-tabs .nav-link {
+        color: #64748b;
+        transition: all 0.2s;
+    }
+
+    .email-template-tabs .nav-link.active {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    
+    .email-composer-card {
+        background: #ffffff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    .email-composer-header {
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 16px 20px;
+        border-top-left-radius: 16px;
+        border-top-right-radius: 16px;
+    }
+
+    .email-composer-header h6 {
+        font-weight: 800;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.95rem;
+    }
+
+    .email-composer-body {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        flex-grow: 1;
+    }
+
+    .email-badge-title {
+        font-size: 0.72rem;
+        font-weight: 800;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.7px;
+        margin-bottom: 8px;
+    }
+
+    .email-badges-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        background: #f8fafc;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid #f1f5f9;
+    }
+
+    .email-placeholder-badge {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        user-select: none;
+    }
+
+    .email-placeholder-badge:hover {
+        background: #f0fdf4;
+        border-color: #10b981;
+        color: #059669;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1);
+    }
+
+    .email-placeholder-badge:active {
+        transform: translateY(0);
+    }
+
+    .email-placeholder-badge i {
+        font-size: 0.75rem;
+        opacity: 0.85;
+    }
+
+    .email-textarea-wrapper {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .email-editor-textarea {
+        font-family: inherit;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        border-radius: 12px;
+        border: 1px solid #cbd5e1;
+        padding: 14px;
+        resize: vertical;
+        outline: none;
+        transition: border-color 0.25s, box-shadow 0.25s;
+        min-height: 240px;
+        color: #1e293b;
+    }
+
+    .email-editor-textarea:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+    }
+
+    /* Preview Email Component */
+    .email-preview-card {
+        background: #f8fafc;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        padding: 20px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .email-preview-title {
+        font-size: 0.8rem;
+        font-weight: 800;
+        margin-bottom: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        display: flex;
+        align-items: center;
+    }
+
+    .email-preview-envelope {
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .email-preview-meta {
+        background: #fafafa;
+        border-bottom: 1px solid #f1f5f9;
+        padding: 14px 18px;
+        font-size: 0.82rem;
+        color: #64748b;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .email-preview-meta-row {
+        display: flex;
+        gap: 8px;
+    }
+
+    .email-preview-meta-label {
+        font-weight: 800;
+        min-width: 80px;
+        color: #475569;
+    }
+
+    .email-preview-meta-val {
+        color: #1e293b;
+        word-break: break-all;
+    }
+
+    .email-preview-body-container {
+        padding: 24px;
+        font-size: 0.9rem;
+        line-height: 1.65;
+        color: #334155;
+        background: #ffffff;
+        min-height: 240px;
+        max-height: 380px;
+        overflow-y: auto;
+        font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    .preview-highlight-badge {
+        background: #fffbeb;
+        color: #b45309;
+        padding: 1px 6px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        border: 1px solid #fde68a;
+        display: inline-block;
+        margin: 0 2px;
+    }
+
+    .settings-trash-info {
+        padding: 10px 16px;
+        margin-bottom: 16px;
+        font-size: 0.8rem;
+        color: #dc2626;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 12px;
+        line-height: 1.5;
+    }
+    .settings-trash-info i {
+        color: #dc2626;
+    }
 </style>
 
 
@@ -1574,6 +2128,24 @@
     <script>
         function toggleMainSettingsSidebar() {
             $('.premium-settings-wrapper').toggleClass('main-sidebar-collapsed');
+        }
+
+        function toggleTrashPanel(panel) {
+            if (panel === 'time') {
+                $('#active-templates-section').toggleClass('d-none');
+                $('#trash-templates-section').toggleClass('d-none');
+                $('#trash-info-time').toggleClass('d-none');
+                $('[data-panel="time"] span').text(
+                    $('#active-templates-section').hasClass('d-none') ? 'Đang xem' : 'Thùng rác'
+                );
+            } else if (panel === 'holiday') {
+                $('#active-holidays-section').toggleClass('d-none');
+                $('#trash-holidays-section').toggleClass('d-none');
+                $('#trash-info-holiday').toggleClass('d-none');
+                $('[data-panel="holiday"] span').text(
+                    $('#active-holidays-section').hasClass('d-none') ? 'Đang xem' : 'Thùng rác'
+                );
+            }
         }
 
         // Tab switching logic (optional, Bootstrap handles mostly)
@@ -1885,6 +2457,150 @@
             const toast = document.getElementById('temp-toast');
             if(toast) toast.classList.remove('show');
         }, 3000);
+
+        // --- Cấu hình Email Hủy phòng Redesign Logic ---
+        
+        // Chèn biến tại vị trí con trỏ
+        window.insertPlaceholder = function(editorId, placeholder) {
+            const txtarea = document.getElementById(editorId);
+            if (!txtarea) return;
+            
+            const scrollPos = txtarea.scrollTop;
+            let strPos = 0;
+            const br = ((txtarea.selectionStart || txtarea.selectionStart == '0') ? "ff" : (document.selection ? "ie" : false));
+            
+            if (br == "ie") {
+                txtarea.focus();
+                const range = document.selection.createRange();
+                range.moveStart('character', -txtarea.value.length);
+                strPos = range.text.length;
+            } else if (br == "ff") {
+                strPos = txtarea.selectionStart;
+            }
+            
+            const front = (txtarea.value).substring(0, strPos);
+            const back = (txtarea.value).substring(strPos, txtarea.value.length);
+            txtarea.value = front + placeholder + back;
+            strPos = strPos + placeholder.length;
+            
+            if (br == "ie") {
+                txtarea.focus();
+                const ieRange = document.selection.createRange();
+                ieRange.moveStart('character', -txtarea.value.length);
+                ieRange.moveStart('character', strPos);
+                ieRange.moveEnd('character', 0);
+                ieRange.select();
+            } else if (br == "ff") {
+                txtarea.selectionStart = strPos;
+                txtarea.selectionEnd = strPos;
+                txtarea.focus();
+            }
+            
+            txtarea.scrollTop = scrollPos;
+            
+            // Kích hoạt sự kiện input để đồng bộ và cập nhật preview
+            const event = new Event('input', { bubbles: true });
+            txtarea.dispatchEvent(event);
+        };
+
+        // Xem trước email động và đồng bộ vào hidden input
+        window.updateEmailPreview = function(editorId, previewElId, subjectInputId, previewSubjectId, realBodyId) {
+            const editor = document.getElementById(editorId);
+            const previewEl = document.getElementById(previewElId);
+            const subjectInput = document.getElementById(subjectInputId);
+            const previewSubject = document.getElementById(previewSubjectId);
+            const realBody = document.getElementById(realBodyId);
+            
+            if (!editor) return;
+            
+            const cleanValue = editor.value;
+            
+            // Chuyển đổi \n thành <br> cho trường ẩn (để gửi lên backend lưu DB)
+            if (realBody) {
+                realBody.value = cleanValue.replace(/\n/g, '<br>');
+            }
+            
+            // Xem trước tiêu đề
+            if (subjectInput && previewSubject) {
+                previewSubject.textContent = subjectInput.value || "(Chưa nhập tiêu đề email)";
+            }
+            
+            if (!previewEl) return;
+            
+            // Xử lý ký tự HTML trong preview để tránh lỗi hiển thị
+            let escaped = cleanValue
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+                
+            // Dữ liệu mẫu thay thế biến trong preview
+            const mocks = {
+                '{CustomerName}': 'Nguyễn Văn A',
+                '{BookingId}': 'BK-10294',
+                '{RoomName}': 'Phòng 302 - Premium Ocean Suite',
+                '{StartTime}': '14:00 ngày 15/06/2026',
+                '{EndTime}': '12:00 ngày 18/06/2026',
+                '{RefundPercent}': '50',
+                '{StaffReason}': 'Khách có việc gia đình đột xuất',
+                '{PolicyMessage}': 'Được hoàn trả 50% tiền cọc theo quy định chính sách hủy trước 24 giờ.'
+            };
+            
+            for (const [key, value] of Object.entries(mocks)) {
+                escaped = escaped.split(key).join(`<span class="preview-highlight-badge">${value}</span>`);
+            }
+            
+            // Chuyển xuống dòng \n thành <br> hiển thị trong HTML preview
+            const html = escaped.replace(/\n/g, "<br>");
+            
+            previewEl.innerHTML = html || `<span class="text-muted italic">Chưa nhập nội dung email...</span>`;
+        };
+
+        // Khi load trang: Chuyển dữ liệu có sẵn từ database (<br> thành \n) đưa vào editor
+        const realAppBody = document.getElementById('real-approval-body');
+        const editorAppBody = document.getElementById('editor-approval-body');
+        const appSubject = document.getElementById('approval-email-subject');
+        
+        if (realAppBody && editorAppBody) {
+            editorAppBody.value = realAppBody.value.replace(/<br\s*\/?>/gi, '\n');
+            
+            // Vẽ preview lần đầu
+            window.updateEmailPreview('editor-approval-body', 'preview-approval-body', 'approval-email-subject', 'preview-approval-subject', 'real-approval-body');
+            
+            // Lắng nghe thay đổi
+            editorAppBody.addEventListener('input', function() {
+                window.updateEmailPreview('editor-approval-body', 'preview-approval-body', 'approval-email-subject', 'preview-approval-subject', 'real-approval-body');
+            });
+            
+            if (appSubject) {
+                appSubject.addEventListener('input', function() {
+                    window.updateEmailPreview('editor-approval-body', 'preview-approval-body', 'approval-email-subject', 'preview-approval-subject', 'real-approval-body');
+                });
+            }
+        }
+        
+        const realRejBody = document.getElementById('real-rejection-body');
+        const editorRejBody = document.getElementById('editor-rejection-body');
+        const rejSubject = document.getElementById('rejection-email-subject');
+        
+        if (realRejBody && editorRejBody) {
+            editorRejBody.value = realRejBody.value.replace(/<br\s*\/?>/gi, '\n');
+            
+            // Vẽ preview lần đầu
+            window.updateEmailPreview('editor-rejection-body', 'preview-rejection-body', 'rejection-email-subject', 'preview-rejection-subject', 'real-rejection-body');
+            
+            // Lắng nghe thay đổi
+            editorRejBody.addEventListener('input', function() {
+                window.updateEmailPreview('editor-rejection-body', 'preview-rejection-body', 'rejection-email-subject', 'preview-rejection-subject', 'real-rejection-body');
+            });
+            
+            if (rejSubject) {
+                rejSubject.addEventListener('input', function() {
+                    window.updateEmailPreview('editor-rejection-body', 'preview-rejection-body', 'rejection-email-subject', 'preview-rejection-subject', 'real-rejection-body');
+                });
+            }
+        }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="~/js/admin-ai-hub.js" asp-append-version="true"></script>

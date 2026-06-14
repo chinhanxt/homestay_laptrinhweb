@@ -53,6 +53,10 @@ namespace WebHomestay.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        // Soft delete
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
+
         public virtual ICollection<ActivityLog> ActivityLogs { get; set; } = new List<ActivityLog>();
     }
 }

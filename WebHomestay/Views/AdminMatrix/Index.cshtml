@@ -123,8 +123,8 @@
     }).ToList();
 
     var matrixPayloadJson = JsonSerializer.Serialize(matrixPayload);
-    var bookingDetailsTemplate = Url.Action("Details", "AdminBookings", new { id = "__id__" }) ?? "/admin/bookings/details/__id__";
-    var bookingIndexUrl = Url.Action("Index", "AdminBookings") ?? "/admin/bookings";
+    var bookingDetailsTemplate = Url.Action("Details", "AdminBookings", new { id = "__id__" }) ?? "/chinhan/hethong/bookings/details/__id__";
+    var bookingIndexUrl = Url.Action("Index", "AdminBookings") ?? "/chinhan/hethong/bookings";
 }
 
 <div class="admin-matrix-page" data-density="standard">

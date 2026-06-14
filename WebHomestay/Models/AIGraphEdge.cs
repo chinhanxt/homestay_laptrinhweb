@@ -10,5 +10,7 @@ namespace WebHomestay.Models
         public string RelationshipType { get; set; } = string.Empty;
         public decimal Weight { get; set; } = 1;
         public string Evidence { get; set; } = string.Empty;
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
     }
 }

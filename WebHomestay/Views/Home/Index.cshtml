@@ -1,17 +1,36 @@
-@model IEnumerable<WebHomestay.Models.Room>
+﻿@model IEnumerable<WebHomestay.Models.Room>
 @{
-    ViewData["Title"] = "StayLuxe - Danh sách phòng nghỉ";
+    ViewData["Title"] = "chinhan - Danh sách phòng nghỉ";
     var branches = ViewBag.Branches as List<WebHomestay.Models.Branch>;
 }
 
-<!-- Compact Header - Search Only -->
-<section class="py-2" style="padding-top: 85px !important;">
-    <div class="container">
+<!-- Hero Section with Integrated Search -->
+<section class="hero-home position-relative">
+    <div class="hero-overlay"></div>
+    <!-- Dummy Background Image (can be replaced with a real high-res image later) -->
+    <!-- <img src="https://images.unsplash.com/photo-1542314831-c6a4d14f4c4b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80" alt="chinhan Resort" class="hero-bg-img" /> -->
+    
+    <div class="container position-relative hero-content-wrapper text-center">
+        <span class="luxury-kicker text-white mb-3 d-block reveal-up">Chào mừng đến với chinhan</span>
+        <h1 class="hero-title text-white mb-5 reveal-up" style="font-size: 3.5rem; text-shadow: 0 4px 20px rgba(0,0,0,0.3);">Trải nghiệm nghỉ dưỡng<br/>đẳng cấp & riêng tư</h1>
+
         <div class="row justify-content-center">
-            
-            <div class="col-lg-12">
-                <form method="get" action="/Home/Search" class="editorial-search reveal-up mb-3">
-                    <input type="hidden" name="branchId" id="searchBranchId" value="" />
+            <div class="col-lg-11">
+                <!-- Integrated Booking Engine -->
+                <form method="get" action="/Home/Search" class="editorial-search integrated-search reveal-up">
+                    <div class="search-field">
+                        <label class="search-label">Địa điểm</label>
+                        <select class="search-input" name="branchId" id="searchBranchId">
+                            <option value="">Tất cả địa điểm</option>
+                            @if (branches != null)
+                            {
+                                foreach (var branch in branches)
+                                {
+                                    <option value="@branch.Id">@branch.Name</option>
+                                }
+                            }
+                        </select>
+                    </div>
                     <div class="search-field">
                         <label class="search-label">Nhận phòng</label>
                         <input type="date" class="search-input" name="checkIn" id="searchCheckIn" required>
@@ -29,51 +48,38 @@
                             }
                         </select>
                     </div>
-                    <button type="submit" class="btn-search-luxury">
+                    <button type="submit" class="btn-search-luxury btn-search-integrated">
                         TÌM PHÒNG
                     </button>
                 </form>
-
-                <div class="editorial-search reveal-up" style="grid-template-columns: 1fr;">
-                    <div class="search-field">
-                        <label class="search-label">Lọc nhanh theo chi nhánh</label>
-                        <select class="search-input" id="branchQuickFilter">
-                            <option value="">Tất cả địa điểm</option>
-                            @if (branches != null)
-                            {
-                                foreach (var branch in branches)
-                                {
-                                    <option value="@branch.Id">@branch.Name</option>
-                                }
-                            }
-                        </select>
-                    </div>
-                </div>
+            </div>
         </div>
     </div>
 </section>
+
 
 @section Scripts {
     <script>
         var checkIn = document.getElementById('searchCheckIn');
         var checkOut = document.getElementById('searchCheckOut');
         var today = new Date().toISOString().split('T')[0];
-        checkIn.setAttribute('min', today);
-        checkOut.setAttribute('min', today);
-        checkIn.addEventListener('change', function() {
-            var d = new Date(this.value);
-            d.setDate(d.getDate() + 1);
-            checkOut.value = d.toISOString().split('T')[0];
-            checkOut.setAttribute('min', checkOut.value);
-        });
+        if(checkIn) checkIn.setAttribute('min', today);
+        if(checkOut) checkOut.setAttribute('min', today);
+        if(checkIn) {
+            checkIn.addEventListener('change', function() {
+                var d = new Date(this.value);
+                d.setDate(d.getDate() + 1);
+                checkOut.value = d.toISOString().split('T')[0];
+                checkOut.setAttribute('min', checkOut.value);
+            });
+        }
 
-        var branchQuickFilter = document.getElementById('branchQuickFilter');
+        // Branch filter for the Room Collection below
         var searchBranchId = document.getElementById('searchBranchId');
         var branchGroups = document.querySelectorAll('.branch-room-group');
 
         function applyBranchFilter() {
-            var selectedBranchId = branchQuickFilter ? branchQuickFilter.value : '';
-            if (searchBranchId) searchBranchId.value = selectedBranchId;
+            var selectedBranchId = searchBranchId ? searchBranchId.value : '';
 
             branchGroups.forEach(function(group) {
                 var isMatch = !selectedBranchId || group.getAttribute('data-branch-id') === selectedBranchId;
@@ -81,9 +87,9 @@
             });
         }
 
-        if (branchQuickFilter) {
-            branchQuickFilter.addEventListener('change', applyBranchFilter);
-            applyBranchFilter();
+        if (searchBranchId) {
+            searchBranchId.addEventListener('change', applyBranchFilter);
+            applyBranchFilter(); // Run once on load
         }
     </script>
 }

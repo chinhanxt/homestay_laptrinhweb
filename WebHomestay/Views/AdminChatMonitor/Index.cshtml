@@ -1,18 +1,21 @@
+@using WebHomestay.Services
+@inject ISettingService SettingService
 @{
     ViewData["Title"] = "Giám sát hội thoại";
     Layout = "_Layout";
+    var retentionDays = await SettingService.GetIntAsync("BookingTrashRetentionDays", 7);
 }
 
 @section Styles {
     <link rel="stylesheet" href="~/css/admin-chat-monitor.css" asp-append-version="true" />
 }
 
-<div class="chat-monitor-shell">
+<div class="chat-monitor-shell ai-control-room">
     <aside class="chat-session-sidebar" id="session-sidebar" aria-label="Danh sách hội thoại">
         <div class="sidebar-header">
             <div>
-                <span class="sidebar-kicker">Trung tâm hỗ trợ</span>
-                <h1><i class="fas fa-comments me-2"></i>Hội thoại</h1>
+                <span class="sidebar-kicker">Phòng điều hành AI</span>
+                <h1><i class="fas fa-comments me-2"></i>Giám sát Chatbot</h1>
             </div>
             <span class="session-count" id="session-count-badge">0</span>
         </div>
@@ -20,6 +23,14 @@
             <button class="btn btn-sm btn-outline-secondary" data-cancellation-filter="Pending">Yêu cầu hủy chờ xử lý</button>
             <button class="btn btn-sm btn-outline-secondary" data-cancellation-filter="Approved">Đã chấp nhận</button>
             <button class="btn btn-sm btn-outline-secondary" data-cancellation-filter="Rejected">Đã từ chối</button>
+        </div>
+        <div class="chat-scope-row">
+            <button class="btn btn-sm btn-primary" type="button" data-session-scope="active">Đang theo dõi</button>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-session-scope="deleted">Thùng rác</button>
+        </div>
+        <div class="trash-retention-info d-none" id="trash-retention-info">
+            <i class="fas fa-info-circle me-1"></i>
+            Các phiên trong này sẽ tự động bị xóa vĩnh viễn sau @retentionDays ngày.
         </div>
         <div class="sidebar-search">
             <i class="fas fa-magnifying-glass"></i>
@@ -59,6 +70,15 @@
                     <button class="btn btn-sm btn-outline-secondary" id="btn-config-auto-reply" type="button">
                         <i class="fas fa-message me-1"></i>Tin nhắn tự động
                     </button>
+                    <button class="btn btn-sm btn-outline-danger" id="btn-soft-delete-session" type="button">
+                        <i class="fas fa-trash me-1"></i>Xóa phiên
+                    </button>
+                    <button class="btn btn-sm btn-outline-success d-none" id="btn-restore-session" type="button">
+                        <i class="fas fa-rotate-left me-1"></i>Khôi phục
+                    </button>
+                    <button class="btn btn-sm btn-danger d-none" id="btn-permanent-delete-session" type="button">
+                        <i class="fas fa-trash-can me-1"></i>Xóa vĩnh viễn
+                    </button>
                 </div>
             </div>
 
@@ -75,7 +95,8 @@
                         <li><a class="dropdown-item send-form-block" data-type="roomSelector" href="#">Gửi danh sách phòng</a></li>
                         <li><a class="dropdown-item send-form-block" data-type="slotPicker" href="#">Gửi khung giờ</a></li>
                         <li><a class="dropdown-item send-form-block" data-type="infoForm" href="#">Gửi form thông tin</a></li>
-                        <li><a class="dropdown-item send-form-block" data-type="paymentQr" href="#">Gửi QR thanh toán</a></li>
+                        <li><a class="dropdown-item send-form-block" data-type="bookingCta" href="#">Gửi CTA đặt phòng</a></li>
+                        <li><a class="dropdown-item send-form-block" data-type="handoffContact" href="#">Gửi liên hệ chi nhánh</a></li>
                     </ul>
                     <input type="text" class="form-control" id="admin-reply-input" placeholder="Nhập tin nhắn cho khách..." maxlength="1000" />
                     <button class="btn btn-primary send-reply-button" id="btn-send-reply" type="button" aria-label="Gửi tin nhắn">

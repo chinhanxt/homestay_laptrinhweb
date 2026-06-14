@@ -52,7 +52,7 @@ namespace WebHomestay.Services
                 BankCode = Get("BankCode"),
                 BankAccountNumber = Get("BankAccountNumber"),
                 BankAccountName = Get("BankAccountName"),
-                TransferContentTemplate = Get("TransferContentTemplate", "STAYLUXE {BookingId}"),
+                TransferContentTemplate = Get("TransferContentTemplate", "chinhan {BookingId}"),
                 CountdownMinutes = countdown,
                 BeforeBillMessage = Get("BeforeBillMessage", "Vui lòng tải lên ảnh chụp màn hình bill thanh toán thành công để chúng tôi xác nhận nhanh nhất."),
                 AfterBillMessage = Get("AfterBillMessage", "Chúng tôi đã nhận được Bill của bạn. Nhân viên sẽ đối soát và gửi mã phòng qua Email sớm nhất."),
@@ -112,7 +112,7 @@ namespace WebHomestay.Services
             await Update(model.BranchId, "BankCode", model.BankCode?.Trim() ?? string.Empty);
             await Update(model.BranchId, "BankAccountNumber", model.BankAccountNumber?.Trim() ?? string.Empty);
             await Update(model.BranchId, "BankAccountName", model.BankAccountName?.Trim() ?? string.Empty);
-            await Update(model.BranchId, "TransferContentTemplate", string.IsNullOrWhiteSpace(model.TransferContentTemplate) ? "STAYLUXE {BookingId}" : model.TransferContentTemplate.Trim());
+            await Update(model.BranchId, "TransferContentTemplate", string.IsNullOrWhiteSpace(model.TransferContentTemplate) ? "chinhan {BookingId}" : model.TransferContentTemplate.Trim());
             await Update(model.BranchId, "CountdownMinutes", model.CountdownMinutes.ToString());
             await Update(model.BranchId, "BeforeBillMessage", model.BeforeBillMessage?.Trim() ?? string.Empty);
             await Update(model.BranchId, "AfterBillMessage", model.AfterBillMessage?.Trim() ?? string.Empty);
@@ -178,7 +178,7 @@ namespace WebHomestay.Services
 
         private static string BuildTransferContent(string template, Booking booking, string branchName)
         {
-            return (string.IsNullOrWhiteSpace(template) ? "STAYLUXE {BookingId}" : template)
+            return (string.IsNullOrWhiteSpace(template) ? "chinhan {BookingId}" : template)
                 .Replace("{BookingId}", booking.Id.ToString())
                 .Replace("{BranchName}", branchName);
         }

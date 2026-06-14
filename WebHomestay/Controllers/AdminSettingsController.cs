@@ -35,13 +35,17 @@ namespace WebHomestay.Controllers
             try 
             {
                 var settings = await _context.SystemSettings.OrderBy(s => s.GroupName).ThenBy(s => s.SettingKey).ToListAsync();
-                var branches = await _context.Branches.OrderBy(b => b.Name).ToListAsync();
-                var holidays = await _context.Holidays.OrderByDescending(h => h.Date).ToListAsync();
-                var templates = await _context.RoomSlotTemplates.OrderBy(t => t.Name).ToListAsync();
+                var branches = await _context.Branches.Where(b => !b.IsDeleted).OrderBy(b => b.Name).ToListAsync();
+                var holidays = await _context.Holidays.Where(h => !h.IsDeleted).OrderByDescending(h => h.Date).ToListAsync();
+                var templates = await _context.RoomSlotTemplates.Where(t => !t.IsDeleted).OrderBy(t => t.Name).ToListAsync();
+                var trashedHolidays = await _context.Holidays.Where(h => h.IsDeleted).OrderByDescending(h => h.DeletedAt).ToListAsync();
+                var trashedTemplates = await _context.RoomSlotTemplates.Where(t => t.IsDeleted).OrderByDescending(t => t.DeletedAt).ToListAsync();
                 
                 ViewBag.Branches = branches;
                 ViewBag.Holidays = holidays;
                 ViewBag.Templates = templates;
+                ViewBag.TrashedHolidays = trashedHolidays;
+                ViewBag.TrashedTemplates = trashedTemplates;
                 ViewBag.PaymentQrSettings = await _paymentQrSettingsService.GetSettingsForBranchesAsync(branches);
 
                 return View(settings);

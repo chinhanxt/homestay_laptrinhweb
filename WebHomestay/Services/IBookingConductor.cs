@@ -20,7 +20,8 @@ public enum ConductorAction
     ShowSlots,
     ShowForm,
     AutoBook,
-    PaymentQr
+    PaymentQr,
+    BookingCta
 }
 
 public class ConductorResult
@@ -37,6 +38,8 @@ public class BookingActionRequest
     public string Action { get; set; } = string.Empty;
     public int? RoomId { get; set; }
     public int? SlotId { get; set; }
+    public int? BranchId { get; set; }
+    public int GuestCount { get; set; }
     public string? BookingMode { get; set; }
     public string? CheckInDate { get; set; }
     public string? CheckOutDate { get; set; }

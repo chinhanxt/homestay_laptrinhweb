@@ -56,7 +56,7 @@ function toggleSyncPanel() {
  */
 async function loadCollections() {
     try {
-        const response = await fetch('/admin/ai/collections');
+        const response = await fetch('/chinhan/hethong/ai/collections');
         const collections = await response.json();
         
         const container = $('#ai-collections-list');
@@ -96,7 +96,7 @@ async function loadArticles(collectionId) {
     container.html('<div class="text-center py-5 w-100"><div class="spinner-grow text-primary"></div></div>');
 
     try {
-        const response = await fetch(`/admin/ai/articles/${collectionId}`);
+        const response = await fetch(`/chinhan/hethong/ai/articles/${collectionId}`);
         const articles = await response.json();
         
         container.empty();
@@ -143,14 +143,21 @@ async function loadArticles(collectionId) {
 
 async function deleteArticle(id, event) {
     if (event) event.stopPropagation();
-    if (!confirm('Bạn có chắc chắn muốn xóa bài học này không?')) return;
+    const confirmed = await premiumConfirm('Bạn có chắc chắn muốn xóa bài học này không?', {
+        title: 'Xóa bài học tri thức',
+        confirmText: 'Xóa',
+        cancelText: 'Hủy',
+        isDanger: true,
+        type: 'warning'
+    });
+    if (!confirmed) return;
 
     try {
-        const response = await fetch(`/admin/ai/article/${id}`, { method: 'DELETE' });
+        const response = await fetch(`/chinhan/hethong/ai/article/${id}`, { method: 'DELETE' });
         const result = await response.json();
         if (result.success) {
             loadArticles(currentCollectionId);
-            showToast('Đã xóa bài học.');
+            premiumToast('Đã xóa bài học.');
         }
     } catch (err) {
         console.error('Failed to delete article', err);
@@ -167,7 +174,7 @@ function openCollectionManager() {
 }
 
 async function refreshManagerList() {
-    const response = await fetch('/admin/ai/collections');
+    const response = await fetch('/chinhan/hethong/ai/collections');
     const collections = await response.json();
     const container = $('#manager-collections-list');
     container.empty();
@@ -193,7 +200,7 @@ async function saveCollection() {
     const data = { Name: name, Icon: 'fa-book' };
     
     try {
-        const response = await fetch('/admin/ai/save-collection', {
+        const response = await fetch('/chinhan/hethong/ai/save-collection', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -210,13 +217,21 @@ async function saveCollection() {
 }
 
 async function deleteCollection(id) {
-    if (!confirm('Xóa danh mục sẽ xóa toàn bộ bài học bên trong. Bạn chắc chắn chứ?')) return;
+    const confirmed = await premiumConfirm('Xóa danh mục sẽ xóa toàn bộ bài học bên trong. Bạn chắc chắn chứ?', {
+        title: 'Xóa danh mục tri thức',
+        confirmText: 'Xóa danh mục',
+        cancelText: 'Hủy',
+        isDanger: true,
+        type: 'warning'
+    });
+    if (!confirmed) return;
     try {
-        const response = await fetch(`/admin/ai/collection/${id}`, { method: 'DELETE' });
+        const response = await fetch(`/chinhan/hethong/ai/collection/${id}`, { method: 'DELETE' });
         const result = await response.json();
         if (result.success) {
             refreshManagerList();
             loadCollections();
+            premiumToast('Đã xóa danh mục.');
         }
     } catch (err) {
         console.error('Failed to delete collection', err);
@@ -237,7 +252,7 @@ function createNewArticle() {
 
 async function editArticle(id) {
     try {
-        const response = await fetch(`/admin/ai/article/${id}`);
+        const response = await fetch(`/chinhan/hethong/ai/article/${id}`);
         const article = await response.json();
         currentArticleId = article.id;
         $('#edit-article-title').val(article.title);
@@ -259,11 +274,14 @@ function updatePreview() {
 async function saveArticle() {
     const title = $('#edit-article-title').val();
     const content = $('#edit-article-content').val();
-    if (!title || !content) return alert('Nhập đủ thông tin!');
+    if (!title || !content) {
+        premiumToast('Nhập đủ thông tin!', 'warning');
+        return;
+    }
 
     const data = { Id: currentArticleId || '00000000-0000-0000-0000-000000000000', CollectionId: currentCollectionId, Title: title, Content: content };
     try {
-        const response = await fetch('/admin/ai/save-article', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+        const response = await fetch('/chinhan/hethong/ai/save-article', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         const result = await response.json();
         if (result.success) {
             bootstrap.Modal.getInstance(document.getElementById('articleEditorModal')).hide();
@@ -298,8 +316,15 @@ async function sendTestMessage() {
     }
 }
 
-function clearAIChat() {
-    if (!confirm('Bạn có chắc chắn muốn xóa lịch sử trò chuyện không?')) return;
+async function clearAIChat() {
+    const confirmed = await premiumConfirm('Bạn có chắc chắn muốn xóa lịch sử trò chuyện không?', {
+        title: 'Xóa lịch sử chat',
+        confirmText: 'Xóa lịch sử',
+        cancelText: 'Hủy',
+        isDanger: true,
+        type: 'warning'
+    });
+    if (!confirmed) return;
     const history = $('#ai-chat-history');
     history.empty();
     history.append(`
@@ -359,7 +384,7 @@ async function sendBrainConsoleMessage() {
 }
 
 async function callBrainChat(payload) {
-    const response = await fetch('/admin/ai/brain-chat', {
+    const response = await fetch('/chinhan/hethong/ai/brain-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -400,15 +425,28 @@ function escapeHtml(value) {
 function showToast(msg) { console.log('AI-Hub:', msg); }
 
 async function seedBrainData() {
-    if (!confirm('Đồng bộ dữ liệu hiện có vào AI Brain? Thao tác này không ghi đè dữ liệu đã seed.')) return;
+    const confirmed = await premiumConfirm('Đồng bộ dữ liệu hiện có vào AI Brain? Thao tác này không ghi đè dữ liệu đã seed.', {
+        title: 'Đồng bộ AI Brain',
+        confirmText: 'Đồng ý đồng bộ',
+        cancelText: 'Hủy',
+        isDanger: false,
+        type: 'info'
+    });
+    if (!confirmed) return;
 
     try {
-        const response = await fetch('/admin/ai/seed-brain-data', { method: 'POST' });
+        const response = await fetch('/chinhan/hethong/ai/seed-brain-data', { method: 'POST' });
         if (!response.ok) throw new Error(`Seed failed: ${response.status}`);
         const result = await response.json();
-        alert(`Seed hoàn tất. Tạo mới: ${result.createdScopes} scope, ${result.createdKnowledgeUnits} knowledge, ${result.createdNodes} node, ${result.createdEdges} edge. Tổng hiện có: ${result.totalScopes} scope, ${result.totalKnowledgeUnits} knowledge, ${result.totalNodes} node, ${result.totalEdges} edge.`);
+        premiumAlert(`Seed hoàn tất. Tạo mới: ${result.createdScopes} scope, ${result.createdKnowledgeUnits} knowledge, ${result.createdNodes} node, ${result.createdEdges} edge. Tổng hiện có: ${result.totalScopes} scope, ${result.totalKnowledgeUnits} knowledge, ${result.totalNodes} node, ${result.totalEdges} edge.`, {
+            title: 'Đồng bộ thành công',
+            type: 'success'
+        });
     } catch (err) {
-        alert('Không seed được AI Brain data. Kiểm tra server hoặc migration database.');
+        premiumAlert('Không seed được AI Brain data. Kiểm tra server hoặc migration database.', {
+            title: 'Lỗi đồng bộ',
+            type: 'error'
+        });
         console.error('AI Brain seed failed', err);
     }
 }
@@ -422,7 +460,7 @@ async function loadBrainTraces() {
     detail.html('Chọn một trace để xem live snapshot, RAG và graph reasoning.');
 
     try {
-        const response = await fetch('/admin/ai/brain-traces');
+        const response = await fetch('/chinhan/hethong/ai/brain-traces');
         if (!response.ok) {
             const text = await response.text();
             throw new Error(`Trace list failed: ${response.status} ${text}`);
@@ -452,7 +490,7 @@ async function loadBrainTraceDetail(id) {
     detail.html('<div class="p-3 text-primary fw-bold">Đang tải chi tiết trace...</div>');
 
     try {
-        const response = await fetch(`/admin/ai/brain-trace/${id}`);
+        const response = await fetch(`/chinhan/hethong/ai/brain-trace/${id}`);
         if (!response.ok) {
             const text = await response.text();
             throw new Error(`Trace detail failed: ${response.status} ${text}`);

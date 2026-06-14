@@ -21,7 +21,7 @@ namespace WebHomestay.Controllers
         [HttpGet]
         public IActionResult Index()
         {
-            return Redirect("/admin/settings?tab=holiday");
+            return Redirect("/chinhan/hethong/settings?tab=holiday");
         }
 
 
@@ -33,14 +33,14 @@ namespace WebHomestay.Controllers
             if (date == default)
             {
                 TempData["ErrorMessage"] = "Vui lòng chọn ngày hợp lệ.";
-                return Redirect("/admin/settings?tab=holiday");
+                return Redirect("/chinhan/hethong/settings?tab=holiday");
             }
 
             var exists = await _context.Holidays.AnyAsync(h => h.Date.Date == date.Date);
             if (exists)
             {
                 TempData["ErrorMessage"] = "Ngày này đã được cấu hình là ngày Lễ.";
-                return Redirect("/admin/settings?tab=holiday");
+                return Redirect("/chinhan/hethong/settings?tab=holiday");
             }
 
             var holiday = new Holiday
@@ -53,7 +53,7 @@ namespace WebHomestay.Controllers
             await _context.SaveChangesAsync();
 
             TempData["SuccessMessage"] = $"Đã thêm ngày Lễ: {date:dd/MM/yyyy}";
-            return Redirect("/admin/settings?tab=holiday");
+            return Redirect("/chinhan/hethong/settings?tab=holiday");
         }
 
         [AdminAuthorize(Permission = "holidays.manage")]
@@ -64,11 +64,62 @@ namespace WebHomestay.Controllers
             var holiday = await _context.Holidays.FindAsync(id);
             if (holiday != null)
             {
+                holiday.IsDeleted = true;
+                holiday.DeletedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = "Đã chuyển ngày Lễ vào thùng rác.";
+            }
+            return Redirect("/chinhan/hethong/settings?tab=holiday");
+        }
+
+        [AdminAuthorize(Permission = "holidays.manage")]
+        [HttpPost("delete-by-desc")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteByDescription(string description)
+        {
+            var holidays = await _context.Holidays.Where(h => h.Description == description && !h.IsDeleted).ToListAsync();
+            if (holidays.Any())
+            {
+                foreach (var h in holidays)
+                {
+                    h.IsDeleted = true;
+                    h.DeletedAt = DateTime.UtcNow;
+                }
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = $"Đã chuyển dịp lễ '{description}' vào thùng rác.";
+            }
+            return Redirect("/chinhan/hethong/settings?tab=holiday");
+        }
+
+        [AdminAuthorize(Permission = "holidays.manage")]
+        [HttpPost("restore/{id}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Restore(int id)
+        {
+            var holiday = await _context.Holidays.FindAsync(id);
+            if (holiday != null)
+            {
+                holiday.IsDeleted = false;
+                holiday.DeletedAt = null;
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = "Đã khôi phục ngày Lễ.";
+            }
+            return Redirect("/chinhan/hethong/settings?tab=holiday");
+        }
+
+        [AdminAuthorize(Permission = "holidays.manage")]
+        [HttpPost("permanent-delete/{id}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PermanentDelete(int id)
+        {
+            var holiday = await _context.Holidays.FindAsync(id);
+            if (holiday != null)
+            {
                 _context.Holidays.Remove(holiday);
                 await _context.SaveChangesAsync();
-                TempData["SuccessMessage"] = " Đã xóa ngày Lễ.";
+                TempData["SuccessMessage"] = "Đã xóa vĩnh viễn ngày Lễ.";
             }
-            return Redirect("/admin/settings?tab=holiday");
+            return Redirect("/chinhan/hethong/settings?tab=holiday");
         }
 
         [AdminAuthorize(Permission = "holidays.manage")]
@@ -79,7 +130,7 @@ namespace WebHomestay.Controllers
             if (startDate == default || endDate == default || startDate > endDate)
             {
                 TempData["ErrorMessage"] = "Khoảng ngày không hợp lệ.";
-                return Redirect("/admin/settings?tab=holiday");
+                return Redirect("/chinhan/hethong/settings?tab=holiday");
             }
 
             int addedCount = 0;
@@ -107,22 +158,8 @@ namespace WebHomestay.Controllers
                 TempData["ErrorMessage"] = "Không có ngày mới nào được thêm (có thể đã tồn tại).";
             }
 
-            return Redirect("/admin/settings?tab=holiday");
+            return Redirect("/chinhan/hethong/settings?tab=holiday");
         }
 
-        [AdminAuthorize(Permission = "holidays.manage")]
-        [HttpPost("delete-by-desc")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteByDescription(string description)
-        {
-            var holidays = await _context.Holidays.Where(h => h.Description == description).ToListAsync();
-            if (holidays.Any())
-            {
-                _context.Holidays.RemoveRange(holidays);
-                await _context.SaveChangesAsync();
-                TempData["SuccessMessage"] = $"Đã xóa dịp lễ: {description}";
-            }
-            return Redirect("/admin/settings?tab=holiday");
-        }
     }
 }

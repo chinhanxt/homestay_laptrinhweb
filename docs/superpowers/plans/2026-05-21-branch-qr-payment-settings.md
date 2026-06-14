@@ -45,7 +45,7 @@ namespace WebHomestay.Models.ViewModels
         public string BankCode { get; set; } = string.Empty;
         public string BankAccountNumber { get; set; } = string.Empty;
         public string BankAccountName { get; set; } = string.Empty;
-        public string TransferContentTemplate { get; set; } = "STAYLUXE {BookingId}";
+        public string TransferContentTemplate { get; set; } = "chinhan {BookingId}";
         public int CountdownMinutes { get; set; } = 5;
         public string BeforeBillMessage { get; set; } = "Vui lòng tải lên ảnh chụp màn hình bill thanh toán thành công để chúng tôi xác nhận nhanh nhất.";
         public string AfterBillMessage { get; set; } = "Chúng tôi đã nhận được Bill của bạn. Nhân viên sẽ đối soát và gửi mã phòng qua Email sớm nhất.";
@@ -197,7 +197,7 @@ namespace WebHomestay.Tests.Services
             Assert.Equal(7, settings.BranchId);
             Assert.Equal("Quận 1", settings.BranchName);
             Assert.Equal(5, settings.CountdownMinutes);
-            Assert.Equal("STAYLUXE {BookingId}", settings.TransferContentTemplate);
+            Assert.Equal("chinhan {BookingId}", settings.TransferContentTemplate);
             Assert.Contains("bill thanh toán", settings.BeforeBillMessage);
         }
 
@@ -216,8 +216,8 @@ namespace WebHomestay.Tests.Services
                 QrImageUrl = "https://example.com/qr.png",
                 BankCode = "MB",
                 BankAccountNumber = "123456789",
-                BankAccountName = "STAYLUXE",
-                TransferContentTemplate = "STAYLUXE {BookingId} {BranchName}",
+                BankAccountName = "chinhan",
+                TransferContentTemplate = "chinhan {BookingId} {BranchName}",
                 CountdownMinutes = 8,
                 BeforeBillMessage = "Gửi bill sau khi chuyển khoản.",
                 AfterBillMessage = "Đã nhận bill.",
@@ -229,8 +229,8 @@ namespace WebHomestay.Tests.Services
             Assert.Equal("https://example.com/qr.png", settings.QrImageUrl);
             Assert.Equal("MB", settings.BankCode);
             Assert.Equal("123456789", settings.BankAccountNumber);
-            Assert.Equal("STAYLUXE", settings.BankAccountName);
-            Assert.Equal("STAYLUXE {BookingId} {BranchName}", settings.TransferContentTemplate);
+            Assert.Equal("chinhan", settings.BankAccountName);
+            Assert.Equal("chinhan {BookingId} {BranchName}", settings.TransferContentTemplate);
             Assert.Equal(8, settings.CountdownMinutes);
             Assert.Equal("Gửi bill sau khi chuyển khoản.", settings.BeforeBillMessage);
             Assert.Equal("Đã nhận bill.", settings.AfterBillMessage);
@@ -330,7 +330,7 @@ namespace WebHomestay.Services
                 BankCode = Get("BankCode"),
                 BankAccountNumber = Get("BankAccountNumber"),
                 BankAccountName = Get("BankAccountName"),
-                TransferContentTemplate = Get("TransferContentTemplate", "STAYLUXE {BookingId}"),
+                TransferContentTemplate = Get("TransferContentTemplate", "chinhan {BookingId}"),
                 CountdownMinutes = countdown,
                 BeforeBillMessage = Get("BeforeBillMessage", "Vui lòng tải lên ảnh chụp màn hình bill thanh toán thành công để chúng tôi xác nhận nhanh nhất."),
                 AfterBillMessage = Get("AfterBillMessage", "Chúng tôi đã nhận được Bill của bạn. Nhân viên sẽ đối soát và gửi mã phòng qua Email sớm nhất."),
@@ -390,7 +390,7 @@ namespace WebHomestay.Services
             await Update(model.BranchId, "BankCode", model.BankCode?.Trim() ?? string.Empty);
             await Update(model.BranchId, "BankAccountNumber", model.BankAccountNumber?.Trim() ?? string.Empty);
             await Update(model.BranchId, "BankAccountName", model.BankAccountName?.Trim() ?? string.Empty);
-            await Update(model.BranchId, "TransferContentTemplate", string.IsNullOrWhiteSpace(model.TransferContentTemplate) ? "STAYLUXE {BookingId}" : model.TransferContentTemplate.Trim());
+            await Update(model.BranchId, "TransferContentTemplate", string.IsNullOrWhiteSpace(model.TransferContentTemplate) ? "chinhan {BookingId}" : model.TransferContentTemplate.Trim());
             await Update(model.BranchId, "CountdownMinutes", model.CountdownMinutes.ToString());
             await Update(model.BranchId, "BeforeBillMessage", model.BeforeBillMessage?.Trim() ?? string.Empty);
             await Update(model.BranchId, "AfterBillMessage", model.AfterBillMessage?.Trim() ?? string.Empty);
@@ -456,7 +456,7 @@ namespace WebHomestay.Services
 
         private static string BuildTransferContent(string template, Booking booking, string branchName)
         {
-            return (string.IsNullOrWhiteSpace(template) ? "STAYLUXE {BookingId}" : template)
+            return (string.IsNullOrWhiteSpace(template) ? "chinhan {BookingId}" : template)
                 .Replace("{BookingId}", booking.Id.ToString())
                 .Replace("{BranchName}", branchName);
         }
@@ -573,7 +573,7 @@ Append these tests to `PaymentQrSettingsServiceTests`:
             context.SystemSettings.AddRange(
                 new SystemSetting { SettingKey = "PaymentQr:7:BankCode", SettingValue = "MB", GroupName = "PaymentQr" },
                 new SystemSetting { SettingKey = "PaymentQr:7:BankAccountNumber", SettingValue = "123456789", GroupName = "PaymentQr" },
-                new SystemSetting { SettingKey = "PaymentQr:7:TransferContentTemplate", SettingValue = "STAYLUXE {BookingId} {BranchName}", GroupName = "PaymentQr" }
+                new SystemSetting { SettingKey = "PaymentQr:7:TransferContentTemplate", SettingValue = "chinhan {BookingId} {BranchName}", GroupName = "PaymentQr" }
             );
             await context.SaveChangesAsync();
             var service = CreateService(context);
@@ -582,7 +582,7 @@ Append these tests to `PaymentQrSettingsServiceTests`:
 
             Assert.Contains("https://img.vietqr.io/image/MB-123456789-compact.png", display.QrImageSrc);
             Assert.Contains("amount=880000", display.QrImageSrc);
-            Assert.Equal("STAYLUXE 101 Quận 7", display.TransferContent);
+            Assert.Equal("chinhan 101 Quận 7", display.TransferContent);
         }
 
         [Fact]
@@ -1062,7 +1062,7 @@ with:
 Replace:
 
 ```html
-<p class="text-muted mb-4">Cảm ơn quý khách đã tin tưởng STAYLUXE. Chúng tôi đang xử lý đơn hàng của bạn.</p>
+<p class="text-muted mb-4">Cảm ơn quý khách đã tin tưởng chinhan. Chúng tôi đang xử lý đơn hàng của bạn.</p>
 ```
 
 with:

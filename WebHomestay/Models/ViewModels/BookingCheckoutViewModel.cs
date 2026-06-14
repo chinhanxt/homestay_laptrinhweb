@@ -17,4 +17,5 @@ public class BookingCheckoutViewModel
     public int Capacity { get; set; }
     public int MaxGuests { get; set; }
     public decimal ExtraGuestFee { get; set; }
+    public int GuestCount { get; set; } = 1;
 }

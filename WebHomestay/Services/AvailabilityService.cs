@@ -16,6 +16,7 @@ public class AvailabilityService : IAvailabilityService
     public async Task<bool> IsRoomAvailable(int roomId, DateTime start, DateTime end, int? ignoreBookingId = null)
     {
         // Check for overlapping bookings
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var fiveMinutesAgo = DateTime.UtcNow.AddMinutes(-5);
         var hasOverlap = await _context.Bookings
             .AnyAsync(b => b.RoomId == roomId &&
@@ -24,7 +25,7 @@ public class AvailabilityService : IAvailabilityService
                            b.Status != "Cancelled" &&
                            !(b.Status == "AwaitingPayment" && b.CreatedAt < fiveMinutesAgo) &&
                            b.StartTime < end &&
-                           b.EndTime > start);
+                           b.EndTime > start, cts.Token);
 
         if (hasOverlap) return false;
 
@@ -33,18 +34,19 @@ public class AvailabilityService : IAvailabilityService
             .AnyAsync(s => s.RoomId == roomId &&
                            s.Status == "Blocked" &&
                            s.StartTime < end &&
-                           s.EndTime > start);
+                           s.EndTime > start, cts.Token);
 
         return !hasBlockedSlot;
     }
 
     public async Task<List<int>> GetAvailableRoomIds(int branchId, DateTime start, DateTime end)
     {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         // Get all rooms in branch
         var roomIds = await _context.Rooms
             .Where(r => r.BranchId == branchId && r.Status == "Available")
             .Select(r => r.Id)
-            .ToListAsync();
+            .ToListAsync(cts.Token);
 
         // Filter out those with overlapping bookings
         var fiveMinutesAgo = DateTime.UtcNow.AddMinutes(-5);
@@ -57,7 +59,7 @@ public class AvailabilityService : IAvailabilityService
                         b.EndTime > start)
             .Select(b => b.RoomId)
             .Distinct()
-            .ToListAsync();
+            .ToListAsync(cts.Token);
 
         var availableRoomIds = roomIds.Except(occupiedRoomIds).ToList();
 
@@ -69,7 +71,7 @@ public class AvailabilityService : IAvailabilityService
                         s.EndTime > start)
             .Select(s => s.RoomId)
             .Distinct()
-            .ToListAsync();
+            .ToListAsync(cts.Token);
 
         return availableRoomIds.Except(blockedRoomIds).ToList();
     }
@@ -96,13 +98,14 @@ public class AvailabilityService : IAvailabilityService
         var startOfVisible = visibleFrom.ToDateTime(TimeOnly.MinValue);
         var endOfVisible = visibleTo.ToDateTime(TimeOnly.MaxValue);
 
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var bookings = await _context.Bookings
             .Where(b => b.RoomId == roomId &&
                         !b.IsDeleted &&
                         b.Status != "Cancelled" &&
                         b.StartTime < endOfVisible &&
                         b.EndTime > startOfVisible)
-            .ToListAsync();
+            .ToListAsync(cts.Token);
 
         var blockedDates = new HashSet<DateOnly>();
         for (var i = 0; i < visibleDays; i++)

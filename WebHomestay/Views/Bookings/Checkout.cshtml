@@ -1,4 +1,4 @@
-@model WebHomestay.Models.ViewModels.BookingCheckoutViewModel
+﻿@model WebHomestay.Models.ViewModels.BookingCheckoutViewModel
 @{
     ViewData["Title"] = "Thanh toán & Xác nhận";
 }
@@ -51,7 +51,7 @@
                     <div class="col-md-6">
                         <div class="lux-form-group">
                             <label class="lux-label">Số lượng khách</label>
-                            <input name="GuestCount" class="lux-input" type="number" min="1" max="@Model.Capacity" value="1" />
+                            <input name="GuestCount" class="lux-input" type="number" min="1" max="@Model.Capacity" value="@Math.Max(Model.GuestCount, 1)" />
                             <span class="text-danger small error-msg" id="err-GuestCount"></span>
                         </div>
                     </div>

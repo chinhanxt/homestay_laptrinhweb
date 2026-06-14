@@ -28,7 +28,7 @@ namespace WebHomestay.Tests.Services
             Assert.Equal(7, settings.BranchId);
             Assert.Equal("Quận 1", settings.BranchName);
             Assert.Equal(5, settings.CountdownMinutes);
-            Assert.Equal("STAYLUXE {BookingId}", settings.TransferContentTemplate);
+            Assert.Equal("chinhan {BookingId}", settings.TransferContentTemplate);
             Assert.Contains("bill thanh toán", settings.BeforeBillMessage);
         }
 
@@ -47,8 +47,8 @@ namespace WebHomestay.Tests.Services
                 QrImageUrl = "https://example.com/qr.png",
                 BankCode = "MB",
                 BankAccountNumber = "123456789",
-                BankAccountName = "STAYLUXE",
-                TransferContentTemplate = "STAYLUXE {BookingId} {BranchName}",
+                BankAccountName = "chinhan",
+                TransferContentTemplate = "chinhan {BookingId} {BranchName}",
                 CountdownMinutes = 8,
                 BeforeBillMessage = "Gửi bill sau khi chuyển khoản.",
                 AfterBillMessage = "Đã nhận bill.",
@@ -60,8 +60,8 @@ namespace WebHomestay.Tests.Services
             Assert.Equal("https://example.com/qr.png", settings.QrImageUrl);
             Assert.Equal("MB", settings.BankCode);
             Assert.Equal("123456789", settings.BankAccountNumber);
-            Assert.Equal("STAYLUXE", settings.BankAccountName);
-            Assert.Equal("STAYLUXE {BookingId} {BranchName}", settings.TransferContentTemplate);
+            Assert.Equal("chinhan", settings.BankAccountName);
+            Assert.Equal("chinhan {BookingId} {BranchName}", settings.TransferContentTemplate);
             Assert.Equal(8, settings.CountdownMinutes);
             Assert.Equal("Gửi bill sau khi chuyển khoản.", settings.BeforeBillMessage);
             Assert.Equal("Đã nhận bill.", settings.AfterBillMessage);
@@ -137,7 +137,7 @@ namespace WebHomestay.Tests.Services
             context.SystemSettings.AddRange(
                 new SystemSetting { SettingKey = "PaymentQr:7:BankCode", SettingValue = "MB", GroupName = "PaymentQr" },
                 new SystemSetting { SettingKey = "PaymentQr:7:BankAccountNumber", SettingValue = "123456789", GroupName = "PaymentQr" },
-                new SystemSetting { SettingKey = "PaymentQr:7:TransferContentTemplate", SettingValue = "STAYLUXE {BookingId} {BranchName}", GroupName = "PaymentQr" }
+                new SystemSetting { SettingKey = "PaymentQr:7:TransferContentTemplate", SettingValue = "chinhan {BookingId} {BranchName}", GroupName = "PaymentQr" }
             );
             await context.SaveChangesAsync();
             var service = new PaymentQrSettingsService(context);
@@ -146,7 +146,7 @@ namespace WebHomestay.Tests.Services
 
             Assert.Contains("https://img.vietqr.io/image/MB-123456789-compact.png", display.QrImageSrc);
             Assert.Contains("amount=880000", display.QrImageSrc);
-            Assert.Equal("STAYLUXE 101 Quận 7", display.TransferContent);
+            Assert.Equal("chinhan 101 Quận 7", display.TransferContent);
         }
 
         [Fact]

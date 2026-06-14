@@ -89,7 +89,10 @@ public class AdminChatServiceTests
             CustomerName = "Test",
             Status = "paused",
             PausedBy = "admin01",
-            PausedAt = DateTime.Now
+            PausedAt = DateTime.Now,
+            PauseReason = "manual_handoff",
+            TakenOverBy = "admin01",
+            TakenOverAt = DateTime.Now
         });
         await ctx.SaveChangesAsync();
         var svc = new AdminChatService(ctx);
@@ -100,6 +103,90 @@ public class AdminChatServiceTests
         Assert.Equal("auto", session.Status);
         Assert.Null(session.PausedBy);
         Assert.Null(session.PausedAt);
+        Assert.Null(session.PauseReason);
+        Assert.Null(session.TakenOverBy);
+        Assert.Null(session.TakenOverAt);
+    }
+
+    [Fact]
+    public async Task SoftDeleteSession_Marks_Session_Deleted_Without_Removing_Messages()
+    {
+        var ctx = CreateContext();
+        ctx.AdminChatSessions.Add(new AdminChatSession { SessionId = "sess-1", CustomerName = "Test" });
+        ctx.AdminChatMessages.Add(new AdminChatMessage
+        {
+            SessionId = "sess-1",
+            Role = "user",
+            Content = "Can I book?"
+        });
+        await ctx.SaveChangesAsync();
+        var svc = new AdminChatService(ctx);
+
+        await svc.SoftDeleteSessionAsync("sess-1", "admin01");
+
+        var session = await ctx.AdminChatSessions.FirstAsync(s => s.SessionId == "sess-1");
+        var messages = await ctx.AdminChatMessages.Where(m => m.SessionId == "sess-1").ToListAsync();
+
+        Assert.True(session.IsDeleted);
+        Assert.Equal("admin01", session.DeletedBy);
+        Assert.NotNull(session.DeletedAt);
+        Assert.Single(messages);
+        Assert.Equal("Can I book?", messages[0].Content);
+    }
+
+    [Fact]
+    public async Task TakeoverSession_Sets_Paused_And_Manual_Handoff_Metadata()
+    {
+        var ctx = CreateContext();
+        ctx.AdminChatSessions.Add(new AdminChatSession { SessionId = "sess-1", CustomerName = "Test" });
+        await ctx.SaveChangesAsync();
+        var svc = new AdminChatService(ctx);
+
+        await svc.TakeoverSessionAsync("sess-1", "admin01");
+
+        var session = await ctx.AdminChatSessions.FirstAsync(s => s.SessionId == "sess-1");
+
+        Assert.Equal("paused", session.Status);
+        Assert.Equal("admin01", session.PausedBy);
+        Assert.NotNull(session.PausedAt);
+        Assert.Equal("manual_handoff", session.PauseReason);
+        Assert.Equal("admin01", session.TakenOverBy);
+        Assert.NotNull(session.TakenOverAt);
+    }
+
+    [Fact]
+    public async Task UpsertSession_Revives_Deleted_Session_As_Clean_Active_State()
+    {
+        var ctx = CreateContext();
+        ctx.AdminChatSessions.Add(new AdminChatSession
+        {
+            SessionId = "sess-1",
+            CustomerName = "Old Test",
+            Status = "paused",
+            PausedBy = "admin01",
+            PausedAt = DateTime.Now.AddMinutes(-10),
+            PauseReason = "manual_handoff",
+            TakenOverBy = "admin01",
+            TakenOverAt = DateTime.Now.AddMinutes(-10),
+            IsDeleted = true,
+            DeletedAt = DateTime.Now.AddMinutes(-5),
+            DeletedBy = "admin02"
+        });
+        await ctx.SaveChangesAsync();
+        var svc = new AdminChatService(ctx);
+
+        var session = await svc.UpsertSessionAsync("sess-1", "Revived Name");
+
+        Assert.False(session.IsDeleted);
+        Assert.Equal("auto", session.Status);
+        Assert.Null(session.PausedBy);
+        Assert.Null(session.PausedAt);
+        Assert.Null(session.PauseReason);
+        Assert.Null(session.TakenOverBy);
+        Assert.Null(session.TakenOverAt);
+        Assert.Null(session.DeletedAt);
+        Assert.Null(session.DeletedBy);
+        Assert.Equal("Revived Name", session.CustomerName);
     }
 
     [Fact]
@@ -152,6 +239,105 @@ public class AdminChatServiceTests
     }
 
     [Fact]
+    public async Task GetSessionsAsync_Separates_Active_And_Deleted_Scopes()
+    {
+        var ctx = CreateContext();
+        ctx.AdminChatSessions.AddRange(
+            new AdminChatSession
+            {
+                SessionId = "live-1",
+                CustomerName = "Live",
+                LastActivityAt = DateTime.Now
+            },
+            new AdminChatSession
+            {
+                SessionId = "trash-1",
+                CustomerName = "Deleted",
+                LastActivityAt = DateTime.Now,
+                IsDeleted = true,
+                DeletedAt = DateTime.Now,
+                DeletedBy = "admin01"
+            }
+        );
+        await ctx.SaveChangesAsync();
+        var svc = new AdminChatService(ctx);
+
+        var active = await svc.GetSessionsAsync(false, 60);
+        var deleted = await svc.GetSessionsAsync(true, 60);
+
+        Assert.Single(active);
+        Assert.Equal("live-1", active[0].SessionId);
+        Assert.Single(deleted);
+        Assert.Equal("trash-1", deleted[0].SessionId);
+        Assert.Single(await svc.GetActiveSessionsAsync(60));
+    }
+
+    [Fact]
+    public async Task RestoreSessionAsync_Clears_Delete_Metadata_And_Resurfaces_Session()
+    {
+        var ctx = CreateContext();
+        ctx.AdminChatSessions.Add(new AdminChatSession
+        {
+            SessionId = "trash-1",
+            CustomerName = "Deleted",
+            LastActivityAt = DateTime.Now,
+            IsDeleted = true,
+            DeletedAt = DateTime.Now.AddMinutes(-5),
+            DeletedBy = "admin01"
+        });
+        await ctx.SaveChangesAsync();
+        var svc = new AdminChatService(ctx);
+
+        await svc.RestoreSessionAsync("trash-1");
+
+        var session = await ctx.AdminChatSessions.FirstAsync(s => s.SessionId == "trash-1");
+        var active = await svc.GetSessionsAsync(false, 60);
+        var deleted = await svc.GetSessionsAsync(true, 60);
+
+        Assert.False(session.IsDeleted);
+        Assert.Null(session.DeletedAt);
+        Assert.Null(session.DeletedBy);
+        Assert.Contains(active, s => s.SessionId == "trash-1");
+        Assert.DoesNotContain(deleted, s => s.SessionId == "trash-1");
+    }
+
+    [Fact]
+    public async Task PermanentlyDeleteSessionAsync_Removes_Session_And_Messages()
+    {
+        var ctx = CreateContext();
+        ctx.AdminChatSessions.Add(new AdminChatSession
+        {
+            SessionId = "trash-1",
+            CustomerName = "Deleted",
+            LastActivityAt = DateTime.Now,
+            IsDeleted = true,
+            DeletedAt = DateTime.Now,
+            DeletedBy = "admin01"
+        });
+        ctx.AdminChatMessages.AddRange(
+            new AdminChatMessage
+            {
+                SessionId = "trash-1",
+                Role = "user",
+                Content = "Hello"
+            },
+            new AdminChatMessage
+            {
+                SessionId = "trash-1",
+                Role = "admin",
+                Content = "Hi"
+            }
+        );
+        await ctx.SaveChangesAsync();
+        var svc = new AdminChatService(ctx);
+
+        await svc.PermanentlyDeleteSessionAsync("trash-1");
+
+        Assert.False(await ctx.AdminChatSessions.AnyAsync(s => s.SessionId == "trash-1"));
+        Assert.False(await ctx.AdminChatMessages.AnyAsync(m => m.SessionId == "trash-1"));
+    }
+
+    [Fact]
     public async Task AddSystemAutoReplyAsync_Saves_System_Message()
     {
         var ctx = CreateContext();
@@ -166,4 +352,23 @@ public class AdminChatServiceTests
         Assert.Equal("system", msg.Role);
         Assert.Equal("Xin cho doi.", msg.Content);
     }
+
+    [Fact]
+    public async Task AddAiReplyAsync_Saves_Ai_Message()
+    {
+        var ctx = CreateContext();
+        ctx.AdminChatSessions.Add(new AdminChatSession { SessionId = "sess-1", CustomerName = "Test" });
+        await ctx.SaveChangesAsync();
+        var svc = new AdminChatService(ctx);
+
+        await svc.AddAiReplyAsync("sess-1", "AI Response", formBlockJson: "{}", formBlockType: "roomCards");
+
+        var msg = await ctx.AdminChatMessages.FirstAsync();
+        Assert.Equal("ai", msg.Role);
+        Assert.Equal("AI Response", msg.Content);
+        Assert.Equal("AI", msg.CreatedBy);
+        Assert.Equal("roomCards", msg.FormBlockType);
+        Assert.Equal("{}", msg.FormBlockJson);
+    }
 }
+

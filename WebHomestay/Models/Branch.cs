@@ -26,6 +26,10 @@ namespace WebHomestay.Models
         public string? MapUrl { get; set; }
         public int BookingLeadTimeHours { get; set; } = 2;
 
+        // Soft delete
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
+
         // Navigation properties
         public virtual ICollection<Room> Rooms { get; set; } = new List<Room>();
         public virtual ICollection<AdminUser> StaffMembers { get; set; } = new List<AdminUser>();

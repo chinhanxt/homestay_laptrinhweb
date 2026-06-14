@@ -22,7 +22,7 @@ public class AdminSlotsController : Controller
 
     public IActionResult Index()
     {
-        return Redirect("/admin/settings?tab=time");
+        return Redirect("/chinhan/hethong/settings?tab=time");
     }
 
     [HttpGet]
@@ -35,7 +35,7 @@ public class AdminSlotsController : Controller
         {
             _context.RoomSlotTemplates.Add(template);
             await _context.SaveChangesAsync();
-            return Redirect("/admin/settings?tab=time");
+            return Redirect("/chinhan/hethong/settings?tab=time");
         }
         return View(template);
     }
@@ -67,15 +67,53 @@ public class AdminSlotsController : Controller
         await _slotManagementService.SyncTemplateChangesAsync(template.Id);
         
         TempData["SuccessMessage"] = "Đã cập nhật mẫu và đồng bộ lịch trình các phòng.";
-        return Redirect("/admin/settings?tab=time");
+        return Redirect("/chinhan/hethong/settings?tab=time");
     }
 
     [HttpPost]
     public async Task<IActionResult> DeleteTemplate(int id)
     {
-        await _slotManagementService.DeleteTemplateAndCleanInventoryAsync(id);
-        TempData["SuccessMessage"] = "Đã xóa mẫu và dọn dẹp các ô lịch trống liên quan.";
-        return Redirect("/admin/settings?tab=time");
+        var template = await _context.RoomSlotTemplates.FindAsync(id);
+        if (template != null)
+        {
+            template.IsDeleted = true;
+            template.DeletedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = "Đã chuyển mẫu khung giờ vào thùng rác.";
+        }
+        return Redirect("/chinhan/hethong/settings?tab=time");
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> RestoreTemplate(int id)
+    {
+        var template = await _context.RoomSlotTemplates.FindAsync(id);
+        if (template != null)
+        {
+            template.IsDeleted = false;
+            template.DeletedAt = null;
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = "Đã khôi phục mẫu khung giờ.";
+        }
+        return Redirect("/chinhan/hethong/settings?tab=time");
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> PermanentDeleteTemplate(int id)
+    {
+        var template = await _context.RoomSlotTemplates.FindAsync(id);
+        if (template != null)
+        {
+            // Clean up inventory and assignments before hard delete
+            if (template.IsDeleted)
+            {
+                await _slotManagementService.DeleteTemplateAndCleanInventoryAsync(id);
+                _context.RoomSlotTemplates.Remove(template);
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = "Đã xóa vĩnh viễn mẫu khung giờ.";
+            }
+        }
+        return Redirect("/chinhan/hethong/settings?tab=time");
     }
 
     public async Task<IActionResult> RoomSchedules(int roomId)

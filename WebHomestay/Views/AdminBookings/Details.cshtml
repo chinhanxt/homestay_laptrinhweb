@@ -193,11 +193,11 @@
                             if (isRestricted)
                             {
                                 <button type="button" class="btn btn-link text-danger text-decoration-none small opacity-50" 
-                                        onclick="showLuxToast('Không thể xóa đơn hàng đang vận hành!', 'error')">Hủy đơn hàng này</button>
+                                        onclick="premiumToast('Không thể xóa đơn hàng đang vận hành!', 'error')">Hủy đơn hàng này</button>
                             }
                             else
                             {
-                                <form asp-action="SoftDelete" method="post" class="d-grid" onsubmit="return confirm('Bạn muốn xóa đơn hàng này?')">
+                                <form asp-action="SoftDelete" method="post" class="d-grid" data-premium-confirm="Bạn muốn xóa đơn hàng #@Model.Id vào thùng rác?" data-premium-title="Xóa đơn hàng" data-premium-ok="Xóa" data-premium-danger="true">
                                     <input type="hidden" name="id" value="@Model.Id" />
                                     <button type="submit" class="btn btn-link text-danger text-decoration-none small">Hủy đơn hàng này</button>
                                 </form>
@@ -214,26 +214,7 @@
 @section Scripts {
     <script>
         function showLuxToast(message, type = 'success') {
-            let container = document.querySelector('.lux-toast-container');
-            if (!container) {
-                container = document.createElement('div');
-                container.className = 'lux-toast-container';
-                document.body.appendChild(container);
-            }
-            
-            const toast = document.createElement('div');
-            toast.className = `lux-toast ${type === 'error' ? 'is-danger' : 'is-success'}`;
-            toast.innerHTML = `
-                <div class="lux-toast-accent"></div>
-                <div class="lux-toast-content">${message}</div>
-            `;
-            
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.classList.add('fade-out');
-                setTimeout(() => toast.remove(), 500);
-            }, 4000);
+            premiumToast(message, type);
         }
     </script>
 }

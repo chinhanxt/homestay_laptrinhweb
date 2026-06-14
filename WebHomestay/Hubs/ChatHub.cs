@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+using WebHomestay.Data;
 using WebHomestay.Services;
 
 namespace WebHomestay.Hubs;
@@ -6,10 +8,12 @@ namespace WebHomestay.Hubs;
 public class ChatHub : Hub
 {
     private readonly IAdminChatService _adminChatService;
+    private readonly ApplicationDbContext _context;
 
-    public ChatHub(IAdminChatService adminChatService)
+    public ChatHub(IAdminChatService adminChatService, ApplicationDbContext context)
     {
         _adminChatService = adminChatService;
+        _context = context;
     }
 
     public async Task JoinSession(string sessionId, string role)
@@ -61,22 +65,33 @@ public class ChatHub : Hub
         var adminUser = GetAdminUser();
         var msg = await _adminChatService.AddAdminReplyAsync(sessionId, content,
             adminUser, formBlockJson, formBlockType);
+        var session = await _context.AdminChatSessions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.SessionId == sessionId);
 
-        await Clients.Group($"user_{sessionId}").SendAsync("newMessage", new
+        var replyPayload = new
         {
+            sessionId,
             role = "admin",
             content = msg.Content,
             formBlockJson = msg.FormBlockJson,
             formBlockType = msg.FormBlockType,
             createdAt = msg.CreatedAt
-        });
+        };
+
+        await Clients.Group($"user_{sessionId}").SendAsync("newMessage", replyPayload);
+        await Clients.Group("admin_monitor").SendAsync("newMessage", replyPayload);
 
         await Clients.Group("admin_monitor").SendAsync("sessionUpdate", new
         {
             sessionId,
-            status = "auto",
+            status = session?.Status ?? "auto",
+            pausedBy = session?.PausedBy,
+            pauseReason = session?.PauseReason,
+            takenOverBy = session?.TakenOverBy,
+            takenOverAt = session?.TakenOverAt,
             lastMessage = content,
-            lastActivityAt = DateTime.Now,
+            lastActivityAt = msg.CreatedAt,
             totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync()
         });
     }
@@ -98,6 +113,9 @@ public class ChatHub : Hub
             customerName = s.CustomerName,
             status = s.Status,
             pausedBy = s.PausedBy,
+            pauseReason = s.PauseReason,
+            takenOverBy = s.TakenOverBy,
+            takenOverAt = s.TakenOverAt,
             lastActivityAt = s.LastActivityAt,
             unreadCount = unreadCounts.GetValueOrDefault(s.SessionId),
             totalUnreadCount

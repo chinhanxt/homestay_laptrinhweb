@@ -158,6 +158,72 @@ namespace WebHomestay.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // POST: admin/branches/soft-delete/5
+        [AdminAuthorize(Permission = "branches.delete")]
+        [HttpPost("soft-delete/{id}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SoftDelete(int id)
+        {
+            var role = HttpContext.Session.GetString("AdminRole");
+            var userBranchId = HttpContext.Session.GetInt32("AdminBranchId");
+
+            var branch = await _context.Branches.FindAsync(id);
+            if (branch == null) return NotFound();
+            if (role != "SuperAdmin" && userBranchId.HasValue && branch.Id != userBranchId.Value)
+            {
+                return Forbid();
+            }
+
+            branch.IsDeleted = true;
+            branch.DeletedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Đã chuyển chi nhánh '{branch.Name}' vào thùng rác.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        // GET: admin/branches/trash
+        [AdminAuthorize(Permission = "branches.view")]
+        [HttpGet("trash")]
+        public async Task<IActionResult> Trash()
+        {
+            var trash = await _context.Branches
+                .Where(b => b.IsDeleted)
+                .OrderByDescending(b => b.DeletedAt)
+                .ToListAsync();
+            return View(trash);
+        }
+
+        // POST: admin/branches/restore/5
+        [AdminAuthorize(Permission = "branches.edit")]
+        [HttpPost("restore/{id}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Restore(int id)
+        {
+            var branch = await _context.Branches.FindAsync(id);
+            if (branch == null) return NotFound();
+
+            branch.IsDeleted = false;
+            branch.DeletedAt = null;
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Đã khôi phục chi nhánh '{branch.Name}'.";
+            return RedirectToAction(nameof(Trash));
+        }
+
+        // POST: admin/branches/permanent-delete/5
+        [AdminAuthorize(Permission = "branches.delete")]
+        [HttpPost("permanent-delete/{id}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PermanentDelete(int id)
+        {
+            var branch = await _context.Branches.FindAsync(id);
+            if (branch == null) return NotFound();
+
+            _context.Branches.Remove(branch);
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Đã xóa vĩnh viễn chi nhánh '{branch.Name}'.";
+            return RedirectToAction(nameof(Trash));
+        }
+
         [HttpGet("public-contacts")]
         [AllowAnonymous]
         public async Task<IActionResult> PublicContacts()

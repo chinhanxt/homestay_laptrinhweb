@@ -70,6 +70,35 @@
         box-shadow: 2px 0 8px rgba(59, 130, 246, 0.3);
     }
 
+    .booking-item {
+        position: relative;
+    }
+    .booking-item .btn-delete-image {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: none;
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        z-index: 2;
+    }
+    .booking-item:hover .btn-delete-image {
+        display: flex;
+    }
+    .booking-item .btn-delete-image:hover {
+        background: #ef4444;
+        color: white;
+    }
+
     .status-pill {
         font-size: 0.65rem;
         padding: 3px 8px;
@@ -118,12 +147,20 @@
     <!-- Danh sách bên trái -->
     <div class="list-side">
         <div class="search-box-container">
-            <h5 class="fw-bold mb-3 d-flex align-items-center">
-                <span class="p-2 bg-primary bg-opacity-10 rounded-3 me-2">
-                    <i class="fas fa-images text-primary" style="font-size: 1rem;"></i>
-                </span>
-                Kho ảnh Đơn hàng
-            </h5>
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="fw-bold mb-0 d-flex align-items-center">
+                    <span class="p-2 bg-primary bg-opacity-10 rounded-3 me-2">
+                        <i class="fas fa-images text-primary" style="font-size: 1rem;"></i>
+                    </span>
+                    Kho ảnh Đơn hàng
+                </h5>
+                @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.view"))
+                {
+                    <a asp-action="Trash" class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold" style="font-size: 0.75rem;">
+                        <i class="fas fa-trash-alt me-1"></i> Thùng rác
+                    </a>
+                }
+            </div>
             <form method="get" id="searchForm">
                 <div class="input-group">
                     <span class="input-group-text bg-light border-0"><i class="fas fa-search text-muted"></i></span>
@@ -144,6 +181,20 @@
             @foreach (var item in Model)
             {
                 <div class="booking-item" onclick="loadDetails(@item.Id, this)">
+                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.detail"))
+                    {
+                        <form asp-action="SoftDelete" method="post" class="d-inline btn-delete-image"
+                              data-premium-confirm="Xóa ảnh của đơn hàng #@item.Id vào thùng rác?"
+                              data-premium-title="Xóa ảnh"
+                              data-premium-ok="Xóa"
+                              data-premium-danger="true"
+                              onclick="event.stopPropagation()">
+                            <input type="hidden" name="id" value="@item.Id" />
+                            <button type="submit" class="btn-delete-image" style="all: unset; cursor: pointer; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </form>
+                    }
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="fw-bold text-primary" style="font-size: 0.8rem; letter-spacing: 0.05em;">#@item.Id.ToString().PadLeft(5, '0')</span>
                         @{
@@ -209,7 +260,7 @@
             $('#detailsContainer').html('<div class="d-flex justify-content-center align-items-center h-100"><div class="spinner-border text-primary" role="status"></div></div>');
 
             // Ajax load
-            $.get('/admin/images/get-details/' + id, function(data) {
+            $.get('/chinhan/hethong/images/get-details/' + id, function(data) {
                 $('#detailsContainer').html(data);
             }).fail(function() {
                 $('#detailsContainer').html('<div class="alert alert-danger">Lỗi khi tải thông tin ảnh.</div>');

@@ -14,7 +14,7 @@ The form is collapsed when the chatbot opens. A compact bar appears under the ch
 
 The panel keeps the existing structure and backend behavior:
 
-1. Header: existing StayLuxe Assistant header and close button.
+1. Header: existing chinhan Assistant header and close button.
 2. Context toggle: new compact information bar below the header.
 3. Context form: existing customer name, branch, booking mode, guest count, check-in, and check-out fields, hidden by default.
 4. Messages: existing conversation log remains the main visual area.

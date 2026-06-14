@@ -35,18 +35,35 @@ namespace WebHomestay.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> CheckoutHourly(int roomId, int slotId)
+        public async Task<IActionResult> CheckoutHourly(int roomId, int slotId, int guestCount = 1)
         {
+            guestCount = Math.Max(guestCount, 1);
+            if (!await _availabilityService.IsHourlySlotAvailableForRoomAsync(slotId, roomId, guestCount))
+            {
+                TempData["ErrorMessage"] = "Khung giờ này vừa có khách đặt hoặc không còn khả dụng. Vui lòng chọn khung giờ khác.";
+                return RedirectToAction("Details", "Rooms", new { id = roomId });
+            }
+
             var viewModel = await _roomBookingViewService.BuildHourlyCheckoutAsync(roomId, slotId);
             if (viewModel == null) return NotFound();
+            viewModel.GuestCount = guestCount;
             return View("Checkout", viewModel);
         }
 
         [HttpGet]
-        public async Task<IActionResult> CheckoutDaily(int roomId, DateOnly checkInDate, DateOnly checkOutDate)
+        public async Task<IActionResult> CheckoutDaily(int roomId, DateOnly checkInDate, DateOnly checkOutDate, int guestCount = 1)
         {
+            guestCount = Math.Max(guestCount, 1);
+            var interval = BookingTimeRules.BuildDailyStay(checkInDate, checkOutDate);
+            if (!await _availabilityService.IsRoomAvailable(roomId, interval.Start, interval.End))
+            {
+                TempData["ErrorMessage"] = "Khoảng ngày này vừa có khách đặt hoặc không còn khả dụng. Vui lòng chọn ngày khác.";
+                return RedirectToAction("Details", "Rooms", new { id = roomId });
+            }
+
             var viewModel = await _roomBookingViewService.BuildDailyCheckoutAsync(roomId, checkInDate, checkOutDate);
             if (viewModel == null) return NotFound();
+            viewModel.GuestCount = guestCount;
             return View("Checkout", viewModel);
         }
 

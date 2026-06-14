@@ -30,9 +30,22 @@
             </div>
             
             <!-- Nút Chi tiết đơn - Simplified -->
-            <a href="/admin/bookings/details/@Model.Id" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-2 fw-bold d-flex align-items-center">
+            <a href="/chinhan/hethong/bookings/details/@Model.Id" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-2 fw-bold d-flex align-items-center">
                 <i class="fas fa-external-link-alt me-2"></i>Chi tiết đơn
             </a>
+            @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.detail"))
+            {
+                <form asp-action="SoftDelete" method="post" class="d-inline"
+                      data-premium-confirm="Xóa ảnh của đơn hàng #@Model.Id vào thùng rác?"
+                      data-premium-title="Xóa ảnh"
+                      data-premium-ok="Xóa"
+                      data-premium-danger="true">
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-3 py-2 fw-bold d-flex align-items-center">
+                        <i class="fas fa-trash-alt me-2"></i>Xóa ảnh
+                    </button>
+                </form>
+            }
         </div>
     </div>
     

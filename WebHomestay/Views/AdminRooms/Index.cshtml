@@ -21,6 +21,10 @@
                         <span>Thêm phòng mới</span>
                     </a>
                 }
+                @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.delete"))
+                {
+                    <a asp-action="Trash" class="btn-premium-outline"><i class="fas fa-trash-alt"></i><span>Thùng rác</span></a>
+                }
             </div>
         </header>
 
@@ -125,7 +129,7 @@
                                         }
                                         @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.delete"))
                                         {
-                                            <form asp-action="Delete" asp-route-id="@item.Id" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa phòng này?');">
+                                            <form asp-action="SoftDelete" asp-route-id="@item.Id" method="post" class="d-inline" data-premium-confirm="Bạn có chắc chắn muốn xóa phòng '@item.Name' khỏi hệ thống không?" data-premium-title="Xóa phòng" data-premium-ok="Xóa phòng" data-premium-danger="true">
                                                 <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent" title="Xóa">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
@@ -192,29 +196,6 @@
         });
     </script>
     <script>
-        function showLuxToast(message, type = 'success') {
-            let container = document.querySelector('.lux-toast-container');
-            if (!container) {
-                container = document.createElement('div');
-                container.className = 'lux-toast-container';
-                document.body.appendChild(container);
-            }
-            
-            const toast = document.createElement('div');
-            toast.className = `lux-toast ${type === 'error' ? 'is-danger' : 'is-success'}`;
-            toast.innerHTML = `
-                <div class="lux-toast-accent"></div>
-                <div class="lux-toast-content">${message}</div>
-            `;
-            
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.classList.add('fade-out');
-                setTimeout(() => toast.remove(), 500);
-            }, 4000);
-        }
-
         async function toggleRoomActivity(id, checkbox) {
             const label = checkbox.nextElementSibling;
             const originalChecked = !checkbox.checked;
@@ -224,7 +205,7 @@
             label.innerText = checkbox.checked ? "ĐANG HOẠT ĐỘNG" : "TẠM NGƯNG";
 
             try {
-                const response = await fetch(`/admin/rooms/toggle-status/${id}`, {
+                const response = await fetch(`/chinhan/hethong/rooms/toggle-status/${id}`, {
                     method: 'POST',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',
@@ -235,7 +216,7 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showLuxToast(result.message, 'success');
+                    premiumToast(result.message, 'success');
                     // Cập nhật Badge trạng thái (nếu có)
                     const badgeContainer = checkbox.closest('.d-flex').querySelector('.badge-premium');
                     if (badgeContainer) {
@@ -254,12 +235,12 @@
                     // Thất bại -> Revert lại checkbox và text
                     checkbox.checked = originalChecked;
                     label.innerText = originalText;
-                    showLuxToast(result.message, 'error');
+                    premiumToast(result.message, 'error');
                 }
             } catch (error) {
                 checkbox.checked = originalChecked;
                 label.innerText = originalText;
-                showLuxToast('Lỗi kết nối máy chủ!', 'error');
+                premiumToast('Lỗi kết nối máy chủ!', 'error');
             }
         }
     </script>

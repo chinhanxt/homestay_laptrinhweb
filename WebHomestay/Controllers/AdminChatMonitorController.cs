@@ -19,19 +19,22 @@ public class AdminChatMonitorController : Controller
     private readonly IHubContext<ChatHub> _hubContext;
     private readonly IBookingCancellationService _bookingCancellationService;
     private readonly ISettingService _settingService;
+    private readonly IAdminChatQuickSendService _quickSendService;
 
     public AdminChatMonitorController(
         IAdminChatService adminChatService,
         ApplicationDbContext context,
         IHubContext<ChatHub> hubContext,
         IBookingCancellationService bookingCancellationService,
-        ISettingService settingService)
+        ISettingService settingService,
+        IAdminChatQuickSendService quickSendService)
     {
         _adminChatService = adminChatService;
         _context = context;
         _hubContext = hubContext;
         _bookingCancellationService = bookingCancellationService;
         _settingService = settingService;
+        _quickSendService = quickSendService;
     }
 
     [AdminAuthorize(Permission = "chats.view")]
@@ -43,9 +46,16 @@ public class AdminChatMonitorController : Controller
 
     [AdminAuthorize(Permission = "chats.view")]
     [HttpGet("sessions")]
-    public async Task<IActionResult> GetSessions()
+    public async Task<IActionResult> GetSessions(string scope = "active")
     {
-        var sessions = await _adminChatService.GetActiveSessionsAsync(30);
+        if (!string.Equals(scope, "active", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(scope, "deleted", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "scope chỉ hỗ trợ active hoặc deleted." });
+        }
+
+        var includeDeleted = string.Equals(scope, "deleted", StringComparison.OrdinalIgnoreCase);
+        var sessions = await _adminChatService.GetSessionsAsync(includeDeleted, 30);
         var sessionIds = sessions.Select(s => s.SessionId).ToList();
 
         var lastMessages = await _context.AdminChatMessages
@@ -73,6 +83,12 @@ public class AdminChatMonitorController : Controller
             customerName = s.CustomerName,
             status = s.Status,
             pausedBy = s.PausedBy,
+            pauseReason = s.PauseReason,
+            takenOverBy = s.TakenOverBy,
+            takenOverAt = s.TakenOverAt,
+            isDeleted = s.IsDeleted,
+            deletedAt = s.DeletedAt,
+            deletedBy = s.DeletedBy,
             lastActivityAt = s.LastActivityAt,
             lastMessage = lastMessages.FirstOrDefault(lm => lm.SessionId == s.SessionId)?.LastContent ?? "",
             unreadCount = unreadCounts.GetValueOrDefault(s.SessionId),
@@ -81,6 +97,118 @@ public class AdminChatMonitorController : Controller
         });
 
         return Ok(result);
+    }
+
+    [AdminAuthorize(Permission = "chats.view")]
+    [HttpPost("session/{sessionId}/takeover")]
+    public async Task<IActionResult> Takeover(string sessionId)
+    {
+        var session = await _context.AdminChatSessions.FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        if (session == null || session.IsDeleted)
+        {
+            return NotFound(new { message = "Không tìm thấy phiên chat để tiếp quản." });
+        }
+
+        var adminUser = HttpContext.Session.GetString("AdminUser") ?? "admin";
+        await _adminChatService.TakeoverSessionAsync(sessionId, adminUser);
+        session = await _context.AdminChatSessions.AsNoTracking().FirstAsync(s => s.SessionId == sessionId);
+        var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
+
+        await _hubContext.Clients.Group("admin_monitor").SendAsync("sessionUpdate", new
+        {
+            sessionId,
+            status = session.Status,
+            pausedBy = session.PausedBy,
+            pauseReason = session.PauseReason,
+            takenOverBy = session.TakenOverBy,
+            takenOverAt = session.TakenOverAt,
+            lastActivityAt = session.LastActivityAt,
+            totalUnreadCount
+        });
+
+        return Ok(new
+        {
+            success = true,
+            sessionId,
+            status = session.Status,
+            pausedBy = session.PausedBy,
+            pauseReason = session.PauseReason,
+            takenOverBy = session.TakenOverBy,
+            takenOverAt = session.TakenOverAt
+        });
+    }
+
+    [AdminAuthorize(Permission = "chats.view")]
+    [HttpPost("session/{sessionId}/delete")]
+    public async Task<IActionResult> SoftDelete(string sessionId)
+    {
+        var session = await _context.AdminChatSessions.FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        if (session == null || session.IsDeleted)
+        {
+            return NotFound(new { message = "Không tìm thấy phiên chat để xóa." });
+        }
+
+        var adminUser = HttpContext.Session.GetString("AdminUser") ?? "admin";
+        await _adminChatService.SoftDeleteSessionAsync(sessionId, adminUser);
+
+        await _hubContext.Clients.Group("admin_monitor").SendAsync("sessionDeleted", new
+        {
+            sessionId,
+            deletedBy = adminUser,
+            deletedAt = DateTime.Now
+        });
+
+        return Ok(new { success = true, sessionId });
+    }
+
+    [AdminAuthorize(Permission = "chats.view")]
+    [HttpPost("session/{sessionId}/restore")]
+    public async Task<IActionResult> Restore(string sessionId)
+    {
+        var session = await _context.AdminChatSessions.FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        if (session == null || !session.IsDeleted)
+        {
+            return NotFound(new { message = "Không tìm thấy phiên chat cần khôi phục." });
+        }
+
+        await _adminChatService.RestoreSessionAsync(sessionId);
+        session = await _context.AdminChatSessions.AsNoTracking().FirstAsync(s => s.SessionId == sessionId);
+
+        await _hubContext.Clients.Group("admin_monitor").SendAsync("sessionRestored", new
+        {
+            sessionId,
+            status = session.Status,
+            pausedBy = session.PausedBy,
+            pauseReason = session.PauseReason,
+            takenOverBy = session.TakenOverBy,
+            takenOverAt = session.TakenOverAt,
+            isDeleted = session.IsDeleted,
+            deletedAt = session.DeletedAt,
+            deletedBy = session.DeletedBy,
+            lastActivityAt = session.LastActivityAt
+        });
+
+        return Ok(new { success = true, sessionId });
+    }
+
+    [AdminAuthorize(Permission = "chats.view")]
+    [HttpPost("session/{sessionId}/delete-permanent")]
+    public async Task<IActionResult> PermanentlyDelete(string sessionId)
+    {
+        var session = await _context.AdminChatSessions.AsNoTracking().FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        if (session == null)
+        {
+            return NotFound(new { message = "Không tìm thấy phiên chat để xóa vĩnh viễn." });
+        }
+
+        await _adminChatService.PermanentlyDeleteSessionAsync(sessionId);
+
+        await _hubContext.Clients.Group("admin_monitor").SendAsync("sessionPurged", new
+        {
+            sessionId
+        });
+
+        return Ok(new { success = true, sessionId });
     }
 
     [AdminAuthorize(Permission = "chats.view")]
@@ -139,6 +267,198 @@ public class AdminChatMonitorController : Controller
     }
 
     [AdminAuthorize(Permission = "chats.view")]
+    [HttpPost("session/{sessionId}/reply")]
+    public async Task<IActionResult> SendReply(string sessionId, [FromBody] AdminChatReplyRequest request, CancellationToken cancellationToken = default)
+    {
+        var session = await _context.AdminChatSessions.FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
+        if (session == null || session.IsDeleted)
+        {
+            return BadRequest(new { message = "Phiên chat không còn khả dụng để gửi tin." });
+        }
+
+        if (!await _adminChatService.IsPausedAsync(sessionId))
+        {
+            return BadRequest(new { message = "Cần takeover và tạm dừng AI trước khi nhân viên gửi tin nhắn." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Content))
+        {
+            return BadRequest(new { message = "Nội dung tin nhắn không được để trống." });
+        }
+
+        var adminUser = HttpContext.Session.GetString("AdminUser") ?? "admin";
+        var message = await _adminChatService.AddAdminReplyAsync(
+            sessionId,
+            request.Content.Trim(),
+            adminUser,
+            request.UiBlocksJson,
+            request.FormBlockType);
+
+        object? uiBlocks = null;
+        if (!string.IsNullOrWhiteSpace(message.FormBlockJson))
+        {
+            try
+            {
+                uiBlocks = JsonSerializer.Deserialize<object>(message.FormBlockJson);
+            }
+            catch
+            {
+                uiBlocks = null;
+            }
+        }
+
+        var replyPayload = new
+        {
+            sessionId,
+            role = "admin",
+            content = message.Content,
+            formBlockJson = message.FormBlockJson,
+            formBlockType = message.FormBlockType,
+            uiBlocks,
+            createdAt = message.CreatedAt
+        };
+        await _hubContext.Clients.Group($"user_{sessionId}").SendAsync("newMessage", replyPayload);
+        await _hubContext.Clients.Group("admin_monitor").SendAsync("newMessage", replyPayload);
+
+        var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
+        await _hubContext.Clients.Group("admin_monitor").SendAsync("sessionUpdate", new
+        {
+            sessionId,
+            status = session.Status,
+            pausedBy = session.PausedBy,
+            pauseReason = session.PauseReason,
+            takenOverBy = session.TakenOverBy,
+            takenOverAt = session.TakenOverAt,
+            lastMessage = message.Content,
+            lastActivityAt = message.CreatedAt,
+            totalUnreadCount
+        });
+
+        return Ok(new
+        {
+            success = true,
+            message = new
+            {
+                message.Id,
+                message.Content,
+                message.FormBlockType,
+                message.CreatedAt
+            }
+        });
+    }
+
+    [AdminAuthorize(Permission = "chats.view")]
+    [HttpGet("session/{sessionId}/quick-send/{type}/schema")]
+    public async Task<IActionResult> GetQuickSendSchema(string sessionId, string type, CancellationToken cancellationToken)
+    {
+        var session = await _context.AdminChatSessions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
+        if (session == null || session.IsDeleted)
+        {
+            return NotFound(new { message = "Phiên chat không còn khả dụng." });
+        }
+
+        if (!await _adminChatService.IsPausedAsync(sessionId))
+        {
+            return BadRequest(new { message = "Cần takeover và tạm dừng AI trước khi gửi nhanh." });
+        }
+
+        var schema = await _quickSendService.GetSchemaAsync(type, cancellationToken);
+        if (schema == null)
+        {
+            return BadRequest(new { message = "Loại form gửi nhanh không hợp lệ." });
+        }
+
+        return Ok(schema);
+    }
+
+    [AdminAuthorize(Permission = "chats.view")]
+    [HttpPost("session/{sessionId}/quick-send/{type}")]
+    public async Task<IActionResult> SendQuickSendBlock(
+        string sessionId,
+        string type,
+        [FromBody] AdminChatQuickSendRequest request,
+        CancellationToken cancellationToken)
+    {
+        var session = await _context.AdminChatSessions.FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
+        if (session == null || session.IsDeleted)
+        {
+            return BadRequest(new { message = "Phiên chat không còn khả dụng để gửi nhanh." });
+        }
+
+        if (!await _adminChatService.IsPausedAsync(sessionId))
+        {
+            return BadRequest(new { message = "Cần takeover và tạm dừng AI trước khi gửi nhanh." });
+        }
+
+        try
+        {
+            var block = await _quickSendService.BuildAsync(sessionId, type, request.Payload, cancellationToken);
+            if (block == null)
+            {
+                return BadRequest(new { message = "Loại form gửi nhanh không hợp lệ." });
+            }
+
+            var adminUser = HttpContext.Session.GetString("AdminUser") ?? "admin";
+            var uiBlocksJson = JsonSerializer.Serialize(new { uiBlocks = block.UiBlocks });
+            var message = await _adminChatService.AddAdminReplyAsync(
+                sessionId,
+                block.Message,
+                adminUser,
+                uiBlocksJson,
+                block.FormBlockType);
+
+            var quickSendPayload = new
+            {
+                sessionId,
+                role = "admin",
+                content = message.Content,
+                formBlockJson = message.FormBlockJson,
+                formBlockType = message.FormBlockType,
+                uiBlocks = block.UiBlocks,
+                createdAt = message.CreatedAt
+            };
+            await _hubContext.Clients.Group($"user_{sessionId}").SendAsync("newMessage", quickSendPayload, cancellationToken);
+            await _hubContext.Clients.Group("admin_monitor").SendAsync("newMessage", quickSendPayload, cancellationToken);
+
+            var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
+            await _hubContext.Clients.Group("admin_monitor").SendAsync("sessionUpdate", new
+            {
+                sessionId,
+                status = session.Status,
+                pausedBy = session.PausedBy,
+                pauseReason = session.PauseReason,
+                takenOverBy = session.TakenOverBy,
+                takenOverAt = session.TakenOverAt,
+                lastMessage = message.Content,
+                lastActivityAt = message.CreatedAt,
+                totalUnreadCount
+            }, cancellationToken);
+
+            return Ok(new
+            {
+                success = true,
+                message = new
+                {
+                    message.Id,
+                    message.Content,
+                    message.FormBlockType,
+                    message.CreatedAt
+                }
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Đã xảy ra lỗi hệ thống khi xử lý yêu cầu gửi nhanh: " + ex.Message });
+        }
+    }
+
+    [AdminAuthorize(Permission = "chats.view")]
     [HttpGet("session/{sessionId}/quick-block/{type}")]
     public async Task<IActionResult> GetQuickBlock(string sessionId, string type, CancellationToken cancellationToken)
     {
@@ -147,7 +467,8 @@ public class AdminChatMonitorController : Controller
             "roomSelector" => await BuildRoomSelectorBlock(cancellationToken),
             "slotPicker" => await BuildSlotPickerBlock(cancellationToken),
             "infoForm" => await BuildInfoFormBlock(cancellationToken),
-            "paymentQr" => await BuildPaymentBlock(sessionId, cancellationToken),
+            "bookingCta" => await BuildBookingCtaBlock(sessionId, cancellationToken),
+            "handoffContact" => await BuildHandoffContactBlock(cancellationToken),
             _ => null
         };
 
@@ -466,26 +787,49 @@ public class AdminChatMonitorController : Controller
         };
     }
 
-    private async Task<object> BuildPaymentBlock(string sessionId, CancellationToken cancellationToken)
+    private async Task<object> BuildBookingCtaBlock(string sessionId, CancellationToken cancellationToken)
     {
         var bookingId = await FindLatestPendingBookingId(sessionId, cancellationToken);
-        var paymentUrl = bookingId.HasValue ? $"/Bookings/Success/{bookingId.Value}" : "/Bookings";
+        var targetUrl = bookingId.HasValue ? $"/Bookings/Success/{bookingId.Value}" : "/Bookings";
 
         return new
         {
             message = bookingId.HasValue
-                ? "Mình gửi bạn nút đi tới trang thanh toán nhé."
-                : "Mình gửi bạn đường dẫn tới trang đặt phòng/thanh toán nhé.",
+                ? "Mình gửi bạn nút đi tới trang thanh toán/hoàn tất đặt phòng nhé."
+                : "Mình gửi bạn nút qua luồng đặt phòng chính thức nhé.",
             formBlockType = "uiBlocks",
             uiBlocks = new object[]
             {
                 new
                 {
-                    type = "paymentQr",
+                    type = "bookingCta",
                     data = new
                     {
-                        paymentUrl,
-                        successUrl = paymentUrl
+                        target = targetUrl,
+                        message = "Bạn bấm nút bên dưới để tiếp tục trên trang đặt phòng chính thức."
+                    }
+                }
+            }
+        };
+    }
+
+    private async Task<object> BuildHandoffContactBlock(CancellationToken cancellationToken)
+    {
+        var hasBranches = await _context.Branches.AnyAsync(cancellationToken);
+        return new
+        {
+            message = hasBranches
+                ? "Mình gửi bạn thông tin liên hệ chi nhánh để nhân viên hỗ trợ trực tiếp nhé."
+                : "Mình sẽ chuyển bạn sang nhân viên hỗ trợ trực tiếp.",
+            formBlockType = "uiBlocks",
+            uiBlocks = new object[]
+            {
+                new
+                {
+                    type = "handoffContact",
+                    data = new
+                    {
+                        message = "Bạn chọn chi nhánh phù hợp để lấy Zalo/email liên hệ trực tiếp."
                     }
                 }
             }
@@ -557,4 +901,16 @@ public class AutoReplyRequest
 {
     public string AutoReplyMessage { get; set; } = string.Empty;
     public bool Paused { get; set; }
+}
+
+public class AdminChatReplyRequest
+{
+    public string Content { get; set; } = string.Empty;
+    public string? UiBlocksJson { get; set; }
+    public string? FormBlockType { get; set; }
+}
+
+public class AdminChatQuickSendRequest
+{
+    public JsonElement Payload { get; set; }
 }

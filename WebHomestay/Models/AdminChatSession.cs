@@ -8,6 +8,12 @@ public class AdminChatSession
     public string Status { get; set; } = "auto"; // "auto" | "paused"
     public string? PausedBy { get; set; }
     public DateTime? PausedAt { get; set; }
+    public string? PauseReason { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeletedBy { get; set; }
+    public DateTime? TakenOverAt { get; set; }
+    public string? TakenOverBy { get; set; }
     public string? AutoReplyMessage { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime LastActivityAt { get; set; } = DateTime.Now;

@@ -18,6 +18,7 @@ namespace WebHomestay.Controllers
         private readonly IBookingConductor _bookingConductor;
         private readonly IAdminChatService _adminChatService;
         private readonly IHubContext<Hubs.ChatHub> _hubContext;
+        private readonly ILogger<AIChatController> _logger;
 
         public AIChatController(
             IAIBrainOrchestrator orchestrator,
@@ -26,7 +27,8 @@ namespace WebHomestay.Controllers
             ApplicationDbContext context,
             IBookingConductor bookingConductor,
             IAdminChatService adminChatService,
-            IHubContext<Hubs.ChatHub> hubContext)
+            IHubContext<Hubs.ChatHub> hubContext,
+            ILogger<AIChatController> logger)
         {
             _orchestrator = orchestrator;
             _environment = environment;
@@ -35,6 +37,7 @@ namespace WebHomestay.Controllers
             _bookingConductor = bookingConductor;
             _adminChatService = adminChatService;
             _hubContext = hubContext;
+            _logger = logger;
         }
 
         private static BookingActionRequest MapBookingActionRequest(JsonElement raw)
@@ -51,6 +54,10 @@ namespace WebHomestay.Controllers
                     req.RoomId = roomEl.GetInt32();
                 if (state.TryGetProperty("selectedSlotId", out var slotEl) && slotEl.ValueKind == JsonValueKind.Number)
                     req.SlotId = slotEl.GetInt32();
+                if (state.TryGetProperty("branchId", out var branchEl) && branchEl.ValueKind == JsonValueKind.Number)
+                    req.BranchId = branchEl.GetInt32();
+                if (state.TryGetProperty("guestCount", out var guestEl) && guestEl.ValueKind == JsonValueKind.Number)
+                    req.GuestCount = guestEl.GetInt32();
                 if (state.TryGetProperty("bookingMode", out var modeEl) && modeEl.ValueKind == JsonValueKind.String)
                     req.BookingMode = modeEl.GetString();
                 if (state.TryGetProperty("checkInDate", out var ciEl) && ciEl.ValueKind == JsonValueKind.String)
@@ -76,8 +83,20 @@ namespace WebHomestay.Controllers
         }
 
         [HttpPost("chat")]
-        public async Task<IActionResult> Chat([FromBody] PublicAIChatRequest request, CancellationToken cancellationToken)
+        public async Task<IActionResult> Chat([FromBody] JsonElement raw, CancellationToken cancellationToken)
         {
+            var request = new PublicAIChatRequest
+            {
+                SessionId = raw.TryGetProperty("sessionId", out var sidProp) ? sidProp.GetString() ?? "" : "",
+                Message = raw.TryGetProperty("message", out var msgProp) ? msgProp.GetString() ?? "" : "",
+                CustomerName = raw.TryGetProperty("customerName", out var nameProp) ? nameProp.GetString() : null,
+                BranchId = raw.TryGetProperty("branchId", out var bidProp) && bidProp.ValueKind == JsonValueKind.Number ? bidProp.GetInt32() : null,
+                BookingMode = raw.TryGetProperty("bookingMode", out var modeProp) ? modeProp.GetString() ?? "hourly" : "hourly",
+                GuestCount = raw.TryGetProperty("guestCount", out var gcProp) && gcProp.ValueKind == JsonValueKind.Number ? gcProp.GetInt32() : 1
+            };
+            if (raw.TryGetProperty("startTime", out var stProp) && stProp.ValueKind == JsonValueKind.String && DateTime.TryParse(stProp.GetString(), out var stDate)) request.StartTime = stDate;
+            if (raw.TryGetProperty("endTime", out var etProp) && etProp.ValueKind == JsonValueKind.String && DateTime.TryParse(etProp.GetString(), out var etDate)) request.EndTime = etDate;
+
             if (request == null || string.IsNullOrWhiteSpace(request.Message))
             {
                 return BadRequest(new
@@ -98,6 +117,14 @@ namespace WebHomestay.Controllers
                     request.SessionId, request.CustomerName);
                 await _adminChatService.AddCustomerMessageAsync(
                     request.SessionId, request.Message, request.CustomerName);
+                var contactPhone = ExtractPhoneLikeContact(request.Message);
+                if (!string.IsNullOrWhiteSpace(contactPhone))
+                {
+                    await _adminChatService.UpsertSessionAsync(request.SessionId, contactPhone);
+                    await _adminChatService.AddSystemMessageAsync(
+                        request.SessionId,
+                        $"Khách vừa để lại SĐT/Zalo trong chat: {contactPhone}. Nhân viên nên liên hệ hỗ trợ nếu khách cần chốt đặt phòng.");
+                }
 
                 var unreadCount = (await _adminChatService.GetUnreadCustomerMessageCountsAsync(new[] { request.SessionId }))
                     .GetValueOrDefault(request.SessionId);
@@ -116,6 +143,26 @@ namespace WebHomestay.Controllers
                     await _hubContext.Clients.Group($"user_{request.SessionId}")
                         .SendAsync("newMessage", new
                         {
+                            role = "system",
+                            content = msg.Content,
+                            createdAt = msg.CreatedAt
+                        }, cancellationToken);
+
+                    // Broadcast customer message to admin monitor in realtime
+                    await _hubContext.Clients.Group("admin_monitor")
+                        .SendAsync("newMessage", new
+                        {
+                            sessionId = request.SessionId,
+                            role = "user",
+                            content = request.Message,
+                            createdAt = DateTime.Now
+                        }, cancellationToken);
+
+                    // Broadcast system auto-reply to admin monitor in realtime
+                    await _hubContext.Clients.Group("admin_monitor")
+                        .SendAsync("newMessage", new
+                        {
+                            sessionId = request.SessionId,
                             role = "system",
                             content = msg.Content,
                             createdAt = msg.CreatedAt
@@ -144,6 +191,16 @@ namespace WebHomestay.Controllers
                     });
                 }
 
+                // Broadcast customer message to admin monitor in realtime (normal flow)
+                await _hubContext.Clients.Group("admin_monitor")
+                    .SendAsync("newMessage", new
+                    {
+                        sessionId = request.SessionId,
+                        role = "user",
+                        content = request.Message,
+                        createdAt = DateTime.Now
+                    }, cancellationToken);
+
                 // Normal AI flow
                 var brainRequest = new AIBrainChatRequest
                 {
@@ -158,13 +215,37 @@ namespace WebHomestay.Controllers
 
                 var brainResponse = await _orchestrator.ChatAsync(brainRequest, cancellationToken);
 
+                // Save AI reply to database
+                string? uiBlocksJson = null;
+                if (brainResponse.UiBlocks != null && brainResponse.UiBlocks.Any())
+                {
+                    uiBlocksJson = JsonSerializer.Serialize(new { uiBlocks = brainResponse.UiBlocks });
+                }
+                var aiMsg = await _adminChatService.AddAiReplyAsync(
+                    request.SessionId,
+                    brainResponse.Answer,
+                    uiBlocksJson,
+                    brainResponse.BookingAction);
+
+                // Broadcast AI message to admin monitor in realtime
+                await _hubContext.Clients.Group("admin_monitor")
+                    .SendAsync("newMessage", new
+                    {
+                        sessionId = request.SessionId,
+                        role = "ai",
+                        content = brainResponse.Answer,
+                        formBlockJson = uiBlocksJson,
+                        formBlockType = brainResponse.BookingAction,
+                        createdAt = aiMsg.CreatedAt
+                    }, cancellationToken);
+
                 // Broadcast session update to admin monitor
                 await _hubContext.Clients.Group("admin_monitor")
                     .SendAsync("sessionUpdate", new
                     {
                         sessionId = request.SessionId,
                         status = session.Status,
-                        lastMessage = request.Message,
+                        lastMessage = brainResponse.Answer,
                         unreadCount,
                         totalUnreadCount,
                         lastActivityAt = DateTime.Now
@@ -180,8 +261,9 @@ namespace WebHomestay.Controllers
                     state = brainResponse.BookingState ?? new AIBookingSessionState()
                 });
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError("Error processing AI chat for Session {SessionId}: {ErrorType} - {ErrorMessage}", request.SessionId, ex.GetType().Name, ex.Message);
                 return StatusCode(503, new
                 {
                     answer = "Xin lỗi, mình chưa kiểm tra được tình trạng phòng lúc này. Bạn thử lại sau ít phút nhé.",
@@ -210,11 +292,70 @@ namespace WebHomestay.Controllers
 
             try
             {
+                // Save user action to database
+                string userActionDesc = await GetActionDescriptionAsync(actionRequest);
+                if (!string.IsNullOrEmpty(userActionDesc))
+                {
+                    await _adminChatService.AddCustomerMessageAsync(actionRequest.SessionId, userActionDesc, null);
+
+                    // Broadcast customer message to admin monitor
+                    await _hubContext.Clients.Group("admin_monitor")
+                        .SendAsync("newMessage", new
+                        {
+                            sessionId = actionRequest.SessionId,
+                            role = "user",
+                            content = userActionDesc,
+                            createdAt = DateTime.Now
+                        }, cancellationToken);
+                }
+
+                // Handle the action
                 var result = await _bookingConductor.HandleActionAsync(actionRequest, cancellationToken);
+
+                // Save AI reply to database
+                string? uiBlocksJson = null;
+                if (result.UiBlocks != null && result.UiBlocks.Any())
+                {
+                    uiBlocksJson = JsonSerializer.Serialize(new { uiBlocks = result.UiBlocks });
+                }
+                var aiMsg = await _adminChatService.AddAiReplyAsync(
+                    actionRequest.SessionId,
+                    result.Answer,
+                    uiBlocksJson,
+                    result.Action.ToString());
+
+                // Broadcast AI message to admin monitor in realtime
+                await _hubContext.Clients.Group("admin_monitor")
+                    .SendAsync("newMessage", new
+                    {
+                        sessionId = actionRequest.SessionId,
+                        role = "ai",
+                        content = result.Answer,
+                        formBlockJson = uiBlocksJson,
+                        formBlockType = result.Action.ToString(),
+                        createdAt = aiMsg.CreatedAt
+                    }, cancellationToken);
+
+                // Broadcast session update to admin monitor
+                var unreadCount = (await _adminChatService.GetUnreadCustomerMessageCountsAsync(new[] { actionRequest.SessionId }))
+                    .GetValueOrDefault(actionRequest.SessionId);
+                var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
+
+                await _hubContext.Clients.Group("admin_monitor")
+                    .SendAsync("sessionUpdate", new
+                    {
+                        sessionId = actionRequest.SessionId,
+                        status = "auto",
+                        lastMessage = result.Answer,
+                        unreadCount,
+                        totalUnreadCount,
+                        lastActivityAt = DateTime.Now
+                    }, cancellationToken);
 
                 return Ok(new
                 {
                     answer = result.Answer,
+                    message = result.Answer,
                     sessionId = actionRequest.SessionId,
                     currentStep = result.Action.ToString(),
                     uiBlocks = result.UiBlocks,
@@ -223,6 +364,7 @@ namespace WebHomestay.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError("Error processing booking action {Action} for Session {SessionId}: {ErrorType} - {ErrorMessage}", actionRequest.Action, actionRequest.SessionId, ex.GetType().Name, ex.Message);
                 return StatusCode(503, new
                 {
                     answer = "Xin lỗi, thao tác đặt phòng đang tạm thời bận. Bạn thử lại sau nhé.",
@@ -232,51 +374,76 @@ namespace WebHomestay.Controllers
             }
         }
 
-        [HttpPost("booking-id-card")]
-        public async Task<IActionResult> UploadBookingIdCard(int bookingId, IFormFile? idCardFront, IFormFile? idCardBack)
+        [HttpGet("history")]
+        public async Task<IActionResult> GetHistory([FromQuery] string sessionId, CancellationToken cancellationToken)
         {
-            var booking = await _context.Bookings.FindAsync(bookingId);
-            if (booking == null) return NotFound(new { message = "Không tìm thấy đơn đặt phòng." });
-
-            if (idCardFront != null && idCardFront.Length > 0)
+            if (string.IsNullOrWhiteSpace(sessionId))
             {
-                booking.IdCardFrontPath = await SaveSecureFile(idCardFront);
-                booking.IdCardFrontMaskedPath = await _maskingService.MaskIdCardAsync(booking.IdCardFrontPath!, true);
+                return BadRequest(new { message = "Session ID is required." });
             }
 
-            if (idCardBack != null && idCardBack.Length > 0)
+            var messages = await _adminChatService.GetSessionMessagesAsync(sessionId);
+            return Ok(messages.Select(m => new
             {
-                booking.IdCardBackPath = await SaveSecureFile(idCardBack);
-                booking.IdCardBackMaskedPath = await _maskingService.MaskIdCardAsync(booking.IdCardBackPath!, false);
-            }
-
-            await _context.SaveChangesAsync();
-            return Ok(new { success = true });
+                role = m.Role,
+                content = m.Content,
+                formBlockJson = m.FormBlockJson,
+                formBlockType = m.FormBlockType,
+                createdAt = m.CreatedAt
+            }));
         }
 
-        [HttpPost("payment-proof")]
-        public async Task<IActionResult> UploadPaymentProof(int bookingId, IFormFile? paymentProof)
+        private async Task<string> GetActionDescriptionAsync(BookingActionRequest req)
         {
-            var booking = await _context.Bookings.FindAsync(bookingId);
-            if (booking == null) return NotFound(new { message = "Không tìm thấy đơn đặt phòng." });
-            if (paymentProof == null || paymentProof.Length == 0) return BadRequest(new { message = "Bạn chọn ảnh bill thanh toán trước nhé." });
-            if (!paymentProof.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return BadRequest(new { message = "Bill thanh toán phải là file ảnh." });
-
-            var uploadDir = Path.Combine(_environment.WebRootPath, "uploads", "payments");
-            Directory.CreateDirectory(uploadDir);
-            var extension = Path.GetExtension(paymentProof.FileName).ToLowerInvariant();
-            if (string.IsNullOrWhiteSpace(extension) || extension.Length > 10) extension = ".png";
-            var fileName = $"bill_{bookingId}_{DateTime.Now:yyyyMMddHHmmss}{extension}";
-            var filePath = Path.Combine(uploadDir, fileName);
-            await using (var stream = new FileStream(filePath, FileMode.Create))
+            switch (req.Action)
             {
-                await paymentProof.CopyToAsync(stream);
+                case "select-booking-mode":
+                    return req.BookingMode == "daily" ? "Chọn hình thức: Theo ngày" : "Chọn hình thức: Theo giờ";
+                
+                case "select-branch":
+                    var branchName = req.BranchId.HasValue 
+                        ? await _context.Branches.Where(b => b.Id == req.BranchId).Select(b => b.Name).FirstOrDefaultAsync()
+                        : null;
+                    return $"Chọn chi nhánh: {branchName ?? req.BranchId?.ToString() ?? "Chưa chọn"}";
+                
+                case "select-room":
+                    var roomName = req.RoomId.HasValue
+                        ? await _context.Rooms.Where(r => r.Id == req.RoomId).Select(r => r.Name).FirstOrDefaultAsync()
+                        : null;
+                    return $"Chọn phòng: {roomName ?? req.RoomId?.ToString() ?? "Chưa chọn"}";
+                
+                case "commit-room":
+                    var cRoomName = req.RoomId.HasValue
+                        ? await _context.Rooms.Where(r => r.Id == req.RoomId).Select(r => r.Name).FirstOrDefaultAsync()
+                        : null;
+                    return $"Xác nhận chọn phòng: {cRoomName ?? req.RoomId?.ToString() ?? "Chưa chọn"}";
+                
+                case "confirm-dates":
+                    var modeText = req.BookingMode == "daily" ? "Theo ngày" : "Theo giờ";
+                    var datesText = req.BookingMode == "daily"
+                        ? $"Từ {req.CheckInDate} đến {req.CheckOutDate}"
+                        : $"Ngày {req.HourlyDate}";
+                    return $"Xác nhận thời gian ({modeText}): {datesText}";
+                
+                case "select-slot":
+                    var slotLabel = req.SlotId.HasValue
+                        ? await _context.RoomSlotInventories.Where(s => s.Id == req.SlotId).Select(s => s.SlotLabel).FirstOrDefaultAsync()
+                        : null;
+                    return $"Chọn khung giờ: {slotLabel ?? req.SlotId?.ToString() ?? "Chưa chọn"}";
+                
+                case "submit-booking-form":
+                case "submit-form":
+                    var custName = req.FormData?.GetValueOrDefault("customerName") ?? "";
+                    var custPhone = req.FormData?.GetValueOrDefault("phoneNumber") ?? req.FormData?.GetValueOrDefault("customerPhone") ?? "";
+                    return $"Gửi thông tin đặt phòng (Họ tên: {custName}, SĐT: {custPhone})";
+                
+                case "submit-contact-phone":
+                    var phone = req.FormData?.GetValueOrDefault("phone") ?? req.FormData?.GetValueOrDefault("customerPhone") ?? "";
+                    return $"Gửi thông tin liên hệ: {phone}";
+                
+                default:
+                    return $"Thực hiện hành động: {req.Action}";
             }
-
-            booking.PaymentProofUrl = "/uploads/payments/" + fileName;
-            booking.Status = "AwaitingApproval";
-            await _context.SaveChangesAsync();
-            return Ok(new { success = true });
         }
 
         [HttpGet("branches")]
@@ -289,18 +456,31 @@ namespace WebHomestay.Controllers
             return Ok(branches);
         }
 
-        private async Task<string?> SaveSecureFile(IFormFile? file)
+        [HttpGet("debug-last-trace")]
+        public async Task<IActionResult> DebugLastTrace(CancellationToken cancellationToken)
         {
-            if (file == null || file.Length == 0) return null;
-            string secureDir = Path.Combine(_environment.ContentRootPath, "App_Data", "SecureUploads", "IDCards");
-            if (!Directory.Exists(secureDir)) Directory.CreateDirectory(secureDir);
-            string fileName = Guid.NewGuid() + Path.GetExtension(file.FileName);
-            string filePath = Path.Combine(secureDir, fileName);
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-            }
-            return fileName;
+            var trace = await _context.AIConversationTraces
+                .OrderByDescending(t => t.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+            return Ok(trace);
         }
+
+        [HttpGet("debug-settings")]
+        public async Task<IActionResult> DebugSettings(CancellationToken cancellationToken)
+        {
+            var settings = await _context.SystemSettings
+                .Where(s => s.GroupName == "AI")
+                .ToListAsync(cancellationToken);
+            return Ok(settings);
+        }
+
+        private static string? ExtractPhoneLikeContact(string? message)
+        {
+            var digits = new string((message ?? string.Empty).Where(char.IsDigit).ToArray());
+            if (digits.Length is < 8 or > 15) return null;
+            return digits;
+        }
+
+
     }
 }

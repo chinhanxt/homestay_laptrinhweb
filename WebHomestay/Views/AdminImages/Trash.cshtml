@@ -1,0 +1,111 @@
+@model IEnumerable<WebHomestay.Models.Booking>
+@inject ISettingService SettingService
+
+@{
+    ViewData["Title"] = "Thùng rác Ảnh";
+    var retentionDays = await SettingService.GetIntAsync("BookingTrashRetentionDays", 7);
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Lưu trữ tạm thời</span>
+                <h1>Thùng rác Ảnh</h1>
+                <p class="text-muted small mb-0 mt-1">Các ảnh trong này sẽ tự động bị xóa vĩnh viễn sau @retentionDays ngày.</p>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Index" class="btn-premium-outline">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Quay lại kho ảnh</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="admin-card">
+            <div class="admin-table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Mã đơn</th>
+                            <th>Khách hàng</th>
+                            <th>Phòng</th>
+                            <th>Loại ảnh</th>
+                            <th>Thời điểm xóa</th>
+                            <th>Hết hạn trong</th>
+                            <th class="text-end">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td><span class="fw-bold text-primary">#@item.Id</span></td>
+                                <td>
+                                    <div class="fw-bold">@item.CustomerName</div>
+                                    <div class="small text-muted">@item.CustomerPhone</div>
+                                </td>
+                                <td><span class="fw-bold">@item.Room?.Name</span></td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(item.PaymentProofUrl))
+                                    {
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-10 px-2 py-1 me-1" style="font-size: 0.6rem;">
+                                            <i class="fas fa-file-invoice-dollar me-1"></i>HÓA ĐƠN
+                                        </span>
+                                    }
+                                    @if (!string.IsNullOrEmpty(item.IdCardFrontPath))
+                                    {
+                                        <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-10 px-2 py-1" style="font-size: 0.6rem;">
+                                            <i class="fas fa-id-card me-1"></i>CCCD
+                                        </span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="small fw-bold">@item.DeletedAt?.AddHours(7).ToString("dd/MM/yyyy HH:mm")</div>
+                                </td>
+                                <td>
+                                    @{
+                                        var daysInTrash = (DateTime.UtcNow - (item.DeletedAt ?? DateTime.UtcNow)).Days;
+                                        var daysLeft = retentionDays - daysInTrash;
+                                    }
+                                    <span class="badge-premium @(daysLeft <= 1 ? "badge-danger-soft" : "badge-warning-soft")">
+                                         Còn @(daysLeft < 0 ? 0 : daysLeft) ngày
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <div class="admin-actions">
+                                        <form asp-action="Restore" method="post" class="d-inline">
+                                            <input type="hidden" name="id" value="@item.Id" />
+                                            <button type="submit" class="admin-btn-icon" title="Khôi phục">
+                                                <i class="fas fa-undo"></i>
+                                            </button>
+                                        </form>
+                                        <form asp-action="PermanentDelete" method="post" class="d-inline" data-premium-confirm="Xóa vĩnh viễn ảnh của đơn hàng #@item.Id? Hành động này KHÔNG THỂ hoàn tác." data-premium-title="Xóa vĩnh viễn" data-premium-ok="Xóa vĩnh viễn" data-premium-danger="true">
+                                            <input type="hidden" name="id" value="@item.Id" />
+                                            <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent">
+                                                <i class="fas fa-times-circle"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-5">
+                                    <div class="text-muted opacity-50">
+                                        <i class="fas fa-trash-restore fa-3x mb-3"></i>
+                                        <p>Thùng rác trống.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

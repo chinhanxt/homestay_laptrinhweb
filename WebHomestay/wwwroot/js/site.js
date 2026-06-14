@@ -28,10 +28,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const checkOutField = checkOutInput ? checkOutInput.closest('label') : null;
     const cancelAction = widget.querySelector('#ai-cancel-booking-action');
 
-    let sessionId = createSessionId();
-    let bookingState = {};
+    let sessionId = getSessionId();
+    let bookingState = JSON.parse(localStorage.getItem('ai_booking_state') || '{}');
     let latestBookingSummary = null;
     let zaloContactsLoaded = false;
+
+    function getSessionId() {
+        let sid = localStorage.getItem('ai_chat_session_id');
+        if (!sid) {
+            sid = createSessionId();
+            localStorage.setItem('ai_chat_session_id', sid);
+        }
+        return sid;
+    }
 
     // Connect to SignalR hub for admin chat monitor
     let chatHubConnection = null;
@@ -62,7 +71,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
         chatHubConnection.start().then(function () {
             chatHubConnection.invoke('joinSession', currentSessionId, 'user');
-        }).catch(function () {});
+        }).catch(function (err) {
+            console.error('Error starting SignalR chatHub connection:', err);
+        });
+    }
+
+    function rejoinChatHub(newSessionId) {
+        if (!chatHubConnection || typeof signalR === 'undefined') return;
+        if (chatHubConnection.state === signalR.HubConnectionState.Connected) {
+            chatHubConnection.invoke('joinSession', newSessionId, 'user')
+                .catch(err => console.error('Error rejoining SignalR chat session:', err));
+        } else if (chatHubConnection.state === signalR.HubConnectionState.Disconnected) {
+            chatHubConnection.start().then(function () {
+                chatHubConnection.invoke('joinSession', newSessionId, 'user');
+            }).catch(err => console.error('Error starting and rejoining SignalR chat session:', err));
+        }
+    }
+
+    async function loadChatHistory(sid) {
+        try {
+            const response = await fetch(`/ai/history?sessionId=${sid}`);
+            if (!response.ok) return;
+            const history = await response.json();
+            if (Array.isArray(history) && history.length > 0) {
+                messages.innerHTML = '';
+                history.forEach(msg => {
+                    const role = msg.role;
+                    if (role === 'ai' || role === 'system') {
+                        appendMessage(msg.content, 'bot');
+                    } else if (role === 'admin') {
+                        appendMessage('👤 Admin: ' + msg.content, 'bot');
+                    } else {
+                        appendMessage(msg.content, 'user');
+                    }
+
+                    if (msg.formBlockJson) {
+                        try {
+                            const block = JSON.parse(msg.formBlockJson);
+                            if (Array.isArray(block.uiBlocks)) {
+                                renderUiBlocks(block.uiBlocks);
+                            }
+                        } catch (e) {
+                            console.error('Error parsing historical form block:', e);
+                        }
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error loading chat history:', error);
+        }
     }
 
     function renderAdminFormBlock(formBlockJson, formBlockType) {
@@ -83,6 +140,18 @@ document.addEventListener('DOMContentLoaded', () => {
     setContextExpanded(false);
     connectChatHub(sessionId);
 
+    // Restore booking state inputs
+    if (Object.keys(bookingState).length > 0) {
+        updateBookingState(bookingState);
+    }
+
+    // Restore chat panel open/closed state
+    const isChatOpen = sessionStorage.getItem('ai_chat_is_open') === 'true';
+    setOpen(isChatOpen);
+
+    // Restore chat history from server
+    loadChatHistory(sessionId);
+
     toggle.addEventListener('click', () => {
         setZaloOpen(false);
         setOpen(!widget.classList.contains('is-open'));
@@ -91,10 +160,99 @@ document.addEventListener('DOMContentLoaded', () => {
     if (zaloToggle) zaloToggle.addEventListener('click', () => setZaloOpen(zaloPopover ? zaloPopover.hidden : true));
     if (zaloClose) zaloClose.addEventListener('click', () => setZaloOpen(false));
     if (contextToggle) contextToggle.addEventListener('click', () => setContextExpanded(contextForm ? contextForm.hidden : true));
-    if (bookingConsultAction) bookingConsultAction.addEventListener('click', () => {
-        setContextExpanded(true);
-        if (nameInput) nameInput.focus();
-    });
+    if (bookingConsultAction) {
+        bookingConsultAction.addEventListener('click', async (event) => {
+            event.preventDefault();
+            bookingConsultAction.disabled = true;
+            setBusy(true);
+
+            try {
+                const payload = {
+                    sessionId: sessionId,
+                    action: 'start-booking',
+                    state: bookingState
+                };
+                const response = await fetch('/ai/booking-action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(data.message || 'AI booking action request failed.');
+                
+                // Open the chat widget panel
+                setOpen(true);
+                
+                handleActionResponse(data);
+            } catch {
+                appendMessage('Xin lỗi, thao tác đặt phòng đang tạm thời bận. Bạn thử lại sau ít phút nhé.', 'bot');
+            } finally {
+                bookingConsultAction.disabled = false;
+                setBusy(false);
+            }
+        });
+    }
+
+    const quickActionsToggleBar = widget.querySelector('#ai-quick-actions-toggle-bar');
+    const quickActionsContainer = widget.querySelector('#ai-quick-actions-container');
+    const quickActionsToggleIcon = widget.querySelector('#ai-quick-actions-toggle-icon');
+
+    if (quickActionsToggleBar && quickActionsContainer && quickActionsToggleIcon) {
+        const isCollapsed = sessionStorage.getItem('ai_quick_actions_collapsed') === 'true';
+        setQuickActionsCollapsed(isCollapsed);
+
+        quickActionsToggleBar.addEventListener('click', () => {
+            const currentCollapsed = quickActionsContainer.classList.contains('is-collapsed');
+            setQuickActionsCollapsed(!currentCollapsed);
+        });
+    }
+
+    function setQuickActionsCollapsed(collapsed) {
+        if (!quickActionsContainer || !quickActionsToggleIcon) return;
+        quickActionsContainer.classList.toggle('is-collapsed', collapsed);
+        sessionStorage.setItem('ai_quick_actions_collapsed', String(collapsed));
+        if (collapsed) {
+            quickActionsToggleIcon.classList.remove('fa-chevron-up');
+            quickActionsToggleIcon.classList.add('fa-chevron-down');
+            quickActionsContainer.style.display = 'none';
+        } else {
+            quickActionsToggleIcon.classList.remove('fa-chevron-down');
+            quickActionsToggleIcon.classList.add('fa-chevron-up');
+            quickActionsContainer.style.display = '';
+        }
+    }
+
+    const clearButton = widget.querySelector('#ai-chat-clear');
+    if (clearButton) {
+        clearButton.addEventListener('click', async () => {
+            const confirmed = await premiumConfirm('Bạn có chắc chắn muốn làm mới cuộc trò chuyện và bắt đầu phiên tư vấn mới không?', {
+                title: 'Làm mới cuộc trò chuyện',
+                confirmText: 'Làm mới',
+                cancelText: 'Hủy',
+                isDanger: true,
+                type: 'warning'
+            });
+            if (confirmed) {
+                localStorage.removeItem('ai_chat_session_id');
+                localStorage.removeItem('ai_booking_state');
+                sessionStorage.removeItem('ai_chat_is_open');
+                sessionId = getSessionId();
+                bookingState = {};
+                messages.innerHTML = `
+                    <div class="ai-message ai-message-bot">
+                        Chào bạn, mình có thể tư vấn phòng StayEasy Sài Gòn hoặc Đà Lạt. Bạn muốn đi chi nhánh nào, mấy người và thời gian nào?
+                    </div>
+                `;
+                rejoinChatHub(sessionId);
+                if (nameInput) nameInput.value = '';
+                if (guestsInput) guestsInput.value = '1';
+                if (checkInInput) checkInInput.value = '';
+                if (checkOutInput) checkOutInput.value = '';
+                if (branchSelect) branchSelect.value = '';
+                updateContextDateTimeControls();
+            }
+        });
+    }
     if (cancelAction) cancelAction.addEventListener('click', () => renderCancellationPrompt());
     if (modeSelect) modeSelect.addEventListener('change', updateContextDateTimeControls);
 
@@ -125,7 +283,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.message || 'AI chat request failed.');
-            if (data.sessionId) sessionId = data.sessionId;
+            if (data.sessionId && data.sessionId !== sessionId) {
+                sessionId = data.sessionId;
+                localStorage.setItem('ai_chat_session_id', sessionId);
+                rejoinChatHub(sessionId);
+            }
             updateBookingState(data.state);
 
             appendMessage(data.answer || data.message || 'Mình chưa trả lời được lúc này, bạn thử lại giúp mình nhé.', 'bot');
@@ -229,7 +391,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function setOpen(open) {
         widget.classList.toggle('is-open', open);
         toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-        if (open) setTimeout(() => input.focus(), 120);
+        if (open) {
+            sessionStorage.setItem('ai_chat_is_open', 'true');
+            setTimeout(() => input.focus(), 120);
+        } else {
+            sessionStorage.setItem('ai_chat_is_open', 'false');
+        }
     }
 
     function setBusy(busy) {
@@ -247,11 +414,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleActionResponse(data) {
-        if (data.sessionId) sessionId = data.sessionId;
+        if (data.sessionId && data.sessionId !== sessionId) {
+            sessionId = data.sessionId;
+            localStorage.setItem('ai_chat_session_id', sessionId);
+            rejoinChatHub(sessionId);
+        }
         updateBookingState(data.state);
-        if (data.message) appendMessage(data.message, 'bot');
+        const msgText = data.answer || data.message;
+        if (msgText) appendMessage(msgText, 'bot');
         renderUiBlocks(data.uiBlocks || []);
     }
+
 
     function renderUiBlocks(blocks) {
         if (!Array.isArray(blocks)) return;
@@ -264,6 +437,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (block.type === 'bookingForm') renderBookingForm(block.data || {});
             if (block.type === 'paymentQr') renderPaymentQr(block.data || {});
             if (block.type === 'dateSelector') renderDateSelector(block.data || {});
+            if (block.type === 'bookingModeChoice') renderBookingModeChoice(block.data || {});
+            if (block.type === 'branchSelector') renderBranchSelector(block.data || {});
+            if (block.type === 'singleDatePicker') renderSingleDatePicker(block.data || {});
+            if (block.type === 'dateRangePicker') renderDateRangePicker(block.data || {});
         });
     }
 
@@ -273,6 +450,155 @@ document.addEventListener('DOMContentLoaded', () => {
         messages.appendChild(wrapper);
         scrollMessages();
         return wrapper;
+    }
+
+    function renderBookingModeChoice(data) {
+        const wrapper = appendBlock('ai-booking-mode-choice');
+        const title = document.createElement('h5');
+        title.style.margin = '0 0 10px 0';
+        title.style.fontSize = '0.95rem';
+        title.style.fontWeight = 'bold';
+        title.textContent = data.label || 'Chọn hình thức đặt phòng';
+        wrapper.appendChild(title);
+
+        const flows = Array.isArray(data.flows) ? data.flows : [];
+        flows.forEach(flow => {
+            const button = document.createElement('button');
+            button.className = 'ai-action-btn ai-action-primary w-100 mb-2';
+            button.type = 'button';
+            button.dataset.aiAction = 'select-booking-mode';
+            button.dataset.bookingMode = flow.id;
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = flow.name || flow.id;
+            nameSpan.style.fontWeight = 'bold';
+            button.appendChild(nameSpan);
+
+            if (flow.description) {
+                const desc = document.createElement('small');
+                desc.className = 'd-block mt-1';
+                desc.style.fontSize = '0.75rem';
+                desc.style.opacity = '0.85';
+                desc.style.fontWeight = 'normal';
+                desc.textContent = flow.description;
+                button.appendChild(desc);
+            }
+            wrapper.appendChild(button);
+        });
+        scrollMessages();
+    }
+
+    function renderBranchSelector(data) {
+        const wrapper = appendBlock('ai-branch-selector');
+        const title = document.createElement('h5');
+        title.style.margin = '0 0 10px 0';
+        title.style.fontSize = '0.95rem';
+        title.style.fontWeight = 'bold';
+        title.textContent = data.label || 'Chọn chi nhánh';
+        wrapper.appendChild(title);
+
+        const branches = Array.isArray(data.branches) ? data.branches : [];
+        branches.forEach(branch => {
+            const button = document.createElement('button');
+            button.className = 'ai-action-btn ai-action-primary w-100 mb-2';
+            button.type = 'button';
+            button.dataset.aiAction = 'select-branch';
+            button.dataset.branchId = String(branch.id);
+            button.textContent = branch.name;
+            wrapper.appendChild(button);
+        });
+        scrollMessages();
+    }
+
+    function renderSingleDatePicker(data) {
+        const wrapper = appendBlock('ai-single-date-picker');
+        
+        const container = document.createElement('div');
+        container.className = 'ai-booking-form';
+        
+        const label = document.createElement('label');
+        const caption = document.createElement('span');
+        caption.textContent = data.label || 'Chọn ngày đặt phòng';
+        label.appendChild(caption);
+
+        const dateInput = document.createElement('input');
+        dateInput.type = 'date';
+        dateInput.name = 'checkInDate';
+        
+        const todayStr = new Date().toISOString().split('T')[0];
+        dateInput.min = todayStr;
+        dateInput.value = todayStr;
+        label.appendChild(dateInput);
+        container.appendChild(label);
+
+        const button = document.createElement('button');
+        button.className = 'ai-booking-submit';
+        button.type = 'button';
+        button.dataset.aiAction = 'confirm-dates';
+        button.textContent = 'Xác nhận ngày';
+        container.appendChild(button);
+
+        wrapper.appendChild(container);
+        scrollMessages();
+    }
+
+    function renderDateRangePicker(data) {
+        const wrapper = appendBlock('ai-date-range-picker');
+        
+        const container = document.createElement('div');
+        container.className = 'ai-booking-form';
+        
+        const ciLabel = document.createElement('label');
+        const ciCaption = document.createElement('span');
+        ciCaption.textContent = 'Ngày nhận phòng';
+        ciLabel.appendChild(ciCaption);
+
+        const ciInput = document.createElement('input');
+        ciInput.type = 'date';
+        ciInput.name = 'checkInDate';
+        const todayStr = new Date().toISOString().split('T')[0];
+        ciInput.min = todayStr;
+        ciInput.value = todayStr;
+        ciLabel.appendChild(ciInput);
+        container.appendChild(ciLabel);
+
+        const coLabel = document.createElement('label');
+        const coCaption = document.createElement('span');
+        coCaption.textContent = 'Ngày trả phòng';
+        coLabel.appendChild(coCaption);
+
+        const coInput = document.createElement('input');
+        coInput.type = 'date';
+        coInput.name = 'checkOutDate';
+        
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        coInput.min = tomorrowStr;
+        coInput.value = tomorrowStr;
+        coLabel.appendChild(coInput);
+        container.appendChild(coLabel);
+
+        ciInput.addEventListener('change', () => {
+            if (ciInput.value) {
+                const nextDay = new Date(ciInput.value);
+                nextDay.setDate(nextDay.getDate() + 1);
+                coInput.min = nextDay.toISOString().split('T')[0];
+                if (coInput.value <= ciInput.value) {
+                    coInput.value = coInput.min;
+                }
+            }
+        });
+
+        const button = document.createElement('button');
+        button.className = 'ai-booking-submit';
+        button.type = 'button';
+        button.dataset.aiAction = 'confirm-dates';
+        button.textContent = 'Xác nhận ngày';
+        container.appendChild(button);
+
+        wrapper.appendChild(container);
+        scrollMessages();
     }
 
     function renderRoomCards(data) {
@@ -310,6 +636,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const detailsLink = document.createElement('a');
                 detailsLink.className = 'ai-chip-btn';
                 detailsLink.href = detailsUrl;
+                detailsLink.target = '_blank';
+                detailsLink.rel = 'noopener';
                 detailsLink.textContent = 'Xem chi tiết';
                 actions.appendChild(detailsLink);
             }
@@ -586,7 +914,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!zaloList) return;
         zaloList.textContent = 'Đang tải danh sách chi nhánh...';
         try {
-            const response = await fetch('/admin/branches/public-contacts');
+            const response = await fetch('/chinhan/hethong/branches/public-contacts');
             const branches = await response.json().catch(() => []);
             if (!response.ok) throw new Error('Không tải được danh sách Zalo.');
             renderZaloContacts(Array.isArray(branches) ? branches : []);
@@ -729,7 +1057,7 @@ document.addEventListener('DOMContentLoaded', () => {
         wrapper.textContent = 'Đang tải danh sách chi nhánh...';
 
         try {
-            const response = await fetch('/admin/branches/public-contacts');
+            const response = await fetch('/chinhan/hethong/branches/public-contacts');
             const branches = await response.json().catch(() => []);
             if (!response.ok) throw new Error('Không tải được danh sách chi nhánh.');
             if (!Array.isArray(branches) || branches.length === 0) {
@@ -969,18 +1297,43 @@ document.addEventListener('DOMContentLoaded', () => {
         state.bookingMode = state.bookingMode && state.bookingMode !== 'unknown' ? state.bookingMode : getBookingMode();
         state.guestCount = state.guestCount || getGuestCount();
 
-        if (action === 'confirm-dates' && source.dataset.dsMode === 'dateSelector') {
-            const selectorBlock = source.closest('.ai-date-selector');
-            if (selectorBlock) {
-                const modeInput = selectorBlock.querySelector('input[name="ds-booking-mode"]:checked');
-                if (modeInput) state.bookingMode = modeInput.value;
-                const checkInVal = getDateOnlyFrom(selectorBlock.querySelector('.ai-ds-checkin'));
-                if (checkInVal) {
-                    state.checkInDate = checkInVal;
-                    state.hourlyDate = checkInVal;
+        if (source && source.dataset) {
+            if (source.dataset.bookingMode) state.bookingMode = source.dataset.bookingMode;
+            if (source.dataset.branchId) state.branchId = toSafeNumber(source.dataset.branchId);
+            if (source.dataset.checkInDate) state.checkInDate = source.dataset.checkInDate;
+            if (source.dataset.checkOutDate) state.checkOutDate = source.dataset.checkOutDate;
+            if (source.dataset.hourlyDate) state.hourlyDate = source.dataset.hourlyDate;
+        }
+
+        if (action === 'confirm-dates') {
+            const dateBlock = source.closest('.ai-single-date-picker, .ai-date-range-picker, .ai-date-selector');
+            if (dateBlock) {
+                if (dateBlock.classList.contains('ai-date-selector')) {
+                    const modeInput = dateBlock.querySelector('input[name="ds-booking-mode"]:checked');
+                    if (modeInput) state.bookingMode = modeInput.value;
+                    const checkInVal = getDateOnlyFrom(dateBlock.querySelector('.ai-ds-checkin'));
+                    if (checkInVal) {
+                        state.checkInDate = checkInVal;
+                        state.hourlyDate = checkInVal;
+                    }
+                    const checkOutVal = getDateOnlyFrom(dateBlock.querySelector('.ai-ds-checkout'));
+                    if (checkOutVal) state.checkOutDate = checkOutVal;
                 }
-                const checkOutVal = getDateOnlyFrom(selectorBlock.querySelector('.ai-ds-checkout'));
-                if (checkOutVal) state.checkOutDate = checkOutVal;
+                else if (dateBlock.classList.contains('ai-single-date-picker')) {
+                    state.bookingMode = 'hourly';
+                    const checkInVal = getDateOnlyFrom(dateBlock.querySelector('input[name="checkInDate"]'));
+                    if (checkInVal) {
+                        state.checkInDate = checkInVal;
+                        state.hourlyDate = checkInVal;
+                    }
+                }
+                else if (dateBlock.classList.contains('ai-date-range-picker')) {
+                    state.bookingMode = 'daily';
+                    const checkInVal = getDateOnlyFrom(dateBlock.querySelector('input[name="checkInDate"]'));
+                    if (checkInVal) state.checkInDate = checkInVal;
+                    const checkOutVal = getDateOnlyFrom(dateBlock.querySelector('input[name="checkOutDate"]'));
+                    if (checkOutVal) state.checkOutDate = checkOutVal;
+                }
             }
         } else {
             if (state.bookingMode === 'daily') {
@@ -1045,10 +1398,21 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateBookingState(state) {
         if (!state || typeof state !== 'object') return;
         bookingState = state;
-        if (state.customerName && nameInput && !nameInput.value) nameInput.value = state.customerName;
+        localStorage.setItem('ai_booking_state', JSON.stringify(bookingState));
+        if (state.customerName && nameInput) nameInput.value = state.customerName;
         if (state.branchId && branchSelect) branchSelect.value = String(state.branchId);
         if (state.bookingMode && modeSelect && (state.bookingMode === 'hourly' || state.bookingMode === 'daily')) modeSelect.value = state.bookingMode;
         if (state.guestCount && guestsInput) guestsInput.value = state.guestCount;
+
+        // Also populate dates if present
+        if (checkInInput) {
+            const dateVal = state.bookingMode === 'daily' ? state.checkInDate : state.hourlyDate;
+            if (dateVal) checkInInput.value = dateVal;
+        }
+        if (checkOutInput && state.bookingMode === 'daily' && state.checkOutDate) {
+            checkOutInput.value = state.checkOutDate;
+        }
+        updateContextDateTimeControls();
     }
 
     function getCustomerName() {

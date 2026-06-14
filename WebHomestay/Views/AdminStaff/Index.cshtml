@@ -46,6 +46,10 @@
                         <i class="fas fa-lock"></i><span>Ma trận phân quyền</span>
                     </a>
                 }
+                @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.view"))
+                {
+                    <a asp-action="Trash" class="btn-premium-outline"><i class="fas fa-trash-alt"></i><span>Thùng rác</span></a>
+                }
             </div>
         </header>
 
@@ -123,7 +127,7 @@
                         }
                         @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.delete"))
                         {
-                            <form asp-action="Delete" asp-route-id="@item.Id" method="post" onsubmit="return confirm('Xóa nhân viên này?')">
+                            <form asp-action="SoftDelete" asp-route-id="@item.Id" method="post" data-premium-confirm="Bạn có chắc chắn muốn xóa nhân sự '@item.FullName' khỏi hệ thống không?" data-premium-title="Xóa nhân sự" data-premium-ok="Xóa nhân viên" data-premium-danger="true">
                                 <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent">
                                     <i class="fas fa-trash"></i>
                                 </button>
@@ -195,7 +199,7 @@
                                         }
                                         @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.delete"))
                                         {
-                                            <form asp-action="Delete" asp-route-id="@item.Id" method="post" onsubmit="return confirm('Xóa nhân viên này?')" class="d-inline">
+                                            <form asp-action="SoftDelete" asp-route-id="@item.Id" method="post" data-premium-confirm="Bạn có chắc chắn muốn xóa nhân sự '@item.FullName' khỏi hệ thống không?" data-premium-title="Xóa nhân sự" data-premium-ok="Xóa nhân viên" data-premium-danger="true" class="d-inline">
                                                 <button type="submit" class="btn-table-action is-danger border-0 bg-transparent" title="Xóa">
                                                     <i class="fas fa-trash"></i>
                                                 </button>

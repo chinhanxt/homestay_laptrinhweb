@@ -24,7 +24,7 @@ namespace WebHomestay.Controllers
         [AdminAuthorize(Permission = "staff.view")]
         public async Task<IActionResult> Index()
         {
-            var staff = await _context.AdminUsers.Include(u => u.Branch).ToListAsync();
+            var staff = await _context.AdminUsers.Include(u => u.Branch).Where(u => !u.IsDeleted).ToListAsync();
             ViewBag.Branches = await _context.Branches.OrderBy(b => b.Name).ToListAsync();
             return View(staff);
         }
@@ -137,6 +137,69 @@ namespace WebHomestay.Controllers
 
             await LogAction("Xóa nhân sự", $"Tài khoản: {user.Username}");
             return RedirectToAction(nameof(Index));
+        }
+
+        [AdminAuthorize(Permission = "staff.delete")]
+        [HttpPost("soft-delete/{id}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SoftDelete(int id)
+        {
+            var user = await _context.AdminUsers.FindAsync(id);
+            if (user == null) return NotFound();
+            if (user.Username == "admin") return BadRequest("Không thể xóa tài khoản hệ thống.");
+
+            user.IsDeleted = true;
+            user.DeletedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            await LogAction("Xóa nhân sự", $"Tài khoản: {user.Username}");
+            TempData["SuccessMessage"] = "Nhân sự đã được chuyển vào thùng rác.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        [AdminAuthorize(Permission = "staff.view")]
+        [HttpGet("trash")]
+        public async Task<IActionResult> Trash()
+        {
+            var trash = await _context.AdminUsers
+                .Include(u => u.Branch)
+                .Where(u => u.IsDeleted)
+                .OrderByDescending(u => u.DeletedAt)
+                .ToListAsync();
+            return View(trash);
+        }
+
+        [AdminAuthorize(Permission = "staff.edit")]
+        [HttpPost("restore/{id}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Restore(int id)
+        {
+            var user = await _context.AdminUsers.FindAsync(id);
+            if (user == null) return NotFound();
+
+            user.IsDeleted = false;
+            user.DeletedAt = null;
+            await _context.SaveChangesAsync();
+
+            await LogAction("Khôi phục nhân sự", $"Tài khoản: {user.Username}");
+            TempData["SuccessMessage"] = "Nhân sự đã được khôi phục.";
+            return RedirectToAction(nameof(Trash));
+        }
+
+        [AdminAuthorize(Permission = "staff.delete")]
+        [HttpPost("permanent-delete/{id}")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PermanentDelete(int id)
+        {
+            var user = await _context.AdminUsers.FindAsync(id);
+            if (user == null) return NotFound();
+
+            _context.AdminUsers.Remove(user);
+            await _context.SaveChangesAsync();
+
+            await LogAction("Xóa vĩnh viễn nhân sự", $"Tài khoản: {user.Username}");
+            TempData["SuccessMessage"] = "Nhân sự đã bị xóa vĩnh viễn.";
+            return RedirectToAction(nameof(Trash));
         }
 
         [AdminAuthorize(Permission = "staff.edit")]

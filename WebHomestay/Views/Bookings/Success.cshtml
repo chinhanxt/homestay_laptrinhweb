@@ -86,7 +86,7 @@
                                     <div class="small text-uppercase text-muted mb-2" style="letter-spacing: 0.1em;">Thời gian giữ chỗ còn lại</div>
                                     <div id="countdown" class="display-4 fw-bold mb-3" style="font-family: var(--luxury-font-heading); color: var(--luxury-primary);">@paymentQr.CountdownMinutes.ToString("00"):00</div>
                                     
-                                    <form asp-action="Cancel" method="post" onsubmit="return confirm('Bạn có chắc chắn muốn hủy đơn hàng này không?')">
+                                    <form asp-action="Cancel" method="post" data-premium-confirm="Bạn có chắc chắn muốn hủy đơn hàng này không?" data-premium-title="Hủy đơn hàng" data-premium-ok="Hủy đơn" data-premium-danger="true">
                                         <input type="hidden" name="id" value="@Model.Id" />
                                         <button type="submit" class="btn btn-link text-danger text-decoration-none small text-uppercase fw-bold" style="letter-spacing: 0.05em; font-size: 0.7rem;">
                                             <i class="fas fa-times-circle me-1"></i> Hủy đơn hàng này

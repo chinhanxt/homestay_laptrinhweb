@@ -1,344 +1,546 @@
+@using WebHomestay.Services
+@inject ISettingService SettingService
 @{
     Layout = "_Layout";
-    ViewData["Title"] = "AI Brain Center";
+    ViewData["Title"] = "Trung tâm Bộ não AI";
+    var aiRetentionDays = await SettingService.GetIntAsync("BookingTrashRetentionDays", 7);
 }
 
 @section Styles {
     <link rel="stylesheet" href="~/css/admin-ai-brain-center.css" asp-append-version="true" />
+    <style>
+        .grounding-grid.showing-trash { display: none; }
+        #brain-trash-panel { display: none; }
+        #brain-trash-panel.is-open { display: block; }
+        #brain-trash-toggle.is-active { background: #dc2626; color: #fff; border-color: #dc2626; }
+        .trash-panel-header { padding: 20px 0 12px; }
+        .trash-panel-header h4 { font-size: 1.1rem; font-weight: 700; }
+        .trash-panel-header p { font-size: 0.85rem; color: #6b7280; margin: 0; }
+        .trash-list { display: flex; flex-direction: column; gap: 8px; }
+        .trash-item { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 1px solid #f3f4f6; border-radius: 12px; padding: 14px 18px; transition: all 0.2s; }
+        .trash-item:hover { border-color: #e5e7eb; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .trash-item-body { flex: 1; min-width: 0; }
+        .trash-item-type { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; font-weight: 600; margin-bottom: 2px; }
+        .trash-item-title { font-weight: 600; font-size: 0.9rem; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .trash-item-subtitle { font-size: 0.8rem; color: #6b7280; }
+        .trash-item-date { font-size: 0.75rem; color: #9ca3af; margin-top: 2px; }
+        .trash-item-actions { display: flex; gap: 6px; flex-shrink: 0; margin-left: 12px; }
+        .trash-item-actions .btn { font-size: 0.75rem; padding: 4px 12px; }
+    </style>
 }
 
-<div class="brain-page">
-    <section class="brain-section">
-        <ul class="nav nav-pills brain-tabs" id="brainIdeaTabs" role="tablist">
-            <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-overview" type="button">Tổng quan</button></li>
-            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-knowledge-graph" type="button">Tri thức & Graph</button></li>
-            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-response-form" type="button" onclick="loadFinalSynthesizerConfig(); loadBookingFormConfig();">Trả lời & Form</button></li>
-            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-test-trace" type="button" onclick="loadBrainConversationTraces()">Test & Trace</button></li>
-            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-public-booking" type="button" onclick="loadPublicBookingConfig()">Public Booking Config</button></li>
-        </ul>
-        <div class="tab-content brain-tab-content">
-            <div class="tab-pane fade show active" id="tab-overview">
-                <div class="brain-manager-toolbar"><div><h3>AI Booking Flow</h3><p>Luồng AI bán phòng gồm 6 bước. LLM chỉ tổng hợp câu trả lời; dữ liệu phòng, giá, slot và booking lấy từ hệ thống thật.</p></div></div>
-                <div class="compact-agent-grid">
-                    <article><strong>1. Input Context</strong><span>Tên, chi nhánh, kiểu thuê, số người, tin nhắn.</span></article><article><strong>2. Intent & Memory</strong><span>Hiểu nhu cầu và giữ state trong session.</span></article><article><strong>3. Live Availability</strong><span>Đọc phòng, giá, slot/ngày trống từ DB.</span></article><article><strong>4. Knowledge RAG</strong><span>Lấy chính sách, nội quy, sales script.</span></article><article><strong>5. Graph Reasoning</strong><span>Suy luận quan hệ phòng, tiện nghi, persona.</span></article><article><strong>6. Final Synthesizer</strong><span>Viết câu trả lời và trả UI blocks.</span></article>
-                </div>
-            </div>
-            <div class="tab-pane fade" id="tab-knowledge-graph"><div class="compact-two-stack"><section class="compact-panel" id="compact-knowledge-panel">
-                <div class="brain-manager-toolbar"><div><h3>Ngân hàng kiến thức AI</h3><p>Đây là nơi nạp tri thức mềm cho RAG Agent: sales script, chính sách, nội quy, hướng dẫn và cách tư vấn.</p></div><div class="d-flex gap-2 flex-wrap"><button class="btn btn-outline-primary rounded-pill fw-bold" onclick="loadBrainKnowledge()"><i class="fas fa-rotate me-2"></i>Tải lại</button><button class="btn btn-primary rounded-pill fw-bold" onclick="openKnowledgeEditor()"><i class="fas fa-plus me-2"></i>Thêm Knowledge</button></div></div>
-                <div class="brain-bank-layout"><div class="brain-bank-sidebar"><div class="d-flex justify-content-between align-items-center mb-3"><strong>Scopes</strong><button class="btn btn-sm btn-light border" onclick="openScopeEditor()"><i class="fas fa-plus"></i></button></div><div id="brain-scope-list" class="brain-bank-list"></div></div><div class="brain-bank-main"><div id="brain-knowledge-list" class="brain-card-list"><div class="empty-state">Bấm “Tải lại” để xem ngân hàng kiến thức.</div></div></div></div>
-            </section><section class="compact-panel" id="compact-graph-panel">
-                <div class="brain-manager-toolbar"><div><h3>Graph quan hệ AI</h3><p>Graph mô tả quan hệ giữa chi nhánh, phòng, persona, chính sách và tình huống để AI suy luận có cấu trúc.</p></div><div class="d-flex gap-2 flex-wrap"><div class="btn-group rounded-pill overflow-hidden" role="group"><button class="btn btn-outline-dark fw-bold" onclick="setGraphViewMode('cards')"><i class="fas fa-table-cells-large me-2"></i>Card</button><button class="btn btn-outline-dark fw-bold" onclick="setGraphViewMode('network')"><i class="fas fa-circle-nodes me-2"></i>Node View</button></div><button class="btn btn-outline-primary rounded-pill fw-bold" onclick="loadBrainGraph()"><i class="fas fa-rotate me-2"></i>Tải lại</button><button class="btn btn-primary rounded-pill fw-bold" onclick="openGraphNodeEditor()"><i class="fas fa-circle-plus me-2"></i>Thêm Node</button><button class="btn btn-dark rounded-pill fw-bold" onclick="openGraphEdgeEditor()"><i class="fas fa-link me-2"></i>Thêm Edge</button></div></div>
-                <div id="graph-card-mode" class="graph-manager-grid"><div><h4>Nodes</h4><div id="brain-graph-nodes" class="brain-card-list"></div></div><div><h4>Edges</h4><div id="brain-graph-edges" class="brain-card-list"></div></div></div><div id="graph-network-mode" class="graph-network-mode" style="display:none;"><svg id="brain-graph-network" viewBox="0 0 1200 620" preserveAspectRatio="xMidYMid meet"></svg></div>
-            </section></div></div>
-            <div class="tab-pane fade" id="tab-response-form"><div class="final-synth-grid">
-                            <div class="final-config-card">
-                                <div class="agent-test-info mb-3">
-                                    <div class="agent-test-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
-                                    <div>
-                                        <h3>Final Response Synthesizer</h3>
-                                        <p>Agent này phụ trách phong cách trả lời cuối cùng cho khách và quyết định có hiển thị form thu thập thông tin hay không.</p>
-                                        <div class="agent-function-note">
-                                            <span>Chức năng: nhận persona, live snapshot, knowledge, graph, guard và viết câu trả lời cuối cùng.</span>
-                                            <span>Cấu hình ở đây sẽ được đưa vào system prompt, không cần hard-code lại trong code.</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <label class="form-label fw-bold">Phong cách trả lời tự do</label>
-                                <textarea id="final-style-config" class="form-control final-style-text" rows="5" placeholder="VD: Trả lời thân thiện, ngắn gọn, như lễ tân chuyên nghiệp..."></textarea>
-                                <div class="accordion mt-4" id="finalSystemPromptAccordion">
-                                    <div class="accordion-item border-0 rounded-4 overflow-hidden">
-                                        <h2 class="accordion-header">
-                                            <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#final-system-prompts">
-                                                System Prompts nâng cao
-                                            </button>
-                                        </h2>
-                                        <div id="final-system-prompts" class="accordion-collapse collapse" data-bs-parent="#finalSystemPromptAccordion">
-                                            <div class="accordion-body p-3">
-                                                <div class="final-prompt-grid">
-                                                    <label>Vai trò AI<textarea id="final-base-prompt" class="form-control" rows="4"></textarea></label>
-                                                    <label>Ngôn ngữ & giọng nói<textarea id="final-language-rule" class="form-control" rows="3"></textarea></label>
-                                                    <label>Chống bịa dữ liệu<textarea id="final-data-truth-rule" class="form-control" rows="3"></textarea></label>
-                                                    <label>Hỏi thông tin thiếu<textarea id="final-missing-info-rule" class="form-control" rows="3"></textarea></label>
-                                                    <label>Quy tắc chốt phòng<textarea id="final-booking-rule" class="form-control" rows="3"></textarea></label>
-                                                    <label>Quy tắc form<textarea id="final-form-rule" class="form-control" rows="4"></textarea></label>
-                                                    <label>QR/thanh toán<textarea id="final-payment-rule" class="form-control" rows="3"></textarea></label>
-                                                    <label>Ghi nhớ hội thoại<textarea id="final-memory-rule" class="form-control" rows="3"></textarea></label>
-                                                    <label>Cách đọc context agent<textarea id="final-context-format-rule" class="form-control" rows="3"></textarea></label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <button class="btn btn-primary rounded-pill fw-bold mt-3" onclick="saveFinalSynthesizerConfig()"><i class="fas fa-save me-2"></i>Lưu cấu hình</button>
-                            </div>
+<div class="ai-studio-page">
+    <section class="workspace-card ai-tabs-shell">
+        <div class="ai-tabs-nav nav nav-pills" id="admin-ai-tabs" role="tablist">
+            <button class="nav-link active" id="tab-overview-trigger" data-bs-toggle="pill" data-bs-target="#tab-overview" type="button" role="tab" aria-controls="tab-overview" aria-selected="true">
+                Tổng quan & Briefing
+            </button>
+            <button class="nav-link" id="tab-grounding-trigger" data-bs-toggle="pill" data-bs-target="#tab-grounding" type="button" role="tab" aria-controls="tab-grounding" aria-selected="false">
+                Tri thức & Graph
+            </button>
+            <button class="nav-link" id="tab-studio-trigger" data-bs-toggle="pill" data-bs-target="#tab-studio" type="button" role="tab" aria-controls="tab-studio" aria-selected="false">
+                Trả lời & Form
+            </button>
+        </div>
 
-                            <div class="final-designer-card">
-                                <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
-                                    <div>
-                                        <h3 class="fw-800 mb-1">Booking Form Designer</h3>
-                                        <p class="text-muted mb-0">Form này chỉ hiện sau khi khách đã chọn phòng và timeline.</p>
-                                    </div>
-                                    <div class="d-flex gap-2 flex-wrap justify-content-end">
-                                        <button class="btn btn-outline-primary btn-sm rounded-pill fw-bold" onclick="openAddBookingFormFieldModal()"><i class="fas fa-plus me-1"></i>Thêm trường</button>
-                                        <button class="btn btn-outline-success btn-sm rounded-pill fw-bold" onclick="saveBookingFormConfig()"><i class="fas fa-save me-1"></i>Lưu Booking Form</button>
-                                        <button class="btn btn-outline-danger btn-sm rounded-pill" onclick="clearBookingFormDesigner()">Xóa form</button>
-                                    </div>
-                                </div>
-                                <div class="designer-layout">
-                                    <div class="booking-field-palette">
-                                        <button draggable="true" data-booking-field="customerName">Tên khách</button>
-                                        <button draggable="true" data-booking-field="customerPhone">Số điện thoại</button>
-                                        <button draggable="true" data-booking-field="customerEmail">Email</button>
-                                        <button draggable="true" data-booking-field="guestCount">Số khách</button>
-                                        <button draggable="true" data-booking-field="idCardFront">CCCD mặt trước</button>
-                                        <button draggable="true" data-booking-field="idCardBack">CCCD mặt sau</button>
-                                        <button draggable="true" data-booking-field="customerNote">Ghi chú</button>
-                                    </div>
-                                    <div id="booking-form-dropzone" class="form-dropzone">
-                                        <div class="empty-state">Kéo trường vào đây để tạo booking form preview.</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="final-preview-card">
-                                <h3 class="fw-800 mb-3">Chatbot Preview</h3>
-                                <div class="chatbot-preview-window">
-                                    <div class="preview-bubble ai">Xin chào, mình có thể tư vấn phòng phù hợp cho bạn. Bạn cho mình thêm vài thông tin nhé.</div>
-                                    <div id="booking-chat-form-preview" class="chat-form-preview"></div>
-                                </div>
-                            </div>
-                        </div>
+        <div class="tab-content ai-tabs-content">
+            <section class="tab-pane fade show active workspace-tab" id="tab-overview" role="tabpanel" aria-labelledby="tab-overview-trigger">
+                <div class="workspace-header">
+                    <div>
+                        <p class="ai-eyebrow">Tổng quan AI</p>
+                        <h2>Trung tâm Điều khiển Bộ não AI</h2>
+                        <p class="workspace-copy">
+                            Giám sát tình hình vận hành thông qua trợ lý AI và đồng bộ hóa tri thức ngữ nghĩa thời gian thực.
+                        </p>
                     </div>
-            <div class="tab-pane fade" id="tab-public-booking">
-                <div class="final-synth-grid">
-                    <div class="final-config-card">
-                        <div class="agent-test-info mb-3">
-                            <div class="agent-test-icon"><i class="fas fa-comments"></i></div>
+                </div>
+
+                <div class="overview-bento-grid">
+                    <!-- Daily Briefing Card -->
+                    <div class="bento-card briefing-card">
+                        <div class="bento-card-header">
+                            <i class="fas fa-bullseye card-icon"></i>
+                            <h3>Bản tin Vận hành Hôm nay</h3>
+                        </div>
+                        <div class="bento-card-body d-flex flex-column justify-content-between h-100">
                             <div>
-                                <h3>Public Booking Config</h3>
-                                <p>Cấu hình cho AI Public Booking mode. Khi khách chat ở /ai/chat, AI sẽ dùng các thiết lập này để quyết định hành động.</p>
-                            </div>
-                        </div>
-
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">Chế độ chủ động</label>
-                            <div class="d-flex gap-4">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="proactiveMode" id="mode-balanced" value="balanced" checked>
-                                    <label class="form-check-label" for="mode-balanced">Cân bằng (linh hoạt)</label>
+                                <div id="ai-briefing-loading" class="ai-loading-placeholder">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                    <p class="mt-2 text-muted">Trợ lý AI đang tổng hợp báo cáo vận hành...</p>
                                 </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="proactiveMode" id="mode-proactive" value="proactive">
-                                    <label class="form-check-label" for="mode-proactive">Chủ động (luôn gợi ý)</label>
+                                <div id="ai-briefing-content" class="ai-briefing-text" style="display: none;"></div>
+                            </div>
+                            <div id="ai-quick-actions" class="mt-4 d-flex flex-column gap-2 w-100"></div>
+                        </div>
+                    </div>
+
+                    <!-- Vector Sync Card -->
+                    <div class="bento-card sync-card shadow-lg border border-primary-subtle">
+                        <div class="bento-card-header d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fas fa-project-diagram card-icon text-primary animate-pulse"></i>
+                                <h3 class="mb-0">Cơ sở dữ liệu Vector &amp; RAG Ngữ nghĩa</h3>
+                            </div>
+                            <span class="badge bg-success text-white px-2 py-1 rounded-pill small" id="rag-status-badge" style="font-size:0.75em;">
+                                <span class="spinner-grow spinner-grow-sm me-1" role="status" style="width: 8px; height: 8px;"></span>Hoạt động
+                            </span>
+                        </div>
+                        <div class="bento-card-body">
+                            <p class="text-muted small mb-3">
+                                Mã hóa các tri thức chính sách và đặc tính phòng thành các vector embedding 1536 chiều. Giúp chatbot tìm kiếm thông tin chính xác theo ý nghĩa câu hỏi của khách thay vì so khớp từ khóa thô.
+                            </p>
+
+                            <!-- Vector Stats Grid -->
+                            <div class="vector-stats-grid mb-3">
+                                <div class="vector-stat-item">
+                                    <span class="v-stat-label">Số lượng Vector:</span>
+                                    <strong class="v-stat-val text-primary"><span id="vector-db-count">--</span> / <span id="vector-db-total">--</span></strong>
                                 </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="proactiveMode" id="mode-conservative" value="conservative">
-                                    <label class="form-check-label" for="mode-conservative">Bảo thủ (chỉ khi KH yêu cầu)</label>
+                                <div class="vector-stat-item">
+                                    <span class="v-stat-label">Kích thước vector:</span>
+                                    <strong class="v-stat-val">1536 chiều</strong>
+                                </div>
+                                <div class="vector-stat-item">
+                                    <span class="v-stat-label">Chỉ mục &amp; Tìm kiếm:</span>
+                                    <strong class="v-stat-val">Cosine / HNSW</strong>
+                                </div>
+                                <div class="vector-stat-item text-md-end">
+                                    <span class="v-stat-label">Mô hình nhúng:</span>
+                                    <strong class="v-stat-val text-muted" style="font-size:0.85em;">OpenAI text-3</strong>
+                                </div>
+                            </div>
+
+                            <!-- RAG Pipeline Visualization -->
+                            <div class="rag-pipeline-viz my-4 p-3 rounded-4 bg-light border border-light-subtle">
+                                <h4 class="rag-sub-title text-center mb-3 fw-bold" style="font-size:0.95em; color:var(--ai-ink);"><i class="fas fa-exchange-alt me-1 text-primary animate-pulse"></i>Sơ đồ Quy trình xử lý RAG</h4>
+                                <div class="pipeline-flow d-flex justify-content-between align-items-center">
+                                    <div class="pipeline-step text-center flex-fill" data-bs-toggle="tooltip" title="Nạp nội dung tri thức của homestay từ database.">
+                                        <div class="step-icon mx-auto"><i class="fas fa-file-alt text-primary"></i></div>
+                                        <div class="step-label mt-1 fw-bold">1. Dữ liệu thô</div>
+                                        <div class="step-value text-muted small" style="font-size:0.75em;">DB Homestay</div>
+                                    </div>
+                                    <div class="pipeline-arrow px-1"><i class="fas fa-chevron-right text-muted small-arrow-animation"></i></div>
+                                    <div class="pipeline-step text-center flex-fill" data-bs-toggle="tooltip" title="Tách nhỏ nội dung thành các mảnh logic độc lập để tối ưu tìm kiếm.">
+                                        <div class="step-icon mx-auto"><i class="fas fa-scissors text-warning"></i></div>
+                                        <div class="step-label mt-1 fw-bold">2. Phân mảnh</div>
+                                        <div class="step-value text-muted small" style="font-size:0.75em;">Chunking</div>
+                                    </div>
+                                    <div class="pipeline-arrow px-1"><i class="fas fa-chevron-right text-muted small-arrow-animation"></i></div>
+                                    <div class="pipeline-step text-center flex-fill" data-bs-toggle="tooltip" title="Dùng AI biến đổi mảnh văn bản thành chuỗi vector 1536 chiều.">
+                                        <div class="step-icon mx-auto"><i class="fas fa-microchip text-success"></i></div>
+                                        <div class="step-label mt-1 fw-bold">3. Nhúng Vector</div>
+                                        <div class="step-value text-muted small" style="font-size:0.75em;">Embedding</div>
+                                    </div>
+                                    <div class="pipeline-arrow px-1"><i class="fas fa-chevron-right text-muted small-arrow-animation"></i></div>
+                                    <div class="pipeline-step text-center flex-fill" data-bs-toggle="tooltip" title="Lưu vào PostgreSQL pgvector để tìm kiếm nhanh bằng khoảng cách Cosine.">
+                                        <div class="step-icon mx-auto"><i class="fas fa-database text-info"></i></div>
+                                        <div class="step-label mt-1 fw-bold">4. pgvector</div>
+                                        <div class="step-value text-muted small" style="font-size:0.75em;">HNSW Index</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Progress Bar and Steps -->
+                            <div class="vector-progress-wrapper mb-3">
+                                <div class="d-flex justify-content-between mb-1 small fw-bold">
+                                    <span id="sync-progress-label" class="text-muted">Đồng bộ hoàn tất</span>
+                                    <span id="sync-percentage" class="text-success">100%</span>
+                                </div>
+                                <div class="progress mb-3" style="height: 10px; border-radius: 999px; background: rgba(0, 0, 0, 0.06); overflow: hidden;">
+                                    <div id="sync-progress-bar" class="progress-bar bg-success" role="progressbar" style="width: 100%; transition: width 0.4s ease, background-color 0.4s ease;"></div>
+                                </div>
+                                
+                                <!-- Sync steps checklist -->
+                                <div id="sync-steps-checklist" class="sync-steps-checklist small d-none p-2 rounded-3 bg-light border border-light-subtle">
+                                    <div class="sync-step-item d-flex align-items-center gap-2 mb-2 text-muted" id="sync-step-1">
+                                        <i class="fas fa-circle-notch fa-spin step-icon-status"></i>
+                                        <span class="step-text">Đọc dữ liệu tri thức &amp; thông tin phòng</span>
+                                    </div>
+                                    <div class="sync-step-item d-flex align-items-center gap-2 mb-2 text-muted" id="sync-step-2">
+                                        <i class="far fa-circle step-icon-status"></i>
+                                        <span class="step-text">Mã hóa văn bản thành Vector (OpenAI)</span>
+                                    </div>
+                                    <div class="sync-step-item d-flex align-items-center gap-2 mb-2 text-muted" id="sync-step-3">
+                                        <i class="far fa-circle step-icon-status"></i>
+                                        <span class="step-text">Cập nhật cơ sở dữ liệu pgvector</span>
+                                    </div>
+                                    <div class="sync-step-item d-flex align-items-center gap-2 text-muted" id="sync-step-4">
+                                        <i class="far fa-circle step-icon-status"></i>
+                                        <span class="step-text">Xây dựng chỉ mục tìm kiếm HNSW</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-3">
+                                <button id="btn-reindex-embeddings" class="btn btn-primary rounded-pill w-100 fw-bold py-2 shadow-sm transition-all btn-sync-vector">
+                                    <i class="fas fa-sync me-2"></i>Đồng bộ hóa Vector DB
+                                </button>
+                            </div>
+                            <div id="sync-status-message" class="mt-2 small text-muted text-center fw-bold"></div>
+                            
+                            <!-- RAG Semantic Query Tester -->
+                            <div class="rag-tester-section mt-4 pt-4 border-top">
+                                <h4 class="rag-sub-title mb-2 text-dark fw-bold" style="font-size:1.05em;"><i class="fas fa-search-dollar me-2 text-success"></i>Trình thử nghiệm Truy xuất Ngữ nghĩa (RAG)</h4>
+                                <p class="text-muted small mb-3">
+                                    Nhập câu hỏi bất kỳ để kiểm tra xem thuật toán RAG sẽ truy xuất các điểm tri thức nào và tính toán phần trăm (%) độ trùng khớp ngữ nghĩa (Cosine Similarity).
+                                </p>
+                                <div class="input-group mb-3 rag-input-group shadow-sm rounded-pill overflow-hidden border">
+                                    <input type="text" id="rag-test-query" class="form-control border-0 ps-3 py-2" placeholder="Ví dụ: 'giá phòng đơn', 'chính sách hủy phòng'..." style="box-shadow:none;" />
+                                    <button id="btn-rag-test" class="btn btn-dark px-4 fw-bold border-0">
+                                        <i class="fas fa-bolt me-1 text-warning"></i>Truy xuất (RAG)
+                                    </button>
+                                </div>
+                                
+                                <div id="rag-test-results" class="rag-results-list">
+                                    <div class="empty-state py-3 text-muted text-center rounded-4 border border-dashed bg-light">
+                                        <i class="fas fa-info-circle mb-2" style="font-size: 1.5rem; color: var(--ai-muted);"></i>
+                                        <p class="mb-0 small">Nhập câu hỏi và nhấn nút "Truy xuất (RAG)" để kiểm tra kết quả tìm kiếm ngữ nghĩa.</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-4">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="public-booking-auto-show" checked>
-                                    <label class="form-check-label fw-bold" for="public-booking-auto-show">Tự động show phòng</label>
+                    <!-- Agent Health Status -->
+                    <div class="bento-card agents-card shadow-lg border border-success-subtle">
+                        <div class="bento-card-header d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fas fa-network-wired card-icon text-success animate-pulse"></i>
+                                <h3 class="mb-0">Luồng tác nhân AI (Multi-Agent Flow)</h3>
+                            </div>
+                            <span class="badge bg-success text-white px-2 py-1 rounded-pill small" style="font-size:0.75em;">
+                                <span class="spinner-grow spinner-grow-sm me-1" role="status" style="width: 8px; height: 8px;"></span>Đồng bộ
+                            </span>
+                        </div>
+                        <div class="bento-card-body">
+                            <p class="text-muted small mb-3">
+                                Luồng xử lý tuần tự qua 5 AI Agents chuyên biệt giúp tối ưu câu trả lời dựa trên ngữ cảnh thực tế của hệ thống và các nguyên tắc an toàn.
+                            </p>
+
+                            <!-- Agent Flow Diagram -->
+                            <div class="agent-flow-viz my-4 p-3 rounded-4 bg-light border border-light-subtle">
+                                <h4 class="agent-sub-title text-center mb-3 fw-bold" style="font-size:0.95em; color:var(--ai-ink);"><i class="fas fa-route me-1 text-success"></i>Sơ đồ xử lý hội thoại đa tác nhân</h4>
+                                <div class="agent-pipeline-flow d-flex justify-content-between align-items-center">
+                                    <div class="agent-step text-center flex-fill" data-bs-toggle="tooltip" title="Người điều phối phân tích ý định và lập lịch trình xử lý.">
+                                        <div class="agent-icon mx-auto bg-white border border-primary position-relative">
+                                            <i class="fas fa-network-wired text-primary"></i>
+                                            <span class="agent-status-indicator agent-pulse-glow"></span>
+                                        </div>
+                                        <div class="agent-label mt-1 fw-bold">1. Điều phối</div>
+                                        <div class="agent-value text-primary small" style="font-size:0.75em;">Orchestrator</div>
+                                    </div>
+                                    <div class="pipeline-arrow px-1"><i class="fas fa-chevron-right text-muted small-arrow-animation"></i></div>
+                                    <div class="agent-step text-center flex-fill" data-bs-toggle="tooltip" title="Tra cứu tài liệu tri thức liên quan từ Vector DB.">
+                                        <div class="agent-icon mx-auto bg-white border border-warning position-relative">
+                                            <i class="fas fa-search-plus text-warning"></i>
+                                            <span class="agent-status-indicator agent-pulse-glow"></span>
+                                        </div>
+                                        <div class="agent-label mt-1 fw-bold">2. Tra cứu</div>
+                                        <div class="agent-value text-warning small" style="font-size:0.75em;">Vector RAG</div>
+                                    </div>
+                                    <div class="pipeline-arrow px-1"><i class="fas fa-chevron-right text-muted small-arrow-animation"></i></div>
+                                    <div class="agent-step text-center flex-fill" data-bs-toggle="tooltip" title="Truy vấn dữ liệu thời gian thực của phòng, giá, tình trạng sẵn có.">
+                                        <div class="agent-icon mx-auto bg-white border border-success position-relative">
+                                            <i class="fas fa-database text-success"></i>
+                                            <span class="agent-status-indicator agent-pulse-glow"></span>
+                                        </div>
+                                        <div class="agent-label mt-1 fw-bold">3. Dữ liệu thực</div>
+                                        <div class="agent-value text-success small" style="font-size:0.75em;">Live System</div>
+                                    </div>
+                                    <div class="pipeline-arrow px-1"><i class="fas fa-chevron-right text-muted small-arrow-animation"></i></div>
+                                    <div class="agent-step text-center flex-fill" data-bs-toggle="tooltip" title="Kiểm duyệt câu trả lời, đảm bảo an toàn thông tin, phòng chống ảo giác.">
+                                        <div class="agent-icon mx-auto bg-white border border-danger position-relative">
+                                            <i class="fas fa-shield-alt text-danger"></i>
+                                            <span class="agent-status-indicator agent-pulse-glow"></span>
+                                        </div>
+                                        <div class="agent-label mt-1 fw-bold">4. An toàn</div>
+                                        <div class="agent-value text-danger small" style="font-size:0.75em;">Safety Guard</div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold">Max lần show</label>
-                                <input id="public-booking-max-shows" type="number" class="form-control" value="2" min="1" max="10" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold">Cooldown (messages)</label>
-                                <input id="public-booking-cooldown" type="number" class="form-control" value="3" min="0" max="20" />
+
+                            <!-- Agent Health list in list format for details -->
+                            <div class="agent-details-grid d-grid gap-2 mt-3">
+                                <div class="agent-details-item d-flex justify-content-between align-items-center p-2 rounded-3 bg-light border border-light-subtle">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-primary-subtle text-primary rounded-circle p-1" style="width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center;"><i class="fas fa-network-wired" style="font-size:0.8em;"></i></span>
+                                        <span class="small fw-bold text-dark">Agent Điều phối (Orchestrator)</span>
+                                    </div>
+                                    <span class="badge bg-success-glow text-success rounded-pill small" style="font-size:0.75em;">Hoạt động</span>
+                                </div>
+                                <div class="agent-details-item d-flex justify-content-between align-items-center p-2 rounded-3 bg-light border border-light-subtle">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-warning-subtle text-warning rounded-circle p-1" style="width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center;"><i class="fas fa-search-plus" style="font-size:0.8em;"></i></span>
+                                        <span class="small fw-bold text-dark">Agent Tra cứu Tri thức (Vector RAG)</span>
+                                    </div>
+                                    <span class="badge bg-success-glow text-success rounded-pill small" style="font-size:0.75em;">Đang chạy</span>
+                                </div>
+                                <div class="agent-details-item d-flex justify-content-between align-items-center p-2 rounded-3 bg-light border border-light-subtle">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-success-subtle text-success rounded-circle p-1" style="width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center;"><i class="fas fa-database" style="font-size:0.8em;"></i></span>
+                                        <span class="small fw-bold text-dark">Agent Dữ liệu Thực (Live System)</span>
+                                    </div>
+                                    <span class="badge bg-success-glow text-success rounded-pill small" style="font-size:0.75em;">Đã kết nối</span>
+                                </div>
+                                <div class="agent-details-item d-flex justify-content-between align-items-center p-2 rounded-3 bg-light border border-light-subtle">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-danger-subtle text-danger rounded-circle p-1" style="width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center;"><i class="fas fa-shield-alt" style="font-size:0.8em;"></i></span>
+                                        <span class="small fw-bold text-dark">Hàng rào Bảo vệ (Safety Guard)</span>
+                                    </div>
+                                    <span class="badge bg-success-glow text-success rounded-pill small" style="font-size:0.75em;">Đang chạy</span>
+                                </div>
                             </div>
                         </div>
-
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">Từ khoá thoát booking</label>
-                            <input id="public-booking-exit-keywords" class="form-control" placeholder="thôi,bỏ,khác,xóa,hủy,không,để sau" />
-                            <div class="form-text">Phân cách bằng dấu phẩy. Khi KH dùng từ này, AI thoát booking mode và xoá progress.</div>
-                        </div>
-
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">Tính cách AI</label>
-                            <input id="public-booking-personality" class="form-control" placeholder="thân thiện, nhiệt tình, như lễ tân khách sạn" />
-                        </div>
-
-                        <hr class="my-4" />
-
-                        <label class="form-label fw-bold">Public Booking Prompt (bổ sung vào system prompt)</label>
-                        <textarea id="public-booking-prompt" class="form-control final-style-text" rows="6" placeholder="Booking Conductor đã quyết định hành động: {Action}..."></textarea>
-                        <div class="row g-3 mt-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Trigger Words</label>
-                                <input id="public-booking-trigger-words" class="form-control" placeholder="đặt,chốt,lấy,book,giữ phòng" />
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">Max Tokens</label>
-                                <input id="public-booking-max-tokens" type="number" class="form-control" value="300" />
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">Timeout (giây)</label>
-                                <input id="public-booking-timeout" type="number" class="form-control" value="15" />
-                            </div>
-                        </div>
-                        <button class="btn btn-primary rounded-pill fw-bold mt-3" onclick="savePublicBookingConfig()"><i class="fas fa-save me-2"></i>Lưu cấu hình</button>
                     </div>
                 </div>
+            </section>
+
+            <section class="tab-pane fade workspace-tab" id="tab-grounding" role="tabpanel" aria-labelledby="tab-grounding-trigger">
+            <div class="workspace-header">
+                <div>
+                    <p class="ai-eyebrow">Tri thức & Graph</p>
+                    <h2>Dữ liệu AI nhìn vào để trả lời</h2>
+                    <p class="workspace-copy">
+                        Toàn bộ tri thức hệ thống sẽ được seed lại từ dữ liệu thật của chi nhánh và phòng. Admin vẫn có thể sửa tay sau khi seed.
+                    </p>
+                </div>
+                <div class="workspace-actions">
+                    <button id="reseed-ai-grounding" class="btn btn-danger rounded-pill fw-bold">
+                        <i class="fas fa-broom-ball me-2"></i>Xóa sạch và seed lại
+                    </button>
+                </div>
             </div>
-            <div class="tab-pane fade" id="tab-test-trace"><div class="brain-manager-toolbar"><div><h3>Test public booking flow</h3><p>Test như khách thật: nhập context, nhắn câu hỏi, xem answer và UI blocks.</p></div></div><div class="compact-test-grid"><section class="compact-panel"><input id="public-ai-test-name" class="form-control mb-2" placeholder="Tên khách" /><select id="public-ai-test-branch" class="form-select mb-2"></select><select id="public-ai-test-mode" class="form-select mb-2"><option value="hourly">Theo giờ</option><option value="daily">Theo ngày</option></select><input id="public-ai-test-guests" class="form-control mb-2" type="number" min="1" value="1" /><textarea id="public-ai-test-message" class="form-control mb-2" rows="3" placeholder="VD: ngày mai còn phòng không?"></textarea><button class="btn btn-primary rounded-pill fw-bold" onclick="runPublicAIFlowTest()">Chạy test</button><pre id="public-ai-test-output" class="agent-preview mt-3"></pre></section><section class="compact-panel"><div class="brain-manager-toolbar"><div><h3>Conversation Trace</h3><p>Xem AI đã lưu gì sau mỗi phiên: persona, live snapshot, knowledge, graph reasoning, guard và final answer.</p></div><button class="btn btn-outline-primary rounded-pill fw-bold" onclick="loadBrainConversationTraces()"><i class="fas fa-rotate me-2"></i>Tải trace</button></div><div class="trace-manager-layout">
-                    <div class="trace-list-panel">
-                        <div id="conversation-trace-list" class="trace-list-items">
-                            <div class="empty-state">Bấm “Tải trace” để xem lịch sử AIConversationTrace.</div>
+
+            <div class="grounding-summary-row">
+                <div id="ai-grounding-stats" class="grounding-stats"></div>
+
+                <section class="scope-strip-panel is-collapsed" id="scope-strip-panel">
+                    <button class="scope-panel-toggle" id="toggle-scope-strip" type="button" aria-expanded="false">
+                        <span>
+                            <strong>Scopes đang có</strong>
+                            <small>Ẩn chi tiết để tiết kiệm diện tích.</small>
+                        </span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div id="brain-scope-list" class="scope-strip"></div>
+                </section>
+            </div>
+
+            <div class="grounding-toolbar">
+                <div class="grounding-actions">
+                    <button class="btn btn-outline-dark rounded-pill fw-bold" id="reload-grounding">
+                        <i class="fas fa-rotate me-2"></i>Tải lại
+                    </button>
+                    <button class="btn btn-outline-primary rounded-pill fw-bold" id="open-scope-modal">
+                        <i class="fas fa-layer-group me-2"></i>Scope
+                    </button>
+                    <button class="btn btn-primary rounded-pill fw-bold" id="open-knowledge-modal">
+                        <i class="fas fa-plus me-2"></i>Knowledge
+                    </button>
+                    <button class="btn btn-dark rounded-pill fw-bold" id="open-node-modal">
+                        <i class="fas fa-circle-plus me-2"></i>Node
+                    </button>
+                    <button class="btn btn-outline-dark rounded-pill fw-bold" id="open-edge-modal">
+                        <i class="fas fa-link me-2"></i>Edge
+                    </button>
+                    <button class="btn btn-outline-danger rounded-pill fw-bold" id="brain-trash-toggle">
+                        <i class="fas fa-trash-alt me-2"></i>Thùng rác
+                    </button>
+                </div>
+            </div>
+
+            <div id="brain-trash-panel">
+                <div class="trash-panel-header">
+                    <h4><i class="fas fa-trash-alt me-2 text-danger"></i>Thùng rác Tri thức & Graph</h4>
+                    <p>Các mục trong này sẽ tự động bị xóa vĩnh viễn sau @aiRetentionDays ngày. Có thể khôi phục hoặc xóa vĩnh viễn ngay.</p>
+                </div>
+                <div id="brain-trash-list" class="trash-list"></div>
+            </div>
+
+            <div class="grounding-grid" id="grounding-grid">
+                <section class="grounding-panel knowledge-panel">
+                    <div class="panel-heading">
+                        <div>
+                            <h3>Knowledge Units</h3>
+                            <p>Danh sách knowledge units được chia nhỏ để AI nhìn vào và trả lời.</p>
+                        </div>
+                        <input id="knowledge-search" class="form-control" placeholder="Tìm knowledge..." />
+                    </div>
+                    <div id="brain-knowledge-list" class="entity-list"></div>
+                </section>
+
+                <section class="grounding-panel graph-panel">
+                    <div class="panel-heading">
+                        <div>
+                            <h3>Graph Nodes & Edges</h3>
+                            <p>Xem dạng danh sách thu gọn hoặc chuyển sang bản đồ node để nhìn quan hệ trực quan hơn.</p>
+                        </div>
+                        <div class="graph-panel-actions">
+                            <input id="graph-search" class="form-control" placeholder="Tìm node hoặc edge..." />
+                            <div class="graph-view-toggle">
+                                <button type="button" class="chip-button is-active" data-graph-view="list">Danh sách</button>
+                                <button type="button" class="chip-button" data-graph-view="map3d">3D</button>
+                            </div>
                         </div>
                     </div>
-                    <div class="trace-detail-panel" id="conversation-trace-detail">
-                        <div class="empty-state">Chọn một trace để xem chi tiết.</div>
+                    <div class="graph-map-toolbar" id="graph-map-toolbar" hidden>
+                        <button type="button" class="icon-tool-button" id="graph-zoom-out" title="Thu nhỏ"><i class="fas fa-minus"></i></button>
+                        <button type="button" class="icon-tool-button" id="graph-zoom-in" title="Phóng to"><i class="fas fa-plus"></i></button>
+                        <button type="button" class="icon-tool-button" id="graph-reset-view" title="Đặt lại góc nhìn"><i class="fas fa-compress-arrows-alt"></i></button>
                     </div>
-                </div></section></div></div>
+                    <div id="graph-list-mode" class="graph-list-mode">
+                        <div class="graph-list-section">
+                            <div class="mini-heading">Nodes</div>
+                            <div id="brain-graph-nodes" class="entity-list"></div>
+                        </div>
+                        <div class="graph-list-section">
+                            <div class="mini-heading">Edges</div>
+                            <div id="brain-graph-edges" class="entity-list"></div>
+                        </div>
+                    </div>
+                    <div id="graph-map-mode" class="graph-map-mode" hidden>
+                        <svg id="graph-map-canvas" viewBox="0 0 1200 760" preserveAspectRatio="xMidYMid meet"></svg>
+                    </div>
+                </section>
+            </div>
+            </section>
+
+            <section class="tab-pane fade workspace-tab" id="tab-studio" role="tabpanel" aria-labelledby="tab-studio-trigger">
+            <div class="studio-toolbar">
+                <div>
+                    <p class="ai-eyebrow">Trả lời & Form</p>
+                    <p class="workspace-copy mb-0">
+                        Cấu hình sale-assist theo flow: hồ sơ trợ lý, field cần thu thập, block giao diện, luật runtime và handoff người thật.
+                    </p>
+                </div>
+                <div class="workspace-actions">
+                    <button id="save-studio-config" class="btn btn-primary rounded-pill fw-bold">
+                        <i class="fas fa-save me-2"></i>Lưu cấu hình
+                    </button>
+                </div>
+            </div>
+
+            <div class="studio-shell">
+                <aside class="studio-nav">
+                    <div class="studio-nav-head">
+                        <h3>Danh mục cấu hình</h3>
+                        <p>Chọn phần cần chỉnh trong studio.</p>
+                    </div>
+                    <div id="studio-category-nav" class="studio-category-nav"></div>
+                </aside>
+
+                <main class="studio-editor">
+                    <div class="studio-editor-head">
+                        <div>
+                            <h3 id="studio-editor-title">Đang tải cấu hình...</h3>
+                            <p id="studio-editor-copy">Studio sẽ hiển thị trình chỉnh cấu hình tương ứng với nhóm đang chọn.</p>
+                        </div>
+                        <div id="studio-last-updated" class="studio-updated"></div>
+                    </div>
+                    <div id="studio-config-editor" class="studio-config-editor"></div>
+                </main>
+
+                <aside class="studio-preview">
+                    <div class="studio-preview-head">
+                        <h3>Runtime Simulator</h3>
+                        <p>Chạy rule engine local để test flow, field và block mà không tốn token.</p>
+                    </div>
+                    <div id="studio-simulator" class="studio-simulator"></div>
+                </aside>
+            </div>
+            </section>
         </div>
     </section>
 </div>
 
-<div class="modal fade" id="finalFormFieldModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content brain-modal">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold" id="final-form-field-modal-title">Thêm trường form</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <label class="form-label fw-bold">Tên hiển thị</label>
-                <input id="final-form-field-label" class="form-control mb-3" placeholder="VD: Số điện thoại" />
-                <label class="form-label fw-bold">Trường dữ liệu</label>
-                <select id="final-form-field-type" class="form-select mb-3">
-                    <option value="customerName">Tên khách</option>
-                    <option value="customerPhone">Số điện thoại</option>
-                    <option value="customerEmail">Email</option>
-                    <option value="guestCount">Số khách</option>
-                    <option value="idCardFront">CCCD mặt trước</option>
-                    <option value="idCardBack">CCCD mặt sau</option>
-                    <option value="customerNote">Ghi chú</option>
-                </select>
-                <div class="form-check mb-4">
-                    <input id="final-form-field-required" class="form-check-input" type="checkbox" checked />
-                    <label class="form-check-label fw-bold" for="final-form-field-required">Bắt buộc nhập</label>
-                </div>
-                <label class="form-label fw-bold">Mô tả/hướng dẫn dưới field</label>
-                <textarea id="final-form-field-help" class="form-control" rows="3" placeholder="VD: Nhập đúng họ tên người đặt phòng."></textarea>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="saveBookingFormFieldFromModal(true)">Lưu trường & Booking Form</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="finalConditionOptionModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content brain-modal">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold" id="final-condition-option-title">Quản lý option điều kiện</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="final-condition-option-kind" />
-                <input type="hidden" id="final-condition-option-editing" />
-                <div class="row g-3 mb-4">
-                    <div class="col-md-4">
-                        <label class="form-label fw-bold">Tên hiển thị</label>
-                        <input id="final-condition-option-label" class="form-control" placeholder="VD: Muốn xem ảnh phòng" />
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold">Mã value</label>
-                        <input id="final-condition-option-value" class="form-control" placeholder="VD: view_photos" />
-                    </div>
-                    <div class="col-md-5">
-                        <label class="form-label fw-bold">Từ khóa</label>
-                        <input id="final-condition-option-keywords" class="form-control" placeholder="VD: ảnh,hình,view phòng" />
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label fw-bold">Prompt rule</label>
-                        <textarea id="final-condition-option-rule" class="form-control" rows="2" placeholder="Mô tả khi nào AI nên hiểu option này đúng."></textarea>
-                    </div>
-                </div>
-                <div class="d-flex gap-2 mb-4">
-                    <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="saveFinalConditionOption()">Lưu option</button>
-                    <button type="button" class="btn btn-light rounded-pill px-4" onclick="resetFinalConditionOptionForm()">Làm mới</button>
-                </div>
-                <div id="final-condition-option-list" class="list-group"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <div class="modal fade" id="brainScopeModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content brain-modal">
-            <div class="modal-header"><h5 class="modal-title fw-bold">Scope kiến thức</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-content ai-modal">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Scope kiến thức</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
             <div class="modal-body">
                 <input type="hidden" id="scope-id" />
                 <label class="form-label fw-bold">Tên scope</label>
-                <input id="scope-name" class="form-control mb-3" placeholder="VD: Chính sách đặt phòng" />
+                <input id="scope-name" class="form-control mb-3" />
                 <label class="form-label fw-bold">Mô tả</label>
                 <textarea id="scope-description" class="form-control mb-3" rows="3"></textarea>
                 <label class="form-label fw-bold">Thứ tự</label>
                 <input id="scope-order" type="number" class="form-control" value="1" />
             </div>
-            <div class="modal-footer"><button class="btn btn-primary rounded-pill px-4" onclick="saveBrainScope()">Lưu scope</button></div>
+            <div class="modal-footer">
+                <button class="btn btn-primary rounded-pill px-4" id="save-scope-btn">Lưu scope</button>
+            </div>
         </div>
     </div>
 </div>
 
 <div class="modal fade" id="brainKnowledgeModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content brain-modal">
-            <div class="modal-header"><h5 class="modal-title fw-bold">Knowledge Unit</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-content ai-modal">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Knowledge Unit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
             <div class="modal-body">
                 <input type="hidden" id="knowledge-id" />
                 <label class="form-label fw-bold">Scope</label>
                 <select id="knowledge-scope" class="form-select mb-3"></select>
                 <label class="form-label fw-bold">Tiêu đề</label>
-                <input id="knowledge-title" class="form-control mb-3" placeholder="VD: Quy tắc không xác nhận booking" />
-                <label class="form-label fw-bold">Nội dung tri thức</label>
-                <textarea id="knowledge-content" class="form-control mb-3" rows="7" placeholder="Viết chính sách, kịch bản tư vấn, hướng dẫn..."></textarea>
+                <input id="knowledge-title" class="form-control mb-3" />
+                <label class="form-label fw-bold">Nội dung</label>
+                <textarea id="knowledge-content" class="form-control mb-3" rows="7"></textarea>
                 <div class="row g-3">
-                    <div class="col-md-8"><label class="form-label fw-bold">Tags</label><input id="knowledge-tags" class="form-control" placeholder="sales,policy,checkin" /></div>
-                    <div class="col-md-4"><label class="form-label fw-bold">Priority</label><input id="knowledge-priority" type="number" class="form-control" value="10" /></div>
+                    <div class="col-md-8">
+                        <label class="form-label fw-bold">Tags</label>
+                        <input id="knowledge-tags" class="form-control" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Priority</label>
+                        <input id="knowledge-priority" type="number" class="form-control" value="10" />
+                    </div>
                 </div>
             </div>
-            <div class="modal-footer"><button class="btn btn-primary rounded-pill px-4" onclick="saveBrainKnowledgeUnit()">Lưu knowledge</button></div>
+            <div class="modal-footer">
+                <button class="btn btn-primary rounded-pill px-4" id="save-knowledge-btn">Lưu knowledge</button>
+            </div>
         </div>
     </div>
 </div>
 
 <div class="modal fade" id="brainGraphNodeModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content brain-modal">
-            <div class="modal-header"><h5 class="modal-title fw-bold">Graph Node</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-content ai-modal">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Graph Node</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
             <div class="modal-body">
                 <input type="hidden" id="graph-node-id" />
                 <label class="form-label fw-bold">Loại node</label>
-                <input id="graph-node-type" class="form-control mb-3" placeholder="branch, room, persona, policy" />
+                <input id="graph-node-type" class="form-control mb-3" />
                 <label class="form-label fw-bold">Tên node</label>
                 <input id="graph-node-label" class="form-control mb-3" />
                 <label class="form-label fw-bold">Tóm tắt</label>
                 <textarea id="graph-node-summary" class="form-control mb-3" rows="4"></textarea>
                 <label class="form-label fw-bold">Metadata JSON</label>
-                <textarea id="graph-node-metadata" class="form-control" rows="3">{}</textarea>
+                <textarea id="graph-node-metadata" class="form-control" rows="4">{}</textarea>
             </div>
-            <div class="modal-footer"><button class="btn btn-primary rounded-pill px-4" onclick="saveBrainGraphNode()">Lưu node</button></div>
+            <div class="modal-footer">
+                <button class="btn btn-primary rounded-pill px-4" id="save-node-btn">Lưu node</button>
+            </div>
         </div>
     </div>
 </div>
 
 <div class="modal fade" id="brainGraphEdgeModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content brain-modal">
-            <div class="modal-header"><h5 class="modal-title fw-bold">Graph Edge</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-content ai-modal">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Graph Edge</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
             <div class="modal-body">
                 <input type="hidden" id="graph-edge-id" />
                 <label class="form-label fw-bold">From node</label>
@@ -346,17 +548,18 @@
                 <label class="form-label fw-bold">To node</label>
                 <select id="graph-edge-to" class="form-select mb-3"></select>
                 <label class="form-label fw-bold">Quan hệ</label>
-                <input id="graph-edge-type" class="form-control mb-3" placeholder="contains_room, best_for, requires_policy" />
+                <input id="graph-edge-type" class="form-control mb-3" />
                 <label class="form-label fw-bold">Weight</label>
                 <input id="graph-edge-weight" type="number" step="0.1" class="form-control mb-3" value="1" />
                 <label class="form-label fw-bold">Evidence</label>
                 <textarea id="graph-edge-evidence" class="form-control" rows="3"></textarea>
             </div>
-            <div class="modal-footer"><button class="btn btn-dark rounded-pill px-4" onclick="saveBrainGraphEdge()">Lưu edge</button></div>
+            <div class="modal-footer">
+                <button class="btn btn-dark rounded-pill px-4" id="save-edge-btn">Lưu edge</button>
+            </div>
         </div>
     </div>
 </div>
-
 
 @section Scripts {
     <script src="~/js/admin-ai-brain-center.js" asp-append-version="true"></script>

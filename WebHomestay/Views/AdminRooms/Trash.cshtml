@@ -1,0 +1,106 @@
+@model IEnumerable<WebHomestay.Models.Room>
+@inject ISettingService SettingService
+
+@{
+    ViewData["Title"] = "Thùng rác Phòng";
+    var retentionDays = await SettingService.GetIntAsync("BookingTrashRetentionDays", 7);
+}
+
+<link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
+
+<div class="premium-admin-body">
+    <div class="admin-shell">
+        <header class="admin-hero">
+            <div class="admin-hero-title">
+                <span class="admin-kicker">Lưu trữ tạm thời</span>
+                <h1>Thùng rác Phòng</h1>
+                <p class="text-muted small mb-0 mt-1">Các phòng trong này sẽ tự động bị xóa vĩnh viễn sau @retentionDays ngày.</p>
+            </div>
+            <div class="admin-hero-actions">
+                <a asp-action="Index" class="btn-premium-outline">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Quay lại danh sách</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="admin-card">
+            <div class="admin-table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Tên phòng</th>
+                            <th>Chi nhánh</th>
+                            <th>Trạng thái</th>
+                            <th>Thời điểm xóa</th>
+                            <th>Hết hạn trong</th>
+                            <th class="text-end">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td><span class="fw-bold text-primary">@item.Name</span></td>
+                                <td>
+                                    <span class="badge-premium badge-primary-soft">@item.Branch?.Name</span>
+                                </td>
+                                <td>
+                                    @if (item.Status == "Available")
+                                    {
+                                        <span class="badge-premium badge-success-soft" style="width: fit-content;">Sẵn sàng</span>
+                                    }
+                                    else if (item.Status == "Occupied")
+                                    {
+                                        <span class="badge-premium badge-info-soft" style="width: fit-content;">Đang có khách</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-premium badge-warning-soft" style="width: fit-content;">Đang bảo trì</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="small fw-bold">@item.DeletedAt?.AddHours(7).ToString("dd/MM/yyyy HH:mm")</div>
+                                </td>
+                                <td>
+                                    @{
+                                        var daysInTrash = (DateTime.UtcNow - (item.DeletedAt ?? DateTime.UtcNow)).Days;
+                                        var daysLeft = retentionDays - daysInTrash;
+                                    }
+                                    <span class="badge-premium @(daysLeft <= 1 ? "badge-danger-soft" : "badge-warning-soft")">
+                                         Còn @(daysLeft < 0 ? 0 : daysLeft) ngày
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <div class="admin-actions">
+                                        <form asp-action="Restore" asp-route-id="@item.Id" method="post" class="d-inline">
+                                            <button type="submit" class="admin-btn-icon" title="Khôi phục">
+                                                <i class="fas fa-undo"></i>
+                                            </button>
+                                        </form>
+                                        <form asp-action="PermanentDelete" asp-route-id="@item.Id" method="post" class="d-inline" data-premium-confirm="Xóa vĩnh viễn phòng này? Hành động này KHÔNG THỂ hoàn tác." data-premium-title="Xóa vĩnh viễn" data-premium-ok="Xóa vĩnh viễn" data-premium-danger="true">
+                                            <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent">
+                                                <i class="fas fa-times-circle"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5">
+                                    <div class="text-muted opacity-50">
+                                        <i class="fas fa-trash-restore fa-3x mb-3"></i>
+                                        <p>Thùng rác trống.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

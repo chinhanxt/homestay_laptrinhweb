@@ -13,5 +13,15 @@ namespace WebHomestay.Models
         public string FinalAnswer { get; set; } = string.Empty;
         public string ModelProvider { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        // Enhanced AI Tracking columns
+        public string? IntentClassified { get; set; }
+        public decimal? IntentConfidence { get; set; }
+        public string? ActionTaken { get; set; }
+        public int? ResponseTimeMs { get; set; }
+        public string? AgentOutputs { get; set; }
+        public string? ErrorLog { get; set; }
+        public string? PerformanceLog { get; set; }
+        public string? ModelName { get; set; }
     }
 }

@@ -1,7 +1,9 @@
 @model IEnumerable<WebHomestay.Models.Booking>
+@inject ISettingService SettingService
 
 @{
     ViewData["Title"] = "Thùng rác Đơn hàng";
+    var retentionDays = await SettingService.GetIntAsync("BookingTrashRetentionDays", 7);
 }
 
 <link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
@@ -12,7 +14,7 @@
             <div class="admin-hero-title">
                 <span class="admin-kicker">Lưu trữ tạm thời</span>
                 <h1>Thùng rác Đơn hàng</h1>
-                <p class="text-muted small mb-0 mt-1">Các đơn hàng trong này sẽ tự động bị xóa vĩnh viễn sau 7 ngày.</p>
+                <p class="text-muted small mb-0 mt-1">Các đơn hàng trong này sẽ tự động bị xóa vĩnh viễn sau @retentionDays ngày.</p>
             </div>
             <div class="admin-hero-actions">
                 <a asp-action="Index" class="btn-premium-outline">
@@ -66,7 +68,7 @@
                                 <td>
                                     @{
                                         var daysInTrash = (DateTime.UtcNow - (item.DeletedAt ?? DateTime.UtcNow)).Days;
-                                        var daysLeft = 7 - daysInTrash;
+                                        var daysLeft = retentionDays - daysInTrash;
                                     }
                                     <span class="badge-premium @(daysLeft <= 1 ? "badge-danger-soft" : "badge-warning-soft")">
                                          Còn @(daysLeft < 0 ? 0 : daysLeft) ngày
@@ -80,7 +82,7 @@
                                                 <i class="fas fa-undo"></i>
                                             </button>
                                         </form>
-                                        <form asp-action="PermanentDelete" method="post" class="d-inline" onsubmit="return confirm('Xóa vĩnh viễn đơn hàng này?')">
+                                        <form asp-action="PermanentDelete" method="post" class="d-inline" data-premium-confirm="Xóa vĩnh viễn đơn hàng này? Hành động này KHÔNG THỂ hoàn tác." data-premium-title="Xóa vĩnh viễn" data-premium-ok="Xóa vĩnh viễn" data-premium-danger="true">
                                             <input type="hidden" name="id" value="@item.Id" />
                                             <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent">
                                                 <i class="fas fa-times-circle"></i>

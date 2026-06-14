@@ -63,12 +63,15 @@ namespace WebHomestay.Data
             modelBuilder.Entity<AIAgentDefinition>().ToTable("ai_agent_definitions");
             modelBuilder.Entity<AIConversationTrace>().ToTable("ai_conversation_traces");
 
-            // AdminUser - Branch relationship
-            modelBuilder.Entity<AdminUser>()
-                .HasOne(a => a.Branch)
-                .WithMany(b => b.StaffMembers)
-                .HasForeignKey(a => a.BranchId)
-                .OnDelete(DeleteBehavior.SetNull);
+            // AdminUser - Branch relationship + column mappings
+            modelBuilder.Entity<AdminUser>(entity => {
+                entity.HasOne(a => a.Branch)
+                    .WithMany(b => b.StaffMembers)
+                    .HasForeignKey(a => a.BranchId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
+                entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
+            });
 
             // ActivityLog - AdminUser relationship
             modelBuilder.Entity<ActivityLog>()
@@ -87,6 +90,8 @@ namespace WebHomestay.Data
                 entity.Property(e => e.Email).HasColumnName("email").HasMaxLength(100);
                 entity.Property(e => e.MapUrl).HasColumnName("map_url");
                 entity.Property(e => e.BookingLeadTimeHours).HasColumnName("booking_lead_time_hours");
+                entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
+                entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
             });
 
             // Configure column mappings for Room
@@ -103,6 +108,9 @@ namespace WebHomestay.Data
                 entity.Property(e => e.Capacity).HasColumnName("capacity");
                 entity.Property(e => e.MaxGuests).HasColumnName("max_guests");
                 entity.Property(e => e.Status).HasColumnName("status");
+                entity.Property(e => e.Embedding).HasColumnName("embedding");
+                entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
+                entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
             });
 
             // Configure column mappings for User
@@ -164,6 +172,8 @@ namespace WebHomestay.Data
                 entity.Property(e => e.FixedEndTime).HasColumnName("fixed_end_time");
                 entity.Property(e => e.CrossesMidnight).HasColumnName("crosses_midnight");
                 entity.Property(e => e.IsActive).HasColumnName("is_active");
+                entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
+                entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
             });
 
             // RoomSlotTemplateAssignment Mapping
@@ -253,6 +263,9 @@ namespace WebHomestay.Data
                 entity.Property(e => e.Priority).HasColumnName("priority");
                 entity.Property(e => e.IsActive).HasColumnName("is_active");
                 entity.Property(e => e.LastUpdated).HasColumnName("last_updated");
+                entity.Property(e => e.Embedding).HasColumnName("embedding");
+                entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
+                entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
                 entity.HasOne(e => e.Scope).WithMany(e => e.KnowledgeUnits).HasForeignKey(e => e.ScopeId).OnDelete(DeleteBehavior.Cascade);
             });
 
@@ -264,6 +277,8 @@ namespace WebHomestay.Data
                 entity.Property(e => e.Summary).HasColumnName("summary");
                 entity.Property(e => e.MetadataJson).HasColumnName("metadata_json");
                 entity.Property(e => e.IsActive).HasColumnName("is_active");
+                entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
+                entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
             });
 
             modelBuilder.Entity<AIGraphEdge>(entity =>
@@ -274,6 +289,8 @@ namespace WebHomestay.Data
                 entity.Property(e => e.RelationshipType).HasColumnName("relationship_type");
                 entity.Property(e => e.Weight).HasColumnName("weight");
                 entity.Property(e => e.Evidence).HasColumnName("evidence");
+                entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
+                entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
                 entity.HasOne(e => e.FromNode).WithMany(e => e.OutgoingEdges).HasForeignKey(e => e.FromNodeId).OnDelete(DeleteBehavior.Cascade);
                 entity.HasOne(e => e.ToNode).WithMany(e => e.IncomingEdges).HasForeignKey(e => e.ToNodeId).OnDelete(DeleteBehavior.Cascade);
             });
@@ -318,6 +335,8 @@ namespace WebHomestay.Data
                 entity.Property(e => e.AutoReplyMessage).HasColumnName("auto_reply_message");
                 entity.Property(e => e.CreatedAt).HasColumnName("created_at");
                 entity.Property(e => e.LastActivityAt).HasColumnName("last_activity_at");
+                entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
+                entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
             });
 
             modelBuilder.Entity<AdminChatMessage>(entity =>
@@ -382,6 +401,8 @@ namespace WebHomestay.Data
                 entity.Property(e => e.Id).HasColumnName("id");
                 entity.Property(e => e.Date).HasColumnName("date");
                 entity.Property(e => e.Description).HasColumnName("description");
+                entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
+                entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
             });
 
             modelBuilder.Entity<RolePermissionTemplate>(entity =>

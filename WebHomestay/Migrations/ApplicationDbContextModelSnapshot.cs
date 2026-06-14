@@ -102,6 +102,12 @@ namespace WebHomestay.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ActionTaken")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AgentOutputs")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at");
@@ -110,6 +116,9 @@ namespace WebHomestay.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("customer_message");
+
+                    b.Property<string>("ErrorLog")
+                        .HasColumnType("text");
 
                     b.Property<string>("FinalAnswer")
                         .IsRequired()
@@ -126,20 +135,35 @@ namespace WebHomestay.Migrations
                         .HasColumnType("text")
                         .HasColumnName("guard_result");
 
+                    b.Property<string>("IntentClassified")
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("IntentConfidence")
+                        .HasColumnType("numeric");
+
                     b.Property<string>("LiveSystemSnapshot")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("live_system_snapshot");
+
+                    b.Property<string>("ModelName")
+                        .HasColumnType("text");
 
                     b.Property<string>("ModelProvider")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("model_provider");
 
+                    b.Property<string>("PerformanceLog")
+                        .HasColumnType("text");
+
                     b.Property<string>("PersonaSummary")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("persona_summary");
+
+                    b.Property<int?>("ResponseTimeMs")
+                        .HasColumnType("integer");
 
                     b.Property<string>("RetrievedKnowledgeJson")
                         .IsRequired()
@@ -163,6 +187,10 @@ namespace WebHomestay.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("deleted_at");
+
                     b.Property<string>("Evidence")
                         .IsRequired()
                         .HasColumnType("text")
@@ -171,6 +199,10 @@ namespace WebHomestay.Migrations
                     b.Property<Guid>("FromNodeId")
                         .HasColumnType("uuid")
                         .HasColumnName("from_node_id");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.Property<string>("RelationshipType")
                         .IsRequired()
@@ -201,9 +233,17 @@ namespace WebHomestay.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("deleted_at");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.Property<string>("Label")
                         .IsRequired()
@@ -295,9 +335,21 @@ namespace WebHomestay.Migrations
                         .HasColumnType("text")
                         .HasColumnName("content");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<float[]>("Embedding")
+                        .HasColumnType("real[]")
+                        .HasColumnName("embedding");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.Property<DateTime>("LastUpdated")
                         .HasColumnType("timestamp without time zone")
@@ -432,9 +484,23 @@ namespace WebHomestay.Migrations
                         .HasColumnType("text")
                         .HasColumnName("customer_name");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
                     b.Property<DateTime>("LastActivityAt")
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("last_activity_at");
+
+                    b.Property<string>("PauseReason")
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("PausedAt")
                         .HasColumnType("timestamp without time zone")
@@ -454,6 +520,12 @@ namespace WebHomestay.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
+
+                    b.Property<DateTime?>("TakenOverAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("TakenOverBy")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -477,10 +549,18 @@ namespace WebHomestay.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("deleted_at");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -846,6 +926,10 @@ namespace WebHomestay.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("booking_lead_time_hours");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("deleted_at");
+
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
@@ -859,6 +943,10 @@ namespace WebHomestay.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("hotline");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.Property<string>("MapUrl")
                         .HasColumnType("text")
@@ -888,9 +976,17 @@ namespace WebHomestay.Migrations
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("date");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("deleted_at");
+
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.HasKey("Id");
 
@@ -943,9 +1039,17 @@ namespace WebHomestay.Migrations
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("deleted_at");
+
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<float[]>("Embedding")
+                        .HasColumnType("real[]")
+                        .HasColumnName("embedding");
 
                     b.Property<decimal>("ExtraGuestFee")
                         .HasColumnType("decimal(10, 2)")
@@ -954,6 +1058,10 @@ namespace WebHomestay.Migrations
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text")
                         .HasColumnName("image_url");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.Property<int>("MaxGuests")
                         .HasColumnType("integer")
@@ -1116,6 +1224,10 @@ namespace WebHomestay.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("crosses_midnight");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("deleted_at");
+
                     b.Property<int>("DurationMinutes")
                         .HasColumnType("integer")
                         .HasColumnName("duration_minutes");
@@ -1131,6 +1243,10 @@ namespace WebHomestay.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.Property<string>("Name")
                         .IsRequired()

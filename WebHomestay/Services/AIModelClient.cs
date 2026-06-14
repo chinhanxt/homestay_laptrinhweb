@@ -19,7 +19,60 @@ namespace WebHomestay.Services
 
         public async Task<AIModelResponse> CompleteAsync(AIModelRequest request, CancellationToken cancellationToken = default)
         {
-            var provider = string.IsNullOrWhiteSpace(_options.Provider) ? "groq" : _options.Provider.Trim().ToLowerInvariant();
+            var initialProvider = string.IsNullOrWhiteSpace(_options.Provider) ? "groq" : _options.Provider.Trim().ToLowerInvariant();
+            
+            try
+            {
+                return await ExecuteWithRetryAsync(initialProvider, request, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                // Fallback chain
+                if (initialProvider == "gemini")
+                {
+                    try
+                    {
+                        // Fallback to groq
+                        return await ExecuteWithRetryAsync("groq", request, cancellationToken);
+                    }
+                    catch (Exception fallbackEx)
+                    {
+                        throw new AggregateException($"Both primary ({initialProvider}) and fallback (groq) failed.", ex, fallbackEx);
+                    }
+                }
+                Console.WriteLine("AIModelClient CompleteAsync Exception: " + ex.ToString());
+                throw;
+            }
+        }
+
+        private async Task<AIModelResponse> ExecuteWithRetryAsync(string provider, AIModelRequest request, CancellationToken cancellationToken)
+        {
+            int maxRetries = 3;
+            int delayMs = 1000;
+
+            for (int i = 0; i < maxRetries; i++)
+            {
+                try
+                {
+                    return await ExecuteCoreAsync(provider, request, cancellationToken);
+                }
+                catch (HttpRequestException ex) when (i < maxRetries - 1 && ex.StatusCode != System.Net.HttpStatusCode.Unauthorized && ex.StatusCode != System.Net.HttpStatusCode.BadRequest)
+                {
+                    await Task.Delay(delayMs, cancellationToken);
+                    delayMs *= 2;
+                }
+                catch (InvalidOperationException ex) when (i < maxRetries - 1 && ex.Message.Contains("429"))
+                {
+                    await Task.Delay(delayMs, cancellationToken);
+                    delayMs *= 2;
+                }
+            }
+
+            return await ExecuteCoreAsync(provider, request, cancellationToken);
+        }
+
+        private async Task<AIModelResponse> ExecuteCoreAsync(string provider, AIModelRequest request, CancellationToken cancellationToken)
+        {
             var model = ResolveModel(provider);
 
             if (provider == "mock")
@@ -58,7 +111,17 @@ namespace WebHomestay.Services
 
             using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var json = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-            var content = json.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? string.Empty;
+            
+            // Handle differences in response formats if needed, but OpenAI-compatible usually matches this
+            string content = string.Empty;
+            if (json.RootElement.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+            {
+                var firstChoice = choices[0];
+                if (firstChoice.TryGetProperty("message", out var message) && message.TryGetProperty("content", out var contentProp))
+                {
+                    content = contentProp.GetString() ?? string.Empty;
+                }
+            }
 
             return new AIModelResponse
             {
@@ -75,7 +138,9 @@ namespace WebHomestay.Services
             return provider switch
             {
                 "groq" => "llama-3.3-70b-versatile",
-                "openrouter" or "9router" => "openai/gpt-4o-mini",
+                "openrouter" => "openai/gpt-4o-mini",
+                "9router" => "cx/gpt-5.3-codex",
+                "gemini" => "gemini-2.0-flash",
                 _ => "llama-3.3-70b-versatile"
             };
         }
@@ -86,7 +151,9 @@ namespace WebHomestay.Services
             return provider switch
             {
                 "groq" => "https://api.groq.com/openai/v1/chat/completions",
-                "openrouter" or "9router" => "https://openrouter.ai/api/v1/chat/completions",
+                "openrouter" => "https://openrouter.ai/api/v1/chat/completions",
+                "9router" => "http://localhost:20128/v1/chat/completions",
+                "gemini" => "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
                 _ => throw new InvalidOperationException($"AI provider '{provider}' is not supported.")
             };
         }

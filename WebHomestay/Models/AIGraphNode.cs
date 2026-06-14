@@ -10,5 +10,7 @@ namespace WebHomestay.Models
         public bool IsActive { get; set; } = true;
         public ICollection<AIGraphEdge> OutgoingEdges { get; set; } = new List<AIGraphEdge>();
         public ICollection<AIGraphEdge> IncomingEdges { get; set; } = new List<AIGraphEdge>();
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
     }
 }
