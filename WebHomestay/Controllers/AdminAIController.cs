@@ -88,6 +88,22 @@ public class AdminAIController : Controller
         return Ok(result);
     }
 
+    [AdminAuthorize(Permission = "ai.edit")]
+    [HttpPost("neo4j-seed")]
+    public async Task<IActionResult> SeedNeo4j(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var seedService = HttpContext.RequestServices.GetRequiredService<WebHomestay.Services.AI.Graph.Neo4jGraphSeedService>();
+            var count = await seedService.SeedAsync(cancellationToken);
+            return Ok(new { success = true, message = $"Successfully seeded {count} nodes and relationships into Neo4j." });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new { success = false, message = $"Seeding failed: {ex.Message}" });
+        }
+    }
+
     [AdminAuthorize(Permission = "ai.knowledge")]
     [HttpGet("brain-knowledge")]
     public async Task<IActionResult> GetBrainKnowledge()
@@ -451,7 +467,8 @@ public class AdminAIController : Controller
             foreach (var unit in units)
             {
                 var text = $"{unit.Title}. {unit.Content}. Thẻ: {unit.Tags}";
-                unit.Embedding = await _embeddingService.GetEmbeddingAsync(text, cancellationToken);
+                var rawEmbedding = await _embeddingService.GetEmbeddingAsync(text, cancellationToken);
+                unit.Embedding = new Pgvector.Vector(rawEmbedding);
                 count++;
             }
 
@@ -463,7 +480,8 @@ public class AdminAIController : Controller
             {
                 var branchName = room.Branch?.Name ?? "Hệ thống";
                 var text = $"Phòng {room.Name} thuộc chi nhánh {branchName}, giá giờ {room.PricePerHour:N0}đ, giá ngày {room.PricePerDay:N0}đ. Sức chứa {room.Capacity} người, tối đa {room.MaxGuests} khách. Tiện nghi và mô tả: {room.Description ?? "Chưa cập nhật."}";
-                room.Embedding = await _embeddingService.GetEmbeddingAsync(text, cancellationToken);
+                var rawEmbedding = await _embeddingService.GetEmbeddingAsync(text, cancellationToken);
+                room.Embedding = new Pgvector.Vector(rawEmbedding);
                 count++;
             }
 

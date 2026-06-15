@@ -12,7 +12,9 @@ using WebHomestay.Data;
 using WebHomestay.Models;
 using WebHomestay.Services;
 using WebHomestay.Services.AI;
+using WebHomestay.Services.AI.Graph;
 using WebHomestay.Services.AI.Plugins;
+using WebHomestay.Services.AI.Retrieval;
 using Xunit;
 
 namespace WebHomestay.Tests.Services
@@ -27,54 +29,79 @@ namespace WebHomestay.Tests.Services
             return new ApplicationDbContext(options);
         }
 
-        private static EmbeddingService CreateEmbeddingService()
+        private static EmbeddingService CreateEmbeddingService(string provider = "gemma4", string apiKey = "mock-key", HttpClient httpClient = null)
         {
             var options = Options.Create(new AIModelOptions
             {
-                Provider = "mock",
-                ApiKey = "mock-key"
+                Provider = provider,
+                ApiKey = apiKey
             });
             var mockLogger = new Mock<ILogger<EmbeddingService>>();
-            return new EmbeddingService(new HttpClient(), options, mockLogger.Object);
+            return new EmbeddingService(httpClient ?? new HttpClient(), options, mockLogger.Object);
+        }
+
+        private class StubHttpMessageHandler : HttpMessageHandler
+        {
+            private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
+
+            public StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handler)
+            {
+                _handler = handler;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                return Task.FromResult(_handler(request));
+            }
         }
 
         [Fact]
-        public async Task GetEmbeddingAsync_DeterministicFallback_ReturnsNormalized1536Vector()
+        public async Task GetEmbeddingAsync_WhenProviderIsUnsupported_ThrowsEmbeddingUnavailableException()
         {
-            var service = CreateEmbeddingService();
-            var text = "Hướng dẫn tự check-in bằng khóa thông minh";
+            var service = CreateEmbeddingService("legacy-provider", "test-key");
 
-            var result = await service.GetEmbeddingAsync(text);
+            await Assert.ThrowsAsync<EmbeddingUnavailableException>(
+                () => service.GetEmbeddingAsync("chinh sach huy phong"));
+        }
+
+        [Fact]
+        public async Task GetEmbeddingAsync_WhenApiReturnsFailure_ThrowsEmbeddingUnavailableException()
+        {
+            var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest));
+            var client = new HttpClient(handler);
+            var service = CreateEmbeddingService("gemma4", "x", client);
+
+            await Assert.ThrowsAsync<EmbeddingUnavailableException>(
+                () => service.GetEmbeddingAsync("wifi phong"));
+        }
+
+        [Fact]
+        public async Task GetEmbeddingAsync_WhenApiReturns1536Vector_ReturnsVector()
+        {
+            var vector = new float[1536];
+            vector[0] = 0.5f;
+            vector[1535] = -0.5f;
+            var responseJson = new
+            {
+                data = new[]
+                {
+                    new { embedding = vector }
+                }
+            };
+            var payload = JsonSerializer.Serialize(responseJson);
+            var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json")
+            });
+            var client = new HttpClient(handler);
+            var service = CreateEmbeddingService("gemma4", "x", client);
+
+            var result = await service.GetEmbeddingAsync("wifi phong");
 
             Assert.NotNull(result);
             Assert.Equal(1536, result.Length);
-
-            // Compute L2 Norm (length)
-            double sumOfSquares = 0;
-            foreach (var val in result)
-            {
-                sumOfSquares += val * val;
-            }
-            double norm = Math.Sqrt(sumOfSquares);
-
-            // Norm should be extremely close to 1.0 (normalized unit vector)
-            Assert.True(Math.Abs(norm - 1.0) < 1e-4, $"Vector was not normalized. Norm: {norm}");
-        }
-
-        [Fact]
-        public async Task GetEmbeddingAsync_DeterministicFallback_IdenticalInputReturnsIdenticalVector()
-        {
-            var service = CreateEmbeddingService();
-            var text = "Chính sách hủy đặt phòng homestay";
-
-            var result1 = await service.GetEmbeddingAsync(text);
-            var result2 = await service.GetEmbeddingAsync(text);
-
-            Assert.Equal(result1.Length, result2.Length);
-            for (int i = 0; i < result1.Length; i++)
-            {
-                Assert.Equal(result1[i], result2[i]);
-            }
+            Assert.Equal(0.5f, result[0]);
+            Assert.Equal(-0.5f, result[1535]);
         }
 
         [Fact]
@@ -94,11 +121,8 @@ namespace WebHomestay.Tests.Services
                 Tags = "pet,room-10",
                 IsActive = true,
                 Priority = 1,
-                // Embedding will be generated deterministically for testing
-                Embedding = new float[1536]
+                Embedding = new Pgvector.Vector(new float[1536])
             };
-            unit1.Embedding[0] = 0.9f;
-            unit1.Embedding[1] = 0.1f;
 
             var unit2 = new AIKnowledgeUnit
             {
@@ -108,22 +132,38 @@ namespace WebHomestay.Tests.Services
                 Tags = "smoking,room-20",
                 IsActive = true,
                 Priority = 1,
-                Embedding = new float[1536]
+                Embedding = new Pgvector.Vector(new float[1536])
             };
-            unit2.Embedding[0] = 0.1f;
-            unit2.Embedding[1] = 0.9f;
 
             context.AIKnowledgeUnits.Add(unit1);
             context.AIKnowledgeUnits.Add(unit2);
             await context.SaveChangesAsync();
 
-            // Set up mock embedding service that returns a vector closest to unit1 (Pet policy)
+            // Set up mock embedding service
             var mockEmbeddingService = new Mock<IEmbeddingService>();
             var queryEmbedding = new float[1536];
-            queryEmbedding[0] = 0.95f;
-            queryEmbedding[1] = 0.05f;
             mockEmbeddingService.Setup(s => s.GetEmbeddingAsync("thú cưng", It.IsAny<CancellationToken>()))
                 .ReturnsAsync(queryEmbedding);
+
+            // Set up mock vector search service that returns unit1
+            var mockVectorSearch = new Mock<IVectorSearchService>();
+            mockVectorSearch.Setup(v => v.SearchKnowledgeAsync(
+                It.IsAny<float[]>(),
+                It.IsAny<VectorSearchFilter>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new[]
+                {
+                    new VectorSearchResult
+                    {
+                        EntityType = "knowledge",
+                        EntityId = unit1.Id.ToString(),
+                        Title = unit1.Title,
+                        Content = unit1.Content,
+                        Tags = unit1.Tags,
+                        Score = 0.9
+                    }
+                });
 
             // Instantiate plugin with context session: user is currently viewing room 10 (Pet room)
             var sessionState = new AIBookingSessionState
@@ -132,14 +172,29 @@ namespace WebHomestay.Tests.Services
                 ActiveRoomContextId = 10
             };
 
-            var plugin = new KnowledgeGraphPlugin(context, mockEmbeddingService.Object, sessionState);
+            var mockExpansion = new Mock<Neo4jGraphExpansionService>(Mock.Of<INeo4jGraphClient>());
+            mockExpansion.Setup(x => x.ExpandAsync(
+                It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<int>(),
+                It.IsAny<IReadOnlyList<string>?>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new GraphExpansionContext());
+
+            var assembler = new RetrievalContextAssembler(context, mockVectorSearch.Object, mockExpansion.Object);
+            var plugin = new KnowledgeGraphPlugin(context, mockEmbeddingService.Object, mockVectorSearch.Object, assembler, sessionState);
 
             var result = await plugin.SearchPolicies("thú cưng");
 
             var jsonPart = result.Substring(result.IndexOf('\n') + 1);
-            var items = JsonSerializer.Deserialize<List<Dictionary<string, string>>>(jsonPart);
-            Assert.Single(items);
-            Assert.Equal("Chính sách Mang Thú Cưng", items[0]["Title"]);
+            using var doc = JsonDocument.Parse(jsonPart);
+            var root = doc.RootElement;
+            Assert.Equal(JsonValueKind.Array, root.ValueKind);
+            var firstPayload = root[0];
+            var matches = firstPayload.GetProperty("Matches");
+            Assert.Equal(1, matches.GetArrayLength());
+            Assert.Equal("Chính sách Mang Thú Cưng", matches[0].GetProperty("Title").GetString());
         }
 
         [Fact]
@@ -161,10 +216,8 @@ namespace WebHomestay.Tests.Services
                 Capacity = 2,
                 MaxGuests = 2,
                 Status = "Available",
-                Embedding = new float[1536]
+                Embedding = new Pgvector.Vector(new float[1536])
             };
-            room1.Embedding[0] = 1.0f;
-            room1.Embedding[1] = 0.0f;
 
             var room2 = new Room
             {
@@ -176,10 +229,8 @@ namespace WebHomestay.Tests.Services
                 Capacity = 6,
                 MaxGuests = 8,
                 Status = "Available",
-                Embedding = new float[1536]
+                Embedding = new Pgvector.Vector(new float[1536])
             };
-            room2.Embedding[0] = 0.0f;
-            room2.Embedding[1] = 1.0f;
 
             context.Rooms.Add(room1);
             context.Rooms.Add(room2);
@@ -187,11 +238,21 @@ namespace WebHomestay.Tests.Services
 
             var mockEmbeddingService = new Mock<IEmbeddingService>();
             var queryEmbedding = new float[1536];
-            queryEmbedding[0] = 0.4f;
-            queryEmbedding[1] = 0.9165f;
-            // The query looks for romantic bath
             mockEmbeddingService.Setup(s => s.GetEmbeddingAsync("phòng lãng mạn bồn tắm", It.IsAny<CancellationToken>()))
                 .ReturnsAsync(queryEmbedding);
+
+            var mockVectorSearch = new Mock<IVectorSearchService>();
+            var searchResults = new[]
+            {
+                new VectorSearchResult { EntityType = "room", EntityId = "101", Title = room1.Name, Content = room1.Description, Score = 0.45 },
+                new VectorSearchResult { EntityType = "room", EntityId = "102", Title = room2.Name, Content = room2.Description, Score = 0.4 }
+            };
+            mockVectorSearch.Setup(v => v.SearchRoomsAsync(
+                It.IsAny<float[]>(),
+                It.IsAny<int?>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+                .ReturnsAsync(searchResults);
 
             // Scenario A: Guest count is 2 (fits room 1 perfectly)
             var sessionStateA = new AIBookingSessionState
@@ -199,7 +260,7 @@ namespace WebHomestay.Tests.Services
                 GuestCount = 2,
                 BranchId = 1
             };
-            var pluginA = new SemanticSearchPlugin(context, mockEmbeddingService.Object, sessionStateA);
+            var pluginA = new SemanticSearchPlugin(context, mockEmbeddingService.Object, mockVectorSearch.Object, sessionStateA);
             var resultA = await pluginA.SemanticSearchRooms("phòng lãng mạn bồn tắm");
 
             Assert.Contains("\"RoomId\":101", resultA);
@@ -210,7 +271,7 @@ namespace WebHomestay.Tests.Services
                 GuestCount = 5,
                 BranchId = 1
             };
-            var pluginB = new SemanticSearchPlugin(context, mockEmbeddingService.Object, sessionStateB);
+            var pluginB = new SemanticSearchPlugin(context, mockEmbeddingService.Object, mockVectorSearch.Object, sessionStateB);
             var resultB = await pluginB.SemanticSearchRooms("phòng lãng mạn bồn tắm");
 
             // Since Room 1 was penalized, it shouldn't meet the similarity threshold or match

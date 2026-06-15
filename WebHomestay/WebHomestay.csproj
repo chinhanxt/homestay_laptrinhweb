@@ -27,6 +27,7 @@
     <PackageReference Include="QuestPDF" Version="2026.5.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
+    <PackageReference Include="Neo4j.Driver" Version="5.28.1" />
   </ItemGroup>
 
 </Project>

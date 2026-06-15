@@ -7,52 +7,10 @@ var localGroqKeyPath = Path.Combine(builder.Environment.ContentRootPath, "..", "
 if (File.Exists(localGroqKeyPath))
 {
     var content = File.ReadAllText(localGroqKeyPath).Trim();
-    var provider = "groq";
-    var model = "llama-3.3-70b-versatile";
-    var key = content;
-
-    // Detect if the user specified gemini at the end or if the key structure looks like Gemini
-    if (content.EndsWith("gemini", StringComparison.OrdinalIgnoreCase))
-    {
-        provider = "gemini";
-        model = "gemini-2.5-flash";
-        key = content.Substring(0, content.Length - 6).Trim();
-        Environment.SetEnvironmentVariable("AI_ENDPOINT_OVERRIDE", null);
-    }
-    else if (content.Contains('='))
-    {
-        var parts = content.Split('=', 2);
-        provider = parts[0].Trim().ToLowerInvariant();
-        
-        var keyAndEndpoint = parts[1].Trim().Trim('"').Split('|', 2);
-        key = keyAndEndpoint[0].Trim();
-        
-        if (keyAndEndpoint.Length > 1)
-        {
-            Environment.SetEnvironmentVariable("AI_ENDPOINT_OVERRIDE", keyAndEndpoint[1].Trim());
-        }
-        else
-        {
-            Environment.SetEnvironmentVariable("AI_ENDPOINT_OVERRIDE", null);
-        }
-
-        if (provider == "openrouter")
-        {
-            model = "openai/gpt-4o-mini";
-        }
-        else if (provider == "9router")
-        {
-            model = "cx/gpt-5.3-codex";
-        }
-    }
-    else
-    {
-        Environment.SetEnvironmentVariable("AI_ENDPOINT_OVERRIDE", null);
-    }
-
-    builder.Configuration["AIModel:Provider"] = provider;
-    builder.Configuration["AIModel:ApiKey"] = key;
-    builder.Configuration["AIModel:Model"] = model;
+    Environment.SetEnvironmentVariable("AI_ENDPOINT_OVERRIDE", null);
+    builder.Configuration["AIModel:Provider"] = "gemma4";
+    builder.Configuration["AIModel:ApiKey"] = content;
+    builder.Configuration["AIModel:Model"] = "gemma-4-31b-it";
 }
 
 // Fix PostgreSQL DateTime issue
@@ -64,11 +22,12 @@ builder.Services.AddControllersWithViews(options =>
     options.Conventions.Add(new WebHomestay.Helpers.AdminRoutePrefixConvention("chinhan/hethong"));
 });
 builder.Services.Configure<WebHomestay.Services.AIModelOptions>(builder.Configuration.GetSection("AIModel"));
+builder.Services.AddSingleton<WebHomestay.Services.AI.Compatibility.IAIRuntimeSelector, WebHomestay.Services.AI.Compatibility.AIRuntimeSelector>();
 
 // Configure PostgreSQL Connection
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(connectionString, o => o.UseVector()));
 
 // Register Custom Services
 builder.Services.AddScoped<WebHomestay.Services.IAvailabilityService, WebHomestay.Services.AvailabilityService>();
@@ -91,7 +50,34 @@ builder.Services.AddScoped<WebHomestay.Services.AI.IConversationManager, WebHome
 builder.Services.AddScoped<WebHomestay.Services.AI.IEntityExtractorService, WebHomestay.Services.AI.EntityExtractorService>();
 builder.Services.AddScoped<WebHomestay.Services.IPublicBookingRoomExplanationService, WebHomestay.Services.PublicBookingRoomExplanationService>();
 builder.Services.AddScoped<WebHomestay.Services.AI.LLMIntentClassifier>();
-builder.Services.AddScoped<WebHomestay.Services.IAIBrainOrchestrator, WebHomestay.Services.AI.SemanticKernelOrchestrator>();
+// Register Workflow nodes
+builder.Services.AddScoped<WebHomestay.Services.AI.Workflow.Nodes.IntentClassifierNode>();
+builder.Services.AddScoped<WebHomestay.Services.AI.Workflow.Nodes.VectorRecallNode>();
+builder.Services.AddScoped<WebHomestay.Services.AI.Workflow.Nodes.GraphExpansionNode>();
+builder.Services.AddScoped<WebHomestay.Services.AI.Workflow.Nodes.BookingGuardNode>();
+builder.Services.AddScoped<WebHomestay.Services.AI.Workflow.Nodes.ResponseComposerNode>();
+builder.Services.AddScoped<WebHomestay.Services.AI.Workflow.WorkflowRunner>(sp =>
+{
+    var nodes = new WebHomestay.Services.AI.Workflow.IWorkflowNode[]
+    {
+        sp.GetRequiredService<WebHomestay.Services.AI.Workflow.Nodes.IntentClassifierNode>(),
+        sp.GetRequiredService<WebHomestay.Services.AI.Workflow.Nodes.VectorRecallNode>(),
+        sp.GetRequiredService<WebHomestay.Services.AI.Workflow.Nodes.GraphExpansionNode>(),
+        sp.GetRequiredService<WebHomestay.Services.AI.Workflow.Nodes.BookingGuardNode>(),
+        sp.GetRequiredService<WebHomestay.Services.AI.Workflow.Nodes.ResponseComposerNode>()
+    };
+    return new WebHomestay.Services.AI.Workflow.WorkflowRunner(nodes);
+});
+
+var useWorkflow = builder.Configuration.GetValue<bool>("AIModel:UseWorkflowRuntime");
+if (useWorkflow)
+{
+    builder.Services.AddScoped<WebHomestay.Services.IAIBrainOrchestrator, WebHomestay.Services.AI.Workflow.LangGraphOrchestrator>();
+}
+else
+{
+    builder.Services.AddScoped<WebHomestay.Services.IAIBrainOrchestrator, WebHomestay.Services.AI.SemanticKernelOrchestrator>();
+}
 builder.Services.AddScoped<WebHomestay.Services.IBookingConductor, WebHomestay.Services.ContextAwareBookingConductor>();
 builder.Services.AddScoped<WebHomestay.Services.PricingService>();
 builder.Services.AddScoped<WebHomestay.Services.IPermissionResolveService, WebHomestay.Services.PermissionResolveService>();
@@ -102,6 +88,14 @@ builder.Services.AddHostedService<WebHomestay.Services.BookingCleanupService>();
 // Register new Vector DB and Insight Services
 builder.Services.AddScoped<WebHomestay.Services.AI.IEmbeddingService, WebHomestay.Services.AI.EmbeddingService>();
 builder.Services.AddScoped<WebHomestay.Services.AI.IOperationalInsightService, WebHomestay.Services.AI.OperationalInsightService>();
+builder.Services.AddScoped<WebHomestay.Services.AI.Retrieval.IVectorSearchService, WebHomestay.Services.AI.Retrieval.PgVectorSearchService>();
+builder.Services.AddScoped<WebHomestay.Services.AI.Retrieval.RetrievalContextAssembler>();
+
+// Register Neo4j Graph Services
+builder.Services.Configure<WebHomestay.Services.AI.Graph.Neo4jOptions>(builder.Configuration.GetSection("Neo4j"));
+builder.Services.AddSingleton<WebHomestay.Services.AI.Graph.INeo4jGraphClient, WebHomestay.Services.AI.Graph.Neo4jGraphClient>();
+builder.Services.AddScoped<WebHomestay.Services.AI.Graph.Neo4jGraphSeedService>();
+builder.Services.AddScoped<WebHomestay.Services.AI.Graph.Neo4jGraphExpansionService>();
 
 // Add Session
 builder.Services.AddSession(options =>
