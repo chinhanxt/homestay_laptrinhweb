@@ -83,7 +83,7 @@ namespace WebHomestay.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        [AdminAuthorize(Permission = "images.view")]
+        [AdminAuthorize(Permission = "images.trash")]
         [HttpGet("trash")]
         public async Task<IActionResult> Trash()
         {
@@ -106,7 +106,7 @@ namespace WebHomestay.Controllers
             return View(bookings);
         }
 
-        [AdminAuthorize(Permission = "images.detail")]
+        [AdminAuthorize(Permission = "images.restore")]
         [HttpPost("restore")]
         public async Task<IActionResult> Restore(int id)
         {

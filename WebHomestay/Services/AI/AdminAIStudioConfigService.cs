@@ -86,6 +86,43 @@ public class AdminAIStudioConfigService : IAdminAIStudioConfigService
         config.RuntimePolicies.AutoShowRooms = GetBoolSetting(settings, "AIPublicBookingAutoShowRooms", config.RuntimePolicies.AutoShowRooms);
         config.RuntimePolicies.MaxRoomShows = GetIntSetting(settings, "AIPublicBookingMaxRoomShows", config.RuntimePolicies.MaxRoomShows);
         config.RuntimePolicies.RoomCooldownTurns = GetIntSetting(settings, "AIPublicBookingRoomCooldown", config.RuntimePolicies.RoomCooldownTurns);
+
+        // Load trigger and exit rules
+        config.RuntimePolicies.TriggerWords = GetSetting(settings, "AIPublicBookingTriggerWords", config.RuntimePolicies.TriggerWords);
+        config.RuntimePolicies.ExitKeywords = GetSetting(settings, "AIPublicBookingExitKeywords", config.RuntimePolicies.ExitKeywords);
+        config.RuntimePolicies.ProactiveMode = GetSetting(settings, "AIPublicBookingProactiveMode", config.RuntimePolicies.ProactiveMode);
+        config.RuntimePolicies.DependencyRule = GetSetting(settings, "AIPublicBookingDependencyRule", config.RuntimePolicies.DependencyRule);
+        config.RuntimePolicies.GuestOverflowRule = GetSetting(settings, "AIPublicBookingGuestOverflowRule", config.RuntimePolicies.GuestOverflowRule);
+
+        // Load form fields config
+        if (config.BookingFormFields == null || config.BookingFormFields.Count == 0)
+        {
+            var schemaJson = GetSetting(settings, "AIBookingFormSchema", string.Empty);
+            if (!string.IsNullOrWhiteSpace(schemaJson))
+            {
+                try
+                {
+                    var parsed = JsonSerializer.Deserialize<List<BookingFormFieldConfig>>(schemaJson, JsonOptions);
+                    if (parsed != null)
+                    {
+                        foreach (var p in parsed) p.Enabled = true;
+                        config.BookingFormFields = parsed;
+                    }
+                }
+                catch { }
+            }
+
+            if (config.BookingFormFields == null || config.BookingFormFields.Count == 0)
+            {
+                config.BookingFormFields = new List<BookingFormFieldConfig>
+                {
+                    new() { Id = "customerName", Label = "Họ và tên", Type = "text", Enabled = true, Required = true, HelpText = "Nhập đúng họ tên người đặt phòng.", Order = 1 },
+                    new() { Id = "customerPhone", Label = "Số điện thoại", Type = "tel", Enabled = true, Required = true, HelpText = "Số điện thoại/Zalo để homestay liên hệ xác nhận.", Order = 2 },
+                    new() { Id = "customerEmail", Label = "Email", Type = "email", Enabled = true, Required = false, HelpText = "Email nhận thông tin đặt phòng nếu có.", Order = 3 },
+                    new() { Id = "customerNote", Label = "Ghi chú khách hàng", Type = "textarea", Enabled = false, Required = false, HelpText = "Các lưu ý đặc biệt khác.", Order = 4 }
+                };
+            }
+        }
     }
 
     private async Task SyncLegacySettingsAsync(AdminAIStudioConfig request)
@@ -99,6 +136,33 @@ public class AdminAIStudioConfigService : IAdminAIStudioConfigService
         await UpsertLegacySettingAsync("AIPublicBookingRoomCooldown", request.RuntimePolicies.RoomCooldownTurns.ToString(), "Cooldown show phòng");
         await UpsertLegacySettingAsync("AIPublicBookingPersonality", request.AssistantProfile?.Tone ?? string.Empty, "Tính cách public booking AI");
         await UpsertLegacySettingAsync("AIPublicBookingPrompt", BuildPublicBookingPrompt(request), "Prompt public booking từ Studio");
+
+        // Sync new properties
+        await UpsertLegacySettingAsync("AIPublicBookingTriggerWords", request.RuntimePolicies.TriggerWords ?? string.Empty, "Từ khoá kích hoạt đặt phòng");
+        await UpsertLegacySettingAsync("AIPublicBookingExitKeywords", request.RuntimePolicies.ExitKeywords ?? string.Empty, "Từ khoá thoát đặt phòng");
+        await UpsertLegacySettingAsync("AIPublicBookingProactiveMode", request.RuntimePolicies.ProactiveMode ?? string.Empty, "Chế độ chủ động");
+        await UpsertLegacySettingAsync("AIPublicBookingDependencyRule", request.RuntimePolicies.DependencyRule ?? string.Empty, "Quy tắc cha con public booking");
+        await UpsertLegacySettingAsync("AIPublicBookingGuestOverflowRule", request.RuntimePolicies.GuestOverflowRule ?? string.Empty, "Quy tắc khi số khách vượt sức chứa");
+
+        // Sync form schema to AIBookingFormSchema
+        if (request.BookingFormFields != null)
+        {
+            var activeFields = request.BookingFormFields
+                .Where(f => f.Enabled)
+                .Select(f => new
+                {
+                    id = f.Id,
+                    type = f.Type,
+                    label = f.Label,
+                    required = f.Required,
+                    helpText = f.HelpText,
+                    order = f.Order
+                })
+                .OrderBy(f => f.order)
+                .ToList();
+            var serializedSchema = JsonSerializer.Serialize(activeFields, JsonOptions);
+            await UpsertLegacySettingAsync("AIBookingFormSchema", serializedSchema, "Cấu hình Form thông tin đặt phòng");
+        }
     }
 
     private async Task UpsertLegacySettingAsync(string key, string value, string description)
@@ -192,7 +256,8 @@ public class AdminAIStudioConfigService : IAdminAIStudioConfigService
             FieldDefinitions = request.FieldDefinitions,
             UiBlockDefinitions = request.UiBlockDefinitions,
             RuntimePolicies = request.RuntimePolicies,
-            Handoff = request.Handoff
+            Handoff = request.Handoff,
+            BookingFormFields = request.BookingFormFields
         };
 
         if (request.ResponseStyle != null)
@@ -225,14 +290,7 @@ public class AdminAIStudioConfigService : IAdminAIStudioConfigService
     private static void EnsureStructuredShape(AdminAIStudioConfig config)
     {
         var defaults = BuildDefaultConfig();
-        config.Categories = config.Categories
-            .Where(category => !string.Equals(category, "Thanh toán / QR", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        if (config.Categories.Count == 0)
-        {
-            config.Categories = defaults.Categories;
-        }
+        config.Categories = defaults.Categories;
 
         config.AssistantProfile ??= defaults.AssistantProfile;
         config.ConversationFlows ??= defaults.ConversationFlows;
@@ -240,6 +298,7 @@ public class AdminAIStudioConfigService : IAdminAIStudioConfigService
         config.UiBlockDefinitions ??= defaults.UiBlockDefinitions;
         config.RuntimePolicies ??= defaults.RuntimePolicies;
         config.Handoff ??= defaults.Handoff;
+        config.BookingFormFields ??= defaults.BookingFormFields;
 
         if (config.ConversationFlows.Count == 0)
         {
@@ -305,12 +364,9 @@ public class AdminAIStudioConfigService : IAdminAIStudioConfigService
         {
             Categories =
             [
-                "Phong cách trả lời",
-                "Flow hội thoại",
-                "Kho field",
-                "Khối giao diện",
-                "Quy tắc hiển thị & chốt",
-                "Handoff người thật"
+                "Cấu hình Trợ lý & Handoff",
+                "Luật phản hồi & Chốt",
+                "Luồng đặt & Form khách"
             ],
             AssistantProfile = new AdminAIAssistantProfile
             {
@@ -501,6 +557,13 @@ public class AdminAIStudioConfigService : IAdminAIStudioConfigService
                 TriggerPrompt = "Nếu khách cần hỗ trợ ngoài luồng tự động hoặc có vấn đề nhạy cảm, chuyển sang người thật.",
                 ContactInstruction = "Mình sẽ nối bạn với chi nhánh phù hợp để được hỗ trợ trực tiếp.",
                 Keywords = ["nhân viên", "gặp người", "khiếu nại", "hỗ trợ gấp"]
+            },
+            BookingFormFields = new List<BookingFormFieldConfig>
+            {
+                new() { Id = "customerName", Label = "Họ và tên", Type = "text", Enabled = true, Required = true, HelpText = "Nhập đúng họ tên người đặt phòng.", Order = 1 },
+                new() { Id = "customerPhone", Label = "Số điện thoại", Type = "tel", Enabled = true, Required = true, HelpText = "Số điện thoại/Zalo để homestay liên hệ xác nhận.", Order = 2 },
+                new() { Id = "customerEmail", Label = "Email", Type = "email", Enabled = true, Required = false, HelpText = "Email nhận thông tin đặt phòng nếu có.", Order = 3 },
+                new() { Id = "customerNote", Label = "Ghi chú khách hàng", Type = "textarea", Enabled = false, Required = false, HelpText = "Các lưu ý đặc biệt khác.", Order = 4 }
             }
         };
     }

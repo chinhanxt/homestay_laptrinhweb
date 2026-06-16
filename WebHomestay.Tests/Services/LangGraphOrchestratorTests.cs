@@ -76,13 +76,14 @@ public class LangGraphOrchestratorTests
         var mockVectorLogger = new Mock<ILogger<VectorRecallNode>>();
         var mockIntentLogger = new Mock<ILogger<IntentClassifierNode>>();
         var mockComposerLogger = new Mock<ILogger<ResponseComposerNode>>();
+        var mockExplanationService = new Mock<IPublicBookingRoomExplanationService>();
 
         var nodes = new IWorkflowNode[]
         {
-            new IntentClassifierNode(mockConversationManager.Object, mockBookingConductor.Object, mockIntentLogger.Object),
-            new VectorRecallNode(mockEmbeddingService.Object, mockVectorSearch.Object, mockVectorLogger.Object),
+            new IntentClassifierNode(mockConversationManager.Object, mockIntentLogger.Object),
+            new VectorRecallNode(mockEmbeddingService.Object, mockVectorSearch.Object, context, mockConversationManager.Object, mockExplanationService.Object, mockVectorLogger.Object),
             new GraphExpansionNode(graphExpansionService, mockGraphLogger.Object),
-            new BookingGuardNode(mockBookingConductor.Object, mockConversationManager.Object, mockBookingLogger.Object),
+            new BookingGuardNode(mockBookingConductor.Object, mockConversationManager.Object, context, mockExplanationService.Object, mockBookingLogger.Object),
             new ResponseComposerNode(mockAiModelClient.Object, mockComposerLogger.Object)
         };
 
@@ -176,13 +177,14 @@ public class LangGraphOrchestratorTests
         var mockVectorLogger = new Mock<ILogger<VectorRecallNode>>();
         var mockIntentLogger = new Mock<ILogger<IntentClassifierNode>>();
         var mockComposerLogger = new Mock<ILogger<ResponseComposerNode>>();
+        var mockExplanationService = new Mock<IPublicBookingRoomExplanationService>();
 
         var nodes = new IWorkflowNode[]
         {
-            new IntentClassifierNode(mockConversationManager.Object, mockBookingConductor.Object, mockIntentLogger.Object),
-            new VectorRecallNode(mockEmbeddingService.Object, mockVectorSearch.Object, mockVectorLogger.Object),
+            new IntentClassifierNode(mockConversationManager.Object, mockIntentLogger.Object),
+            new VectorRecallNode(mockEmbeddingService.Object, mockVectorSearch.Object, context, mockConversationManager.Object, mockExplanationService.Object, mockVectorLogger.Object),
             new GraphExpansionNode(graphExpansionService, mockGraphLogger.Object),
-            new BookingGuardNode(mockBookingConductor.Object, mockConversationManager.Object, mockBookingLogger.Object),
+            new BookingGuardNode(mockBookingConductor.Object, mockConversationManager.Object, context, mockExplanationService.Object, mockBookingLogger.Object),
             new ResponseComposerNode(mockAiModelClient.Object, mockComposerLogger.Object)
         };
 
@@ -207,8 +209,9 @@ public class LangGraphOrchestratorTests
         var response = await orchestrator.ChatAsync(request, CancellationToken.None);
 
         Assert.NotNull(response);
-        Assert.Contains("thông tin", response.Answer);
+        Assert.Contains("chi nhánh", response.Answer);
         Assert.DoesNotContain("Xin chào", response.Answer);
+        Assert.Equal("AskInfo", response.BookingAction);
 
         var trace = await context.AIConversationTraces
             .FirstOrDefaultAsync(t => t.SessionId == "test-session-guard");
@@ -221,5 +224,21 @@ public class LangGraphOrchestratorTests
         var stageOrder = trace.PerformanceLog.Split(',');
         Assert.Equal(5, stageOrder.Length);
         Assert.Equal("composition", stageOrder[4]);
+    }
+
+    [Fact]
+    public async Task Integration_SearchRomanticRoom()
+    {
+        AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql("Host=localhost;Port=5432;Database=web_homestay;Username=postgres;Password=1510", o => o.UseVector())
+            .Options;
+        using var context = new ApplicationDbContext(options);
+        var trace = await context.AIConversationTraces
+            .OrderByDescending(t => t.CreatedAt)
+            .FirstOrDefaultAsync();
+        
+        var json = System.Text.Json.JsonSerializer.Serialize(trace, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        Assert.NotNull(trace);
     }
 }

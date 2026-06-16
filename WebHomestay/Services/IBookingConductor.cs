@@ -9,7 +9,8 @@ public enum MessageIntent
     PriceQuestion,
     LocationQuestion,
     Compared,
-    Exit
+    Exit,
+    HandoffRequest
 }
 
 public enum ConductorAction

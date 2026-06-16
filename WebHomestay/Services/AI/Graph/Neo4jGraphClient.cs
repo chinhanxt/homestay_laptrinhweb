@@ -16,7 +16,10 @@ namespace WebHomestay.Services.AI.Graph
         public Neo4jGraphClient(IOptions<Neo4jOptions> options)
         {
             var opt = options.Value;
-            _driver = GraphDatabase.Driver(opt.Uri, AuthTokens.Basic(opt.Username, opt.Password));
+            _driver = GraphDatabase.Driver(opt.Uri, AuthTokens.Basic(opt.Username, opt.Password), builder =>
+            {
+                builder.WithConnectionTimeout(TimeSpan.FromSeconds(1));
+            });
             _database = opt.Database;
         }
 

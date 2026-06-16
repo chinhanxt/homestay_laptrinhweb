@@ -89,13 +89,13 @@ namespace WebHomestay.Controllers
                 {
                     ["matrix.view"] = true,
                     ["bookings.view"] = true, ["bookings.detail"] = true, ["bookings.create"] = true, ["bookings.edit"] = true,
-                    ["branches.view"] = true, ["branches.detail"] = true, ["branches.create"] = true, ["branches.edit"] = true,
-                    ["rooms.view"] = true, ["rooms.detail"] = true, ["rooms.create"] = true, ["rooms.edit"] = true,
-                    ["images.view"] = true, ["images.detail"] = true,
+                    ["branches.view"] = true, ["branches.detail"] = true, ["branches.create"] = true, ["branches.edit"] = true, ["branches.trash"] = true, ["branches.restore"] = true,
+                    ["rooms.view"] = true, ["rooms.detail"] = true, ["rooms.create"] = true, ["rooms.edit"] = true, ["rooms.trash"] = true, ["rooms.restore"] = true,
+                    ["images.view"] = true, ["images.detail"] = true, ["images.trash"] = true, ["images.restore"] = true,
                     ["statistics.view"] = true, ["statistics.export"] = true,
-                    ["staff.view"] = true, ["staff.logs"] = true,
+                    ["staff.view"] = true, ["staff.trash"] = true, ["staff.restore"] = true, ["logs.view"] = true,
                     ["settings.view"] = true, ["settings.update"] = true, ["holidays.manage"] = true, ["slots.manage"] = true, ["branch.settings"] = true, ["payment.settings"] = true,
-                    ["ai.view"] = true, ["ai.detail"] = true, ["ai.create"] = true, ["ai.edit"] = true, ["ai.delete"] = true, ["ai.knowledge"] = true, ["ai.graph"] = true, ["ai.response"] = true, ["ai.trace"] = true
+                    ["ai.view"] = true, ["ai.create"] = true, ["ai.edit"] = true, ["ai.delete"] = true, ["ai.knowledge"] = true, ["ai.graph"] = true, ["ai.response"] = true
                 };
                 var staffPerms = new Dictionary<string, bool>
                 {

@@ -3,14 +3,27 @@ using WebHomestay.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var localGroqKeyPath = Path.Combine(builder.Environment.ContentRootPath, "..", "key.md");
-if (File.Exists(localGroqKeyPath))
+var localKeyPath = Path.Combine(builder.Environment.ContentRootPath, "..", "key.md");
+if (File.Exists(localKeyPath))
 {
-    var content = File.ReadAllText(localGroqKeyPath).Trim();
+    var keyEntries = ParseKeyFile(File.ReadAllLines(localKeyPath));
+    var chatKey = GetKeyEntry(keyEntries, "AIModel:ChatApiKey");
+    var embeddingKey = GetKeyEntry(keyEntries, "AIModel:EmbeddingApiKey");
+    var chatFallbackKey = GetKeyEntry(keyEntries, "Groq:AIModel:ChatApiKey");
+    var embeddingFallbackKey = GetKeyEntry(keyEntries, "gemini thường:AIModel:EmbeddingApiKey");
+
     Environment.SetEnvironmentVariable("AI_ENDPOINT_OVERRIDE", null);
-    builder.Configuration["AIModel:Provider"] = "gemma4";
-    builder.Configuration["AIModel:ApiKey"] = content;
-    builder.Configuration["AIModel:Model"] = "gemma-4-31b-it";
+    builder.Configuration["AIModel:Provider"] = "gemini";
+    builder.Configuration["AIModel:ApiKey"] = chatKey;
+    builder.Configuration["AIModel:ChatApiKey"] = chatKey;
+    builder.Configuration["AIModel:EmbeddingApiKey"] = embeddingKey;
+    builder.Configuration["AIModel:Model"] = "gemini-2.5-flash";
+    builder.Configuration["AIModel:ChatFallbackProvider"] = string.IsNullOrWhiteSpace(chatFallbackKey) ? string.Empty : "groq";
+    builder.Configuration["AIModel:ChatFallbackApiKey"] = chatFallbackKey;
+    builder.Configuration["AIModel:ChatFallbackModel"] = "llama-3.3-70b-versatile";
+    builder.Configuration["AIModel:EmbeddingFallbackProvider"] = string.IsNullOrWhiteSpace(embeddingFallbackKey) ? string.Empty : "gemini";
+    builder.Configuration["AIModel:EmbeddingFallbackApiKey"] = embeddingFallbackKey;
+    builder.Configuration["AIModel:EmbeddingFallbackModel"] = "gemini-embedding-001";
 }
 
 // Fix PostgreSQL DateTime issue
@@ -31,6 +44,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Register Custom Services
 builder.Services.AddScoped<WebHomestay.Services.IAvailabilityService, WebHomestay.Services.AvailabilityService>();
+builder.Services.AddScoped<WebHomestay.Services.IExcelTemplateService, WebHomestay.Services.ExcelTemplateService>();
+builder.Services.AddScoped<WebHomestay.Services.IBulkImportService, WebHomestay.Services.BulkImportService>();
 builder.Services.AddScoped<WebHomestay.Services.ISlotGenerationService, WebHomestay.Services.SlotGenerationService>();
 builder.Services.AddScoped<WebHomestay.Services.IRoomBookingViewService, WebHomestay.Services.RoomBookingViewService>();
 builder.Services.AddScoped<WebHomestay.Services.IBookingCreationService, WebHomestay.Services.BookingCreationService>();
@@ -69,15 +84,9 @@ builder.Services.AddScoped<WebHomestay.Services.AI.Workflow.WorkflowRunner>(sp =
     return new WebHomestay.Services.AI.Workflow.WorkflowRunner(nodes);
 });
 
-var useWorkflow = builder.Configuration.GetValue<bool>("AIModel:UseWorkflowRuntime");
-if (useWorkflow)
-{
-    builder.Services.AddScoped<WebHomestay.Services.IAIBrainOrchestrator, WebHomestay.Services.AI.Workflow.LangGraphOrchestrator>();
-}
-else
-{
-    builder.Services.AddScoped<WebHomestay.Services.IAIBrainOrchestrator, WebHomestay.Services.AI.SemanticKernelOrchestrator>();
-}
+builder.Services.AddScoped<WebHomestay.Services.AI.IPublicBookingBrainOrchestrator, WebHomestay.Services.AI.SemanticKernelOrchestrator>();
+builder.Services.AddScoped<WebHomestay.Services.AI.Workflow.IWorkflowBrainOrchestrator, WebHomestay.Services.AI.Workflow.LangGraphOrchestrator>();
+builder.Services.AddScoped<WebHomestay.Services.IAIBrainOrchestrator, WebHomestay.Services.AI.Compatibility.ModeAwareAIBrainOrchestrator>();
 builder.Services.AddScoped<WebHomestay.Services.IBookingConductor, WebHomestay.Services.ContextAwareBookingConductor>();
 builder.Services.AddScoped<WebHomestay.Services.PricingService>();
 builder.Services.AddScoped<WebHomestay.Services.IPermissionResolveService, WebHomestay.Services.PermissionResolveService>();
@@ -117,6 +126,55 @@ using (var scope = app.Services.CreateScope())
     var context = services.GetRequiredService<ApplicationDbContext>();
     context.Database.Migrate();
 
+    // Force reseed on startup to clear any legacy or corrupted embeddings, and reconstruct the grounding data
+    try
+    {
+        var reseedService = services.GetRequiredService<WebHomestay.Services.AI.IAdminAIReseedService>();
+        reseedService.ReseedAsync().GetAwaiter().GetResult();
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Failed to force database reseed on startup.");
+    }
+
+    // Auto-reindex embeddings on startup if any are missing
+    var anyRoomWithEmbedding = context.Rooms.Any(r => r.Embedding != null);
+    var anyUnitWithEmbedding = context.AIKnowledgeUnits.Any(k => k.Embedding != null);
+    if ((!anyRoomWithEmbedding && context.Rooms.Any()) || (!anyUnitWithEmbedding && context.AIKnowledgeUnits.Any()))
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation("Auto-reindexing AI embeddings on startup...");
+        var embeddingService = services.GetRequiredService<WebHomestay.Services.AI.IEmbeddingService>();
+        
+        try
+        {
+            var units = context.AIKnowledgeUnits.Where(k => k.IsActive && !k.IsDeleted && k.Embedding == null).ToList();
+            foreach (var unit in units)
+            {
+                var text = $"{unit.Title}. {unit.Content}. Thẻ: {unit.Tags}";
+                var rawEmbedding = embeddingService.GetEmbeddingAsync(text).GetAwaiter().GetResult();
+                unit.Embedding = new Pgvector.Vector(rawEmbedding);
+            }
+
+            var rooms = context.Rooms.Include(r => r.Branch).Where(r => r.Embedding == null).ToList();
+            foreach (var room in rooms)
+            {
+                var branchName = room.Branch?.Name ?? "Hệ thống";
+                var text = $"Phòng {room.Name} thuộc chi nhánh {branchName}, giá giờ {room.PricePerHour:N0}đ, giá ngày {room.PricePerDay:N0}đ. Sức chứa {room.Capacity} người, tối đa {room.MaxGuests} khách. Tiện nghi và mô tả: {room.Description ?? "Chưa cập nhật."}";
+                var rawEmbedding = embeddingService.GetEmbeddingAsync(text).GetAwaiter().GetResult();
+                room.Embedding = new Pgvector.Vector(rawEmbedding);
+            }
+
+            context.SaveChanges();
+            logger.LogInformation("Auto-reindexing AI embeddings on startup completed successfully.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to auto-reindex AI embeddings on startup.");
+        }
+    }
+
     // Seed default settings
     if (!context.SystemSettings.Any(s => s.SettingKey == "BookingLeadTimeHours"))
     {
@@ -126,6 +184,18 @@ using (var scope = app.Services.CreateScope())
             SettingValue = "2",
             Description = "Số giờ tối thiểu phải đặt trước (Theo giờ)",
             GroupName = "Booking"
+        });
+        context.SaveChanges();
+    }
+
+    if (!context.SystemSettings.Any(s => s.SettingKey == "MaxZipUploadSizeMB"))
+    {
+        context.SystemSettings.Add(new WebHomestay.Models.SystemSetting
+        {
+            SettingKey = "MaxZipUploadSizeMB",
+            SettingValue = "30",
+            Description = "Kích thước tối đa file ZIP upload cho phép (MB)",
+            GroupName = "System"
         });
         context.SaveChanges();
     }
@@ -250,3 +320,82 @@ app.MapControllerRoute(
 app.MapHub<WebHomestay.Hubs.ChatHub>("/chatHub");
 
 app.Run();
+
+static Dictionary<string, string> ParseKeyFile(IEnumerable<string> lines)
+{
+    var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    string? pendingLabel = null;
+
+    foreach (var rawLine in lines)
+    {
+        var line = rawLine.Trim();
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            continue;
+        }
+
+        if (TryMatchKnownLabel(line, out var label, out var inlineValue))
+        {
+            if (!string.IsNullOrWhiteSpace(inlineValue))
+            {
+                result[label] = NormalizeKeyValue(inlineValue);
+                pendingLabel = null;
+            }
+            else
+            {
+                pendingLabel = label;
+            }
+
+            continue;
+        }
+
+        if (!string.IsNullOrWhiteSpace(pendingLabel))
+        {
+            result[pendingLabel] = NormalizeKeyValue(line);
+            pendingLabel = null;
+        }
+    }
+
+    return result;
+}
+
+static bool TryMatchKnownLabel(string line, out string label, out string value)
+{
+    var knownLabels = new[]
+    {
+        "AIModel:ChatApiKey",
+        "AIModel:EmbeddingApiKey",
+        "Groq:AIModel:ChatApiKey",
+        "gemini thường:AIModel:EmbeddingApiKey"
+    };
+
+    foreach (var knownLabel in knownLabels)
+    {
+        if (line.StartsWith(knownLabel + ":", StringComparison.OrdinalIgnoreCase))
+        {
+            label = knownLabel;
+            value = line.Substring(knownLabel.Length + 1).Trim();
+            return true;
+        }
+    }
+
+    label = string.Empty;
+    value = string.Empty;
+    return false;
+}
+
+static string GetKeyEntry(Dictionary<string, string> entries, string key)
+{
+    return entries.TryGetValue(key, out var value) ? value : string.Empty;
+}
+
+static string NormalizeKeyValue(string value)
+{
+    var key = value.Trim();
+    if (key.EndsWith("gemini", StringComparison.OrdinalIgnoreCase))
+    {
+        key = key.Substring(0, key.Length - 6).Trim();
+    }
+
+    return key;
+}

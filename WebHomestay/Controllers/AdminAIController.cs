@@ -4,7 +4,9 @@ using WebHomestay.Data;
 using WebHomestay.Filters;
 using WebHomestay.Models;
 using WebHomestay.Models.AI;
+using WebHomestay.Services;
 using WebHomestay.Services.AI;
+using WebHomestay.Services.AI.Compatibility;
 
 namespace WebHomestay.Controllers;
 
@@ -18,6 +20,9 @@ public class AdminAIController : Controller
     private readonly IAdminAIReseedService _reseedService;
     private readonly IEmbeddingService _embeddingService;
     private readonly IOperationalInsightService _operationalInsightService;
+    private readonly IAIRuntimeSelector _runtimeSelector;
+
+    private readonly IBulkImportService _importService;
 
     public AdminAIController(
         ApplicationDbContext context,
@@ -25,7 +30,9 @@ public class AdminAIController : Controller
         IAdminAIRuntimeSimulatorService runtimeSimulatorService,
         IAdminAIReseedService reseedService,
         IEmbeddingService embeddingService,
-        IOperationalInsightService operationalInsightService)
+        IOperationalInsightService operationalInsightService,
+        IAIRuntimeSelector runtimeSelector,
+        IBulkImportService importService)
     {
         _context = context;
         _studioConfigService = studioConfigService;
@@ -33,6 +40,8 @@ public class AdminAIController : Controller
         _reseedService = reseedService;
         _embeddingService = embeddingService;
         _operationalInsightService = operationalInsightService;
+        _runtimeSelector = runtimeSelector;
+        _importService = importService;
     }
 
     [AdminAuthorize(Permission = "ai.view")]
@@ -85,6 +94,39 @@ public class AdminAIController : Controller
     public async Task<IActionResult> ReseedSystemKnowledge()
     {
         var result = await _reseedService.ReseedAsync();
+        
+        try
+        {
+            var units = await _context.AIKnowledgeUnits
+                .Where(k => k.IsActive && !k.IsDeleted)
+                .ToListAsync();
+
+            foreach (var unit in units)
+            {
+                var text = $"{unit.Title}. {unit.Content}. Thẻ: {unit.Tags}";
+                var rawEmbedding = await _embeddingService.GetEmbeddingAsync(text);
+                unit.Embedding = new Pgvector.Vector(rawEmbedding);
+            }
+
+            var rooms = await _context.Rooms
+                .Include(r => r.Branch)
+                .ToListAsync();
+
+            foreach (var room in rooms)
+            {
+                var branchName = room.Branch?.Name ?? "Hệ thống";
+                var text = $"Phòng {room.Name} thuộc chi nhánh {branchName}, giá giờ {room.PricePerHour:N0}đ, giá ngày {room.PricePerDay:N0}đ. Sức chứa {room.Capacity} người, tối đa {room.MaxGuests} khách. Tiện nghi và mô tả: {room.Description ?? "Chưa cập nhật."}";
+                var rawEmbedding = await _embeddingService.GetEmbeddingAsync(text);
+                room.Embedding = new Pgvector.Vector(rawEmbedding);
+            }
+
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error reindexing embeddings after reseed: {ex.Message}");
+        }
+
         return Ok(result);
     }
 
@@ -495,6 +537,17 @@ public class AdminAIController : Controller
     }
 
     [AdminAuthorize(Permission = "ai.view")]
+    [HttpGet("runtime")]
+    public IActionResult GetRuntime()
+    {
+        return Ok(new
+        {
+            success = true,
+            runtime = _runtimeSelector.GetActiveRuntime()
+        });
+    }
+
+    [AdminAuthorize(Permission = "ai.view")]
     [HttpGet("operational-briefing")]
     public async Task<IActionResult> GetOperationalBriefing(CancellationToken cancellationToken = default)
     {
@@ -560,10 +613,160 @@ public class AdminAIController : Controller
             return Ok(new { success = false, message = $"Lỗi thực thi hành động: {ex.Message}" });
         }
     }
+
+    [AdminAuthorize(Permission = "ai.view")]
+    [HttpPost("rag-test")]
+    public async Task<IActionResult> RagTest([FromBody] RagTestRequest request, [FromServices] WebHomestay.Services.AI.Retrieval.IVectorSearchService vectorSearchService, CancellationToken cancellationToken)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Query))
+        {
+            return BadRequest("Yêu cầu không hợp lệ.");
+        }
+
+        try
+        {
+            var queryEmbedding = await _embeddingService.GetEmbeddingAsync(request.Query, cancellationToken);
+            if (queryEmbedding == null)
+            {
+                return Ok(new { success = true, matches = Array.Empty<object>(), graph = new { nodes = Array.Empty<object>(), edges = Array.Empty<object>() }, timeMs = 0 });
+            }
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            // 1. Search knowledge units in Postgres
+            var hits = await vectorSearchService.SearchKnowledgeAsync(queryEmbedding, new WebHomestay.Services.AI.Retrieval.VectorSearchFilter { ActiveOnly = true }, 5, cancellationToken);
+
+            // 2. Perform graph expansion matching seed keys
+            var seedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var hit in hits)
+            {
+                if (!string.IsNullOrWhiteSpace(hit.Tags))
+                {
+                    var splitTags = hit.Tags.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var tag in splitTags)
+                    {
+                        var trimmed = tag.Trim().ToLowerInvariant();
+                        if (!string.IsNullOrEmpty(trimmed)) seedKeys.Add(trimmed);
+                    }
+                }
+                if (!string.IsNullOrWhiteSpace(hit.EntityId))
+                {
+                    seedKeys.Add(hit.EntityId.ToLowerInvariant());
+                }
+            }
+
+            // Query PostgreSQL directly for matching graph nodes & edges to return rich structured visualization objects
+            var nodes = await _context.AIGraphNodes
+                .Where(n => !n.IsDeleted && n.IsActive)
+                .ToListAsync(cancellationToken);
+
+            var queryTerms = request.Query.ToLower().Split(' ').Where(t => t.Length > 2).ToList();
+            var matchedNodes = nodes
+                .Where(n => seedKeys.Contains(n.Label.ToLower()) 
+                    || queryTerms.Any(term => n.Label.ToLower().Contains(term) || n.Summary.ToLower().Contains(term)))
+                .Take(5)
+                .ToList();
+
+            var nodeIds = matchedNodes.Select(n => n.Id).ToList();
+            var matchedEdges = await _context.AIGraphEdges
+                .Include(e => e.FromNode)
+                .Include(e => e.ToNode)
+                .Where(e => !e.IsDeleted && (nodeIds.Contains(e.FromNodeId) || nodeIds.Contains(e.ToNodeId)))
+                .Select(e => new
+                {
+                    e.Id,
+                    e.FromNodeId,
+                    FromLabel = e.FromNode.Label,
+                    e.ToNodeId,
+                    ToLabel = e.ToNode.Label,
+                    e.RelationshipType,
+                    e.Weight,
+                    e.Evidence
+                })
+                .Take(10)
+                .ToListAsync(cancellationToken);
+
+            var connectedNodeIds = matchedEdges.Select(e => e.FromNodeId).Union(matchedEdges.Select(e => e.ToNodeId)).Distinct().ToList();
+            var connectedNodes = nodes
+                .Where(n => connectedNodeIds.Contains(n.Id))
+                .Select(n => new
+                {
+                    n.Id,
+                    n.NodeType,
+                    n.Label,
+                    n.Summary,
+                    n.MetadataJson,
+                    n.IsActive
+                })
+                .ToList();
+
+            stopwatch.Stop();
+
+            return Ok(new
+            {
+                success = true,
+                matches = hits.Select(h => new
+                {
+                    type = "Knowledge",
+                    id = h.EntityId,
+                    title = h.Title,
+                    content = h.Content,
+                    scopeName = h.Tags.Contains("system-seed") ? "Hệ thống" : "Tri thức",
+                    score = Math.Round(h.Score * 100, 1)
+                }),
+                graph = new
+                {
+                    nodes = connectedNodes,
+                    edges = matchedEdges
+                },
+                timeMs = stopwatch.ElapsedMilliseconds
+            });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new { success = false, message = ex.Message });
+        }
+    }
+
+    [AdminAuthorize(Permission = "ai.edit")]
+    [HttpPost("import-knowledge")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ImportKnowledge(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+        {
+            TempData["ErrorMessage"] = "Vui lòng chọn file ZIP hoặc Excel để import.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            var result = await _importService.ImportAIKnowledgeAsync(file);
+            if (result.Errors.Any())
+            {
+                TempData["ErrorMessage"] = $"Import hoàn tất. Thành công: {result.SuccessCount}, Thất bại: {result.FailureCount}. Chi tiết lỗi: {string.Join(" | ", result.Errors.Take(5))}";
+            }
+            else
+            {
+                TempData["SuccessMessage"] = $"Đã import thành công {result.SuccessCount} bài học tri thức.";
+            }
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = $"Lỗi import: {ex.Message}";
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
 }
 
 public class QuickActionRequest
 {
     public string Action { get; set; } = string.Empty;
     public string Param { get; set; } = string.Empty;
+}
+
+public class RagTestRequest
+{
+    public string Query { get; set; } = string.Empty;
 }

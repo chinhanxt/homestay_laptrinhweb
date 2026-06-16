@@ -23,7 +23,6 @@
 }
 
 <link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
-<link rel="stylesheet" href="~/css/admin-ai-hub.css" asp-append-version="true" />
 
 <div class="premium-settings-wrapper">
     <div class="settings-sidebar">
@@ -50,6 +49,9 @@
             </button>
             <button class="nav-link" id="tab-payment-qr" data-bs-toggle="pill" data-bs-target="#panel-payment-qr" type="button" role="tab">
                 <i class="fas fa-qrcode me-3"></i> <span>Cấu hình mã QR</span>
+            </button>
+            <button class="nav-link" id="tab-import" data-bs-toggle="pill" data-bs-target="#panel-import" type="button" role="tab">
+                <i class="fas fa-file-import me-3"></i> <span>Mẫu & Import</span>
             </button>
         </div>
         
@@ -155,18 +157,30 @@
                                 </div>
 
                                 <div class="row g-3">
-                                    <div class="col-md-4">
-                                        <label class="form-label small fw-bold text-muted">Ngưỡng trước check-in (giờ)</label>
-                                        <input type="number" name="noticeHours" value="@cancellationNoticeHours" min="0" class="form-control-premium" />
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label small fw-bold text-muted">Hoàn tiền trước ngưỡng (%)</label>
-                                        <input type="number" name="refundBefore" value="@cancellationRefundBefore" min="0" max="100" class="form-control-premium" />
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label small fw-bold text-muted">Hoàn tiền sau ngưỡng (%)</label>
-                                        <input type="number" name="refundAfter" value="@cancellationRefundAfter" min="0" max="100" class="form-control-premium" />
-                                    </div>
+                                     <div class="col-md-4">
+                                         <label class="form-label small fw-bold text-muted">Ngưỡng trước check-in</label>
+                                         <div class="input-group-premium">
+                                             <i class="fas fa-clock text-muted"></i>
+                                             <input type="number" name="noticeHours" value="@cancellationNoticeHours" min="0" class="form-control-premium" />
+                                             <span class="suffix">giờ</span>
+                                         </div>
+                                     </div>
+                                     <div class="col-md-4">
+                                         <label class="form-label small fw-bold text-muted">Hoàn tiền trước ngưỡng</label>
+                                         <div class="input-group-premium">
+                                             <i class="fas fa-percentage text-muted"></i>
+                                             <input type="number" name="refundBefore" value="@cancellationRefundBefore" min="0" max="100" class="form-control-premium" />
+                                             <span class="suffix">%</span>
+                                         </div>
+                                     </div>
+                                     <div class="col-md-4">
+                                         <label class="form-label small fw-bold text-muted">Hoàn tiền sau ngưỡng</label>
+                                         <div class="input-group-premium">
+                                             <i class="fas fa-percentage text-muted"></i>
+                                             <input type="number" name="refundAfter" value="@cancellationRefundAfter" min="0" max="100" class="form-control-premium" />
+                                             <span class="suffix">%</span>
+                                         </div>
+                                     </div>
                                     <div class="col-12">
                                         <label class="form-label small fw-bold text-muted">Thông báo chính sách cho khách</label>
                                         <textarea name="policyMessage" rows="3" class="form-control premium-input">@cancellationPolicyMessage</textarea>
@@ -205,8 +219,8 @@
                                                                          <div class="mb-3">
                                                                              <label class="form-label small fw-bold text-muted mb-2">Tiêu đề Email</label>
                                                                              <div class="input-group">
-                                                                                 <span class="input-group-text bg-light border-end-0 rounded-3"><i class="fas fa-heading text-muted"></i></span>
-                                                                                 <input type="text" id="approval-email-subject" name="approvalEmailSubject" value="@cancellationApprovalEmailSubject" class="form-control-premium border-start-0 ps-0" placeholder="Nhập tiêu đề email..." required />
+                                                                                 <span class="input-group-text bg-light border-end-0 rounded-start-3"><i class="fas fa-heading text-muted"></i></span>
+                                                                                 <input type="text" id="approval-email-subject" name="approvalEmailSubject" value="@cancellationApprovalEmailSubject" class="form-control-premium border-start-0 ps-2" placeholder="Nhập tiêu đề email..." required />
                                                                              </div>
                                                                          </div>
                                                                          
@@ -278,8 +292,8 @@
                                                                          <div class="mb-3">
                                                                              <label class="form-label small fw-bold text-muted mb-2">Tiêu đề Email</label>
                                                                              <div class="input-group">
-                                                                                 <span class="input-group-text bg-light border-end-0 rounded-3"><i class="fas fa-heading text-muted"></i></span>
-                                                                                 <input type="text" id="rejection-email-subject" name="rejectionEmailSubject" value="@cancellationRejectionEmailSubject" class="form-control-premium border-start-0 ps-0" placeholder="Nhập tiêu đề email..." required />
+                                                                                 <span class="input-group-text bg-light border-end-0 rounded-start-3"><i class="fas fa-heading text-muted"></i></span>
+                                                                                 <input type="text" id="rejection-email-subject" name="rejectionEmailSubject" value="@cancellationRejectionEmailSubject" class="form-control-premium border-start-0 ps-2" placeholder="Nhập tiêu đề email..." required />
                                                                              </div>
                                                                          </div>
                                                                          
@@ -387,6 +401,9 @@
                         {
                             <button type="button" class="btn-premium btn-sm rounded-pill px-4 mb-2" data-bs-toggle="modal" data-bs-target="#createTemplateModal">
                                 <i class="fas fa-plus me-2"></i> Thêm mẫu mới
+                            </button>
+                            <button type="button" class="btn-premium-outline btn-sm rounded-pill px-3 mb-2" data-bs-toggle="modal" data-bs-target="#importSlotsModal">
+                                <i class="fas fa-file-import me-2"></i> Import Excel
                             </button>
                         }
                         @if (trashedTemplates.Any())
@@ -520,12 +537,17 @@
                         <h2>Ma trận Ngày Lễ</h2>
                         <p>Cấu hình các dịp đặc biệt để hệ thống tự động điều chỉnh biểu giá.</p>
                     </div>
-                    @if (trashedHolidays.Any())
-                    {
-                        <button type="button" class="btn-premium-outline btn-sm rounded-pill px-3 trash-toggle-btn" data-panel="holiday" onclick="toggleTrashPanel('holiday')">
-                            <i class="fas fa-trash-alt me-1"></i> <span>Thùng rác</span> <span class="badge bg-danger ms-1">@trashedHolidays.Count</span>
+                    <div class="d-flex gap-2 align-items-center">
+                        <button type="button" class="btn-premium btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#importHolidaysModal">
+                            <i class="fas fa-file-import me-2"></i> Import Excel
                         </button>
-                    }
+                        @if (trashedHolidays.Any())
+                        {
+                            <button type="button" class="btn-premium-outline btn-sm rounded-pill px-3 trash-toggle-btn" data-panel="holiday" onclick="toggleTrashPanel('holiday')">
+                                <i class="fas fa-trash-alt me-1"></i> <span>Thùng rác</span> <span class="badge bg-danger ms-1">@trashedHolidays.Count</span>
+                            </button>
+                        }
+                    </div>
                 </div>
 
                 <div class="trash-retention-info settings-trash-info d-none" id="trash-info-holiday">
@@ -808,66 +830,195 @@
                                     <input type="hidden" name="BranchId" value="@branch.Id" />
                                     <input type="hidden" name="BranchName" value="@branch.Name" />
 
-                                    <div class="col-lg-4">
-                                        <div class="bg-white border rounded-4 p-3 text-center h-100">
-                                            @if (!string.IsNullOrWhiteSpace(previewSrc))
-                                            {
-                                                <img src="@previewSrc" alt="QR @branch.Name" class="img-fluid mb-3" style="max-height: 220px;" />
-                                            }
-                                            else
-                                            {
-                                                <div class="text-muted small py-5 border rounded-4 bg-light">Chưa có ảnh QR. Nếu nhập ngân hàng và số tài khoản, trang thanh toán sẽ tự tạo VietQR.</div>
-                                            }
-                                            <label class="form-label small fw-bold text-muted mt-3">Upload ảnh QR</label>
-                                            <input type="file" name="qrImage" class="form-control premium-input" accept="image/*" />
-                                            @if (!string.IsNullOrWhiteSpace(qr.QrImagePath))
-                                            {
-                                                <div class="small text-muted mt-2">Ảnh hiện tại: @qr.QrImagePath</div>
-                                            }
+                                    <!-- Cột trái: Live Preview & QR Upload -->
+                                    <div class="col-lg-5 col-xl-4">
+                                        <!-- Live Preview Card -->
+                                        <div class="premium-card mb-4 overflow-hidden border-0 shadow-sm" style="border-radius: var(--admin-radius);">
+                                            <div class="card-header bg-gradient-premium text-white py-3 px-4">
+                                                <h6 class="fw-bold mb-0 d-flex align-items-center"><i class="fas fa-eye me-2"></i>Xem trước thẻ thanh toán</h6>
+                                            </div>
+                                            <div class="card-body p-4 bg-light-subtle d-flex flex-column align-items-center gap-3">
+                                                <!-- The styled Bank Card -->
+                                                <div class="bank-transfer-card bg-slate-900 text-white p-4 w-100 position-relative shadow-lg border border-slate-800" style="border-radius: 20px; overflow: hidden; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
+                                                    <!-- Abstract glowing shapes inside card -->
+                                                    <div class="position-absolute" style="top: -20px; right: -20px; width: 120px; height: 120px; border-radius: 50%; background: rgba(194, 155, 97, 0.15); filter: blur(30px); pointer-events: none;"></div>
+                                                    <div class="position-absolute" style="bottom: -30px; left: -10px; width: 150px; height: 150px; border-radius: 50%; background: rgba(79, 140, 255, 0.12); filter: blur(40px); pointer-events: none;"></div>
+                                                    
+                                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                                        <div class="preview-card-chip text-warning fs-3">
+                                                            <i class="fas fa-microchip"></i>
+                                                        </div>
+                                                        <div class="preview-card-logo">
+                                                            <i class="fas fa-credit-card text-slate-500 fs-4"></i>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3">
+                                                        <span class="text-slate-400 extra-small d-block mb-1 tracking-widest text-uppercase">NGÂN HÀNG THỤ HƯỞNG</span>
+                                                        <strong class="preview-bank-code fs-6 fw-bold text-white tracking-wide">@(string.IsNullOrWhiteSpace(qr.BankCode) ? "CHƯA CẤU HÌNH" : qr.BankCode.ToUpper())</strong>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3">
+                                                        <span class="text-slate-400 extra-small d-block mb-1 tracking-widest text-uppercase">SỐ TÀI KHOẢN</span>
+                                                        <strong class="preview-bank-acc fs-5 fw-bold text-white tracking-widest">@(string.IsNullOrWhiteSpace(qr.BankAccountNumber) ? "•••• •••• ••••" : qr.BankAccountNumber)</strong>
+                                                    </div>
+                                                    
+                                                    <div class="row g-2 align-items-end">
+                                                        <div class="col-7">
+                                                            <span class="text-slate-400 extra-small d-block mb-1 tracking-widest text-uppercase">CHỦ TÀI KHOẢN</span>
+                                                            <strong class="preview-bank-name small fw-bold text-white text-uppercase tracking-wide">@(string.IsNullOrWhiteSpace(qr.BankAccountName) ? "CHƯA CẤU HÌNH" : qr.BankAccountName)</strong>
+                                                        </div>
+                                                        <div class="col-5 text-end">
+                                                            <span class="badge-premium badge-warning-soft px-2 py-1 rounded small fs-9 d-inline-flex align-items-center"><i class="fas fa-qrcode me-1"></i> VietQR.vn</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- QR Code Preview Area -->
+                                                <div class="qr-preview-box w-100 text-center py-4 px-3 border border-dashed rounded-4 bg-white position-relative overflow-hidden" style="min-height: 250px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px;">
+                                                    @if (!string.IsNullOrWhiteSpace(previewSrc))
+                                                    {
+                                                        <div class="qr-preview-wrapper position-relative p-2 bg-white border rounded-3 shadow-sm d-inline-block">
+                                                            <img src="@previewSrc" alt="QR @branch.Name" class="img-fluid" style="max-height: 180px; object-fit: contain;" />
+                                                        </div>
+                                                        <div class="text-success small fw-semibold"><i class="fas fa-check-circle me-1"></i> Đã cấu hình ảnh QR của chi nhánh</div>
+                                                    }
+                                                    else if (hasBankInfo)
+                                                    {
+                                                        <!-- Dynamic VietQR Placeholder representation -->
+                                                        <div class="vietqr-placeholder-graphic position-relative p-3 bg-slate-50 border border-slate-200 rounded-3 shadow-sm text-center d-flex flex-column align-items-center justify-content-center" style="width: 170px; height: 170px;">
+                                                            <i class="fas fa-qrcode text-slate-300 fs-1 mb-2"></i>
+                                                            <span class="text-slate-400 fs-8 fw-semibold text-uppercase">MÃ VIETQR ĐỘNG</span>
+                                                            <span class="text-slate-500 extra-small">Tự động tạo khi xuất hóa đơn</span>
+                                                            <!-- VietQR corner scanner borders -->
+                                                            <div class="position-absolute" style="top: 8px; left: 8px; width: 16px; height: 16px; border-top: 3px solid var(--admin-primary); border-left: 3px solid var(--admin-primary);"></div>
+                                                            <div class="position-absolute" style="top: 8px; right: 8px; width: 16px; height: 16px; border-top: 3px solid var(--admin-primary); border-right: 3px solid var(--admin-primary);"></div>
+                                                            <div class="position-absolute" style="bottom: 8px; left: 8px; width: 16px; height: 16px; border-bottom: 3px solid var(--admin-primary); border-left: 3px solid var(--admin-primary);"></div>
+                                                            <div class="position-absolute" style="bottom: 8px; right: 8px; width: 16px; height: 16px; border-bottom: 3px solid var(--admin-primary); border-right: 3px solid var(--admin-primary);"></div>
+                                                        </div>
+                                                        <div class="text-primary small fw-semibold"><i class="fas fa-magic me-1"></i> Tự động tạo VietQR theo tài khoản ngân hàng</div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="text-muted small py-4 px-3 text-center d-flex flex-column align-items-center justify-content-center">
+                                                            <i class="fas fa-exclamation-triangle text-warning fs-3 mb-2"></i>
+                                                            <span>Chưa có ảnh QR hoặc thông tin ngân hàng thụ hưởng.</span>
+                                                        </div>
+                                                    }
+                                                </div>
+
+                                                <!-- Upload field -->
+                                                <div class="w-100 bg-white border border-slate-100 rounded-4 p-3 shadow-2xs mt-1">
+                                                    <label class="form-label small fw-bold text-muted d-block mb-2 text-uppercase tracking-wider"><i class="fas fa-cloud-upload-alt me-1"></i> Tải lên ảnh QR mới</label>
+                                                    <input type="file" name="qrImage" class="form-control form-control-sm premium-input" accept="image/*" onchange="previewUploadImage(this)" />
+                                                    @if (!string.IsNullOrWhiteSpace(qr.QrImagePath))
+                                                    {
+                                                        <div class="extra-small text-muted mt-2 text-truncate" title="@qr.QrImagePath">Đường dẫn: @qr.QrImagePath</div>
+                                                    }
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div class="col-lg-8">
-                                        <div class="row g-3">
+                                    <!-- Cột phải: Form Cấu hình chi tiết -->
+                                    <div class="col-lg-7 col-xl-8">
+                                        <div class="row g-4">
+                                            <!-- Section 1: Tài khoản ngân hàng -->
                                             <div class="col-12">
-                                                <label class="form-label small fw-bold text-muted">URL ảnh QR thủ công</label>
-                                                <input type="url" name="QrImageUrl" value="@qr.QrImageUrl" class="form-control premium-input" placeholder="https://..." />
+                                                <div class="border rounded-4 p-4 bg-white shadow-2xs">
+                                                    <h6 class="fw-bold mb-3 text-primary d-flex align-items-center border-bottom pb-2">
+                                                        <i class="fas fa-university me-2"></i> Thông tin thụ hưởng ngân hàng
+                                                    </h6>
+                                                    <div class="row g-3">
+                                                        <div class="col-12">
+                                                            <label class="form-label small fw-bold text-muted">URL ảnh QR thủ công (nếu không upload)</label>
+                                                            <div class="input-group-premium">
+                                                                <i class="fas fa-link"></i>
+                                                                <input type="url" name="QrImageUrl" value="@qr.QrImageUrl" class="form-control-premium" placeholder="https://..." oninput="updateQRPreview(this)" />
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label class="form-label small fw-bold text-muted">Mã ngân hàng (ví dụ: MB, VCB, ICB)</label>
+                                                            <div class="input-group-premium">
+                                                                <i class="fas fa-building"></i>
+                                                                <input type="text" name="BankCode" value="@qr.BankCode" class="form-control-premium text-uppercase" placeholder="MB, VCB..." oninput="updateCardText(this, '.preview-bank-code')" />
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label class="form-label small fw-bold text-muted">Số tài khoản thụ hưởng</label>
+                                                            <div class="input-group-premium">
+                                                                <i class="fas fa-hashtag"></i>
+                                                                <input type="text" name="BankAccountNumber" value="@qr.BankAccountNumber" class="form-control-premium" placeholder="Số tài khoản..." oninput="updateCardText(this, '.preview-bank-acc')" />
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label class="form-label small fw-bold text-muted">Họ tên chủ tài khoản</label>
+                                                            <div class="input-group-premium">
+                                                                <i class="fas fa-user-tie"></i>
+                                                                <input type="text" name="BankAccountName" value="@qr.BankAccountName" class="form-control-premium text-uppercase" placeholder="Tên chủ tài khoản..." oninput="updateCardText(this, '.preview-bank-name')" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label small fw-bold text-muted">Mã ngân hàng</label>
-                                                <input type="text" name="BankCode" value="@qr.BankCode" class="form-control premium-input" placeholder="MB, VCB..." />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label small fw-bold text-muted">Số tài khoản</label>
-                                                <input type="text" name="BankAccountNumber" value="@qr.BankAccountNumber" class="form-control premium-input" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label small fw-bold text-muted">Chủ tài khoản</label>
-                                                <input type="text" name="BankAccountName" value="@qr.BankAccountName" class="form-control premium-input" />
-                                            </div>
-                                            <div class="col-md-8">
-                                                <label class="form-label small fw-bold text-muted">Mẫu nội dung chuyển khoản</label>
-                                                <input type="text" name="TransferContentTemplate" value="@qr.TransferContentTemplate" class="form-control premium-input" />
-                                                <div class="form-text">Hỗ trợ: {BookingId}, {BranchName}</div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label small fw-bold text-muted">Thời gian đếm ngược (phút)</label>
-                                                <input type="number" name="CountdownMinutes" value="@qr.CountdownMinutes" min="1" class="form-control premium-input" />
-                                            </div>
+
+                                            <!-- Section 2: Nội dung & Thời gian -->
                                             <div class="col-12">
-                                                <label class="form-label small fw-bold text-muted">Thông báo trước khi gửi bill</label>
-                                                <textarea name="BeforeBillMessage" rows="2" class="form-control premium-input">@qr.BeforeBillMessage</textarea>
+                                                <div class="border rounded-4 p-4 bg-white shadow-2xs">
+                                                    <h6 class="fw-bold mb-3 text-primary d-flex align-items-center border-bottom pb-2">
+                                                        <i class="fas fa-receipt me-2"></i> Nội dung & Đếm ngược
+                                                    </h6>
+                                                    <div class="row g-3">
+                                                        <div class="col-md-8">
+                                                            <label class="form-label small fw-bold text-muted">Mẫu nội dung chuyển khoản</label>
+                                                            <div class="input-group-premium">
+                                                                <i class="fas fa-edit"></i>
+                                                                <input type="text" name="TransferContentTemplate" value="@qr.TransferContentTemplate" class="form-control-premium" placeholder="Ví dụ: chinhan {BookingId}" />
+                                                            </div>
+                                                            <div class="form-text text-muted small mt-2">
+                                                                <span>Hỗ trợ các thẻ: </span>
+                                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1 font-monospace" onclick="insertQrPlaceholder(this, '{BookingId}')">{BookingId}</button>
+                                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1 font-monospace" onclick="insertQrPlaceholder(this, '{BranchName}')">{BranchName}</button>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label class="form-label small fw-bold text-muted">Thời gian đếm ngược thanh toán</label>
+                                                            <div class="input-group-premium">
+                                                                <i class="fas fa-hourglass-half"></i>
+                                                                <input type="number" name="CountdownMinutes" value="@qr.CountdownMinutes" min="1" class="form-control-premium" placeholder="Số phút..." />
+                                                                <span class="suffix">phút</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
+
+                                            <!-- Section 3: Tin nhắn hiển thị cho khách hàng -->
                                             <div class="col-12">
-                                                <label class="form-label small fw-bold text-muted">Thông báo sau khi gửi bill</label>
-                                                <textarea name="AfterBillMessage" rows="2" class="form-control premium-input">@qr.AfterBillMessage</textarea>
+                                                <div class="border rounded-4 p-4 bg-white shadow-2xs">
+                                                    <h6 class="fw-bold mb-3 text-primary d-flex align-items-center border-bottom pb-2">
+                                                        <i class="fas fa-comment-alt me-2"></i> Thông điệp hiển thị cho khách hàng
+                                                    </h6>
+                                                    <div class="row g-3">
+                                                        <div class="col-12">
+                                                            <label class="form-label small fw-bold text-muted">Thông báo trước khi khách gửi bill chuyển khoản</label>
+                                                            <textarea name="BeforeBillMessage" rows="2" class="form-control form-control-premium" placeholder="Nhập lời nhắc trước khi gửi bill...">@qr.BeforeBillMessage</textarea>
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <label class="form-label small fw-bold text-muted">Thông báo sau khi khách gửi bill thành công (chờ xác nhận)</label>
+                                                            <textarea name="AfterBillMessage" rows="2" class="form-control form-control-premium" placeholder="Nhập lời nhắc sau khi nhận bill...">@qr.AfterBillMessage</textarea>
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <label class="form-label small fw-bold text-muted">Thông báo khi mã hóa đơn thanh toán hết thời gian đếm ngược</label>
+                                                            <textarea name="ExpiredMessage" rows="2" class="form-control form-control-premium" placeholder="Nhập thông báo khi hết giờ thanh toán...">@qr.ExpiredMessage</textarea>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div class="col-12">
-                                                <label class="form-label small fw-bold text-muted">Thông báo khi hết thời gian</label>
-                                                <textarea name="ExpiredMessage" rows="2" class="form-control premium-input">@qr.ExpiredMessage</textarea>
-                                            </div>
+
+                                            <!-- Nút Lưu -->
                                             <div class="col-12 text-end">
-                                                <button type="submit" class="btn-premium rounded-pill px-4">
+                                                <button type="submit" class="btn-premium rounded-pill px-5 py-2.5 shadow-sm">
                                                     <i class="fas fa-save me-2"></i>Lưu cấu hình QR
                                                 </button>
                                             </div>
@@ -879,89 +1030,128 @@
                     }
                 </div>
             </div>
-        </div>
-    </div>
-</div>
 
-<!-- Modal: QUẢN LÝ DANH MỤC -->
-<div class="modal fade" id="collectionManagerModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content premium-modal">
-            <div class="modal-header border-0">
-                <h5 class="modal-title fw-bold">Quản lý Danh mục Tri thức</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body py-4">
-                <div class="mb-4">
-                    <label class="form-label small fw-bold text-muted">Thêm danh mục mới</label>
-                    <div class="input-group">
-                        <input type="text" id="new-collection-name" class="form-control rounded-start-4 border-light-subtle" placeholder="Tên danh mục mới...">
-                        <button class="btn btn-primary rounded-end-4 px-4" onclick="saveCollection()"><i class="fas fa-plus"></i></button>
-                    </div>
+            <!-- PANEL: MẪU DỮ LIỆU & IMPORT -->
+            <div class="tab-pane fade" id="panel-import" role="tabpanel">
+                <div class="panel-header">
+                    <h2>Mẫu Dữ Liệu & Cấu Hình Import</h2>
+                    <p>Tải về các file Excel mẫu để điền thông tin và import hàng loạt dữ liệu vào hệ thống.</p>
                 </div>
 
-                <h6 class="fw-bold small text-muted text-uppercase mb-3">Danh sách hiện tại</h6>
-                <div id="manager-collections-list" class="list-group list-group-flush rounded-4 overflow-hidden border">
-                    <!-- Loaded via JS -->
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+                <div class="settings-bento-grid">
+                    <!-- Zip size limit slider -->
+                    <div class="bento-item full-width">
+                        <div class="bento-inner">
+                            <h5 class="bento-title"><i class="fas fa-file-archive me-2 text-warning"></i>Cấu hình Giới hạn Kích thước ZIP/Excel Upload</h5>
+                            <p class="text-muted small mb-4">Thiết lập dung lượng file tối đa cho phép tải lên khi thực hiện Import dữ liệu hàng loạt (từ 5MB đến 100MB).</p>
+                            
+                            <form asp-action="Update" method="post">
+                                <div class="row align-items-center">
+                                    <div class="col-md-8">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <input type="range" class="form-range" min="5" max="100" step="5" id="zipSizeRange" name="value" value="@(Model.FirstOrDefault(s => s.SettingKey == "MaxZipUploadSizeMB")?.SettingValue ?? "30")" oninput="document.getElementById('zipSizeValue').innerText = this.value" />
+                                            <span class="fw-bold text-primary fs-5" style="white-space: nowrap;"><span id="zipSizeValue">@(Model.FirstOrDefault(s => s.SettingKey == "MaxZipUploadSizeMB")?.SettingValue ?? "30")</span> MB</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 text-end">
+                                        <input type="hidden" name="key" value="MaxZipUploadSizeMB" />
+                                        <button type="submit" class="btn btn-primary rounded-pill px-4" style="background: linear-gradient(135deg, #4F81BD 0%, #295B96 100%); border: none;">
+                                            <i class="fas fa-save me-2"></i> Lưu giới hạn
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
 
-<!-- Modal: BIÊN TẬP BÀI HỌC AI -->
-<div class="modal fade ai-editor-modal" id="articleEditorModal" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div>
-                    <h5 class="modal-title fw-800 tracking-tighter">Biên tập Nội dung Đào tạo AI</h5>
-                    <p class="smaller text-muted mb-0">Nạp kiến thức để AI hỗ trợ khách hàng chuyên nghiệp hơn.</p>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="editor-left-pane">
-                    <div class="mb-4">
-                        <label class="editor-label">
-                            <i class="fas fa-heading"></i> TIÊU ĐỀ BÀI HỌC
-                        </label>
-                        <input type="text" id="edit-article-title" class="form-control premium-input" placeholder="Nhập tiêu đề cô đọng...">
-                    </div>
-                    <div>
-                        <label class="editor-label">
-                            <i class="fas fa-edit"></i> NỘI DUNG CHI TIẾT (MARKDOWN)
-                        </label>
-                        <textarea id="edit-article-content" class="form-control premium-input" 
-                                  style="height: 380px; font-family: 'JetBrains Mono', monospace; font-size: 0.95rem;" 
-                                  placeholder="Sử dụng Markdown để trình bày có cấu trúc..."></textarea>
-                    </div>
-                </div>
-                <div class="editor-right-pane">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <label class="editor-label text-muted">
-                            <i class="fas fa-eye"></i> XEM TRƯỚC KẾT QUẢ
-                        </label>
-                        <span class="badge bg-white text-primary border rounded-pill px-2 py-1 smaller fw-bold">Live Preview</span>
-                    </div>
-                    <div id="article-preview" class="preview-container shadow-sm">
-                        <!-- Preview content -->
-                        <div class="text-center py-5 opacity-25">
-                            <i class="fas fa-terminal fa-3x mb-3"></i>
-                            <p>Đang chờ nhập dữ liệu...</p>
+                    <!-- Templates Download cards -->
+                    <div class="bento-item full-width">
+                        <div class="bento-inner">
+                            <h5 class="bento-title"><i class="fas fa-download me-2 text-primary"></i>Danh sách Form mẫu Excel</h5>
+                            <p class="text-muted small mb-4">Vui lòng tải đúng file mẫu dưới đây, điền thông tin theo định dạng và ví dụ có sẵn trước khi import.</p>
+                            
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <div class="border rounded-4 p-3 text-center bg-light-subtle h-100 d-flex flex-column justify-content-between">
+                                        <div>
+                                            <i class="fas fa-map-marked-alt text-primary fs-3 mb-2"></i>
+                                            <h6 class="fw-bold mb-1">Mẫu Chi nhánh</h6>
+                                            <p class="small text-muted mb-3">Chứa thông tin cơ bản của các chi nhánh homestay.</p>
+                                        </div>
+                                        <a asp-action="DownloadTemplate" asp-route-type="branch" class="btn btn-sm btn-outline-primary rounded-pill w-100">
+                                            <i class="fas fa-download me-1"></i> Tải file mẫu
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded-4 p-3 text-center bg-light-subtle h-100 d-flex flex-column justify-content-between">
+                                        <div>
+                                            <i class="fas fa-bed text-success fs-3 mb-2"></i>
+                                            <h6 class="fw-bold mb-1">Mẫu Phòng ngủ</h6>
+                                            <p class="small text-muted mb-3">Bao gồm thông tin phòng, giá giờ/ngày, sức chứa, ảnh đại diện.</p>
+                                        </div>
+                                        <a asp-action="DownloadTemplate" asp-route-type="room" class="btn btn-sm btn-outline-success rounded-pill w-100">
+                                            <i class="fas fa-download me-1"></i> Tải file mẫu
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded-4 p-3 text-center bg-light-subtle h-100 d-flex flex-column justify-content-between">
+                                        <div>
+                                            <i class="fas fa-users-cog text-info fs-3 mb-2"></i>
+                                            <h6 class="fw-bold mb-1">Mẫu Nhân viên</h6>
+                                            <p class="small text-muted mb-3">Tạo tài khoản quản lý/nhân viên và phân quyền chi tiết.</p>
+                                        </div>
+                                        <a asp-action="DownloadTemplate" asp-route-type="staff" class="btn btn-sm btn-outline-info rounded-pill w-100">
+                                            <i class="fas fa-download me-1"></i> Tải file mẫu
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded-4 p-3 text-center bg-light-subtle h-100 d-flex flex-column justify-content-between">
+                                        <div>
+                                            <i class="fas fa-brain fs-3 mb-2" style="color: #6f42c1;"></i>
+                                            <h6 class="fw-bold mb-1">Ngân hàng tri thức AI</h6>
+                                            <p class="small text-muted mb-3">Bài học đào tạo kiến thức homestay cho chatbot AI.</p>
+                                        </div>
+                                        <a asp-action="DownloadTemplate" asp-route-type="ai" class="btn btn-sm btn-outline-secondary rounded-pill w-100" style="color: #6f42c1; border-color: #6f42c1;">
+                                            <i class="fas fa-download me-1"></i> Tải file mẫu
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded-4 p-3 text-center bg-light-subtle h-100 d-flex flex-column justify-content-between">
+                                        <div>
+                                            <i class="fas fa-clock text-warning fs-3 mb-2"></i>
+                                            <h6 class="fw-bold mb-1">Mẫu Khung giờ</h6>
+                                            <p class="small text-muted mb-3">Danh sách khung giờ hoạt động (theo giờ/ngày).</p>
+                                        </div>
+                                        <a asp-action="DownloadTemplate" asp-route-type="slottemplate" class="btn btn-sm btn-outline-warning rounded-pill w-100">
+                                            <i class="fas fa-download me-1"></i> Tải file mẫu
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded-4 p-3 text-center bg-light-subtle h-100 d-flex flex-column justify-content-between">
+                                        <div>
+                                            <i class="fas fa-calendar-day text-danger fs-3 mb-2"></i>
+                                            <h6 class="fw-bold mb-1">Mẫu Ngày lễ</h6>
+                                            <p class="small text-muted mb-3">Cài đặt ma trận các ngày lễ phụ thu trong năm.</p>
+                                        </div>
+                                        <a asp-action="DownloadTemplate" asp-route-type="holiday" class="btn btn-sm btn-outline-danger rounded-pill w-100">
+                                            <i class="fas fa-download me-1"></i> Tải file mẫu
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-link text-muted fw-bold text-decoration-none px-4" data-bs-dismiss="modal">Hủy bỏ</button>
-                <button type="button" class="btn-premium-save shadow-sm" onclick="saveArticle()">
-                    <i class="fas fa-cloud-upload-alt"></i> Lưu & Huấn luyện AI
-                </button>
-            </div>
         </div>
     </div>
 </div>
+
 
 <!-- Modal: THÊM MẪU KHUNG GIỜ -->
 <div class="modal fade" id="createTemplateModal" tabindex="-1">
@@ -983,19 +1173,13 @@
                         <div class="col-md-7">
                             <div class="form-field-card">
                                 <label class="admin-form-label"><i class="fas fa-tag me-1" style="opacity:0.5"></i> Tên hiển thị</label>
-                                <div style="display:flex;align-items:center">
-                                    <input name="Name" class="admin-form-input" placeholder="VD: Combo 4h Trưa" required />
-                                    <span class="input-cursor"></span>
-                                </div>
+                                <input name="Name" class="admin-form-input" placeholder="VD: Combo 4h Trưa" required />
                             </div>
                         </div>
                         <div class="col-md-5">
                             <div class="form-field-card">
                                 <label class="admin-form-label"><i class="fas fa-hashtag me-1" style="opacity:0.5"></i> Mã định danh</label>
-                                <div style="display:flex;align-items:center">
-                                    <input name="Code" class="admin-form-input" placeholder="VD: 4H_NOON" required />
-                                    <span class="input-cursor"></span>
-                                </div>
+                                <input name="Code" class="admin-form-input" placeholder="VD: 4H_NOON" required />
                             </div>
                         </div>
                     </div>
@@ -1004,18 +1188,17 @@
                     <div class="row g-3 mb-3">
                         <div class="col-md-7">
                             <div class="form-field-card">
-                                <label class="admin-form-label"><i class="fas fa-clock me-1" style="opacity:0.5"></i> Thời lượng mỗi phiên</label>
-                                <div class="duration-hub">
-                                    <div class="duration-input-area">
-                                        <input name="DurationHours" id="create-duration-hours" type="number" class="admin-form-input" value="2" min="0.5" step="0.5" required />
-                                        <span class="duration-unit">giờ</span>
-                                    </div>
-                                    <span class="duration-equals">→</span>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label class="admin-form-label mb-0"><i class="fas fa-clock me-1" style="opacity:0.5"></i> Thời lượng mỗi phiên</label>
                                     <div class="minutes-badge">
                                         <i class="far fa-clock"></i>
                                         <span class="minutes-value" id="durationPreview">120</span>
                                         <span>phút</span>
                                     </div>
+                                </div>
+                                <div class="duration-input-wrapper">
+                                    <input name="DurationHours" id="create-duration-hours" type="number" class="duration-large-input" value="2" min="0.5" step="0.5" required />
+                                    <span class="duration-unit">giờ</span>
                                 </div>
                                 <input name="DurationMinutes" type="hidden" id="durationMinutesHidden" value="120" />
                             </div>
@@ -1023,11 +1206,9 @@
                         <div class="col-md-5">
                             <div class="form-field-card">
                                 <label class="admin-form-label"><i class="fas fa-broom me-1" style="opacity:0.5"></i> Dọn dẹp</label>
-                                <div class="duration-hub">
-                                    <div class="duration-input-area" style="flex:0 1 auto;">
-                                        <input name="CleanupMinutes" type="number" class="admin-form-input" value="30" min="0" step="5" required style="font-size:1.2rem !important;width:60px" />
-                                        <span class="duration-unit" style="font-size:0.85rem">phút</span>
-                                    </div>
+                                <div class="duration-input-wrapper">
+                                    <input name="CleanupMinutes" type="number" class="duration-large-input" value="30" min="0" step="5" required style="width:70px !important" />
+                                    <span class="duration-unit">phút</span>
                                 </div>
                             </div>
                         </div>
@@ -1039,8 +1220,14 @@
                             <div class="form-field-card">
                                 <label class="admin-form-label"><i class="fas fa-play-circle me-1" style="opacity:0.5"></i> Thời điểm bắt đầu nhảy slot</label>
                                 <div class="time-pick-group">
-                                    <input name="SeedStartTime" type="time" class="admin-form-input" value="09:00" style="width:160px" />
-                                    <span class="time-hint"><i class="far fa-lightbulb me-1"></i> Slot đầu tiên trong ngày sẽ bắt đầu từ mốc này</span>
+                                    <div class="time-input-wrapper">
+                                        <i class="far fa-clock time-icon"></i>
+                                        <input name="SeedStartTime" type="time" class="time-picker-input" value="09:00" />
+                                    </div>
+                                    <div class="time-hint-alert">
+                                        <i class="far fa-lightbulb"></i>
+                                        <span>Slot đầu tiên trong ngày sẽ bắt đầu từ mốc này</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1087,11 +1274,13 @@
                 <div class="modal-body px-4 py-4">
 
                     <!-- Sync warning -->
-                    <div class="d-flex align-items-center gap-3 p-3 mb-3" style="background:#fffbeb;border-radius:12px;border:1px solid #fde68a;">
-                        <i class="fas fa-sync-alt" style="color:#d97706;font-size:1.1rem"></i>
-                        <div>
-                            <div class="fw-semibold small" style="color:#92400e;">Thay đổi sẽ được đồng bộ</div>
-                            <div class="small" style="color:#b45309;">Tới tất cả phòng đang dùng mẫu này ngay khi lưu</div>
+                    <div class="sync-warning-box">
+                        <div class="sync-warning-icon">
+                            <i class="fas fa-sync-alt"></i>
+                        </div>
+                        <div class="sync-warning-content">
+                            <h6>Thay đổi sẽ được đồng bộ</h6>
+                            <p>Tới tất cả phòng đang dùng mẫu này ngay khi lưu</p>
                         </div>
                     </div>
 
@@ -1100,19 +1289,13 @@
                         <div class="col-md-7">
                             <div class="form-field-card">
                                 <label class="admin-form-label"><i class="fas fa-tag me-1" style="opacity:0.5"></i> Tên hiển thị</label>
-                                <div style="display:flex;align-items:center">
-                                    <input name="Name" id="edit-name" class="admin-form-input" placeholder="Nhập tên mẫu..." required />
-                                    <span class="input-cursor"></span>
-                                </div>
+                                <input name="Name" id="edit-name" class="admin-form-input" placeholder="Nhập tên mẫu..." required />
                             </div>
                         </div>
                         <div class="col-md-5">
                             <div class="form-field-card">
                                 <label class="admin-form-label"><i class="fas fa-hashtag me-1" style="opacity:0.5"></i> Mã định danh</label>
-                                <div style="display:flex;align-items:center">
-                                    <input name="Code" id="edit-code" class="admin-form-input" placeholder="VD: 4H_NOON" required />
-                                    <span class="input-cursor"></span>
-                                </div>
+                                <input name="Code" id="edit-code" class="admin-form-input" placeholder="VD: 4H_NOON" required />
                             </div>
                         </div>
                     </div>
@@ -1121,18 +1304,17 @@
                     <div class="row g-3 mb-3">
                         <div class="col-md-7">
                             <div class="form-field-card">
-                                <label class="admin-form-label"><i class="fas fa-clock me-1" style="opacity:0.5"></i> Thời lượng mỗi phiên</label>
-                                <div class="duration-hub">
-                                    <div class="duration-input-area">
-                                        <input name="DurationHours" id="edit-duration-hours" type="number" class="admin-form-input" min="0.5" step="0.5" required />
-                                        <span class="duration-unit">giờ</span>
-                                    </div>
-                                    <span class="duration-equals">→</span>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label class="admin-form-label mb-0"><i class="fas fa-clock me-1" style="opacity:0.5"></i> Thời lượng mỗi phiên</label>
                                     <div class="minutes-badge">
                                         <i class="far fa-clock"></i>
                                         <span class="minutes-value" id="editDurationPreview">0</span>
                                         <span>phút</span>
                                     </div>
+                                </div>
+                                <div class="duration-input-wrapper">
+                                    <input name="DurationHours" id="edit-duration-hours" type="number" class="duration-large-input" min="0.5" step="0.5" required />
+                                    <span class="duration-unit">giờ</span>
                                 </div>
                                 <input name="DurationMinutes" id="edit-duration" type="hidden" />
                             </div>
@@ -1140,11 +1322,9 @@
                         <div class="col-md-5">
                             <div class="form-field-card">
                                 <label class="admin-form-label"><i class="fas fa-broom me-1" style="opacity:0.5"></i> Dọn dẹp</label>
-                                <div class="duration-hub">
-                                    <div class="duration-input-area" style="flex:0 1 auto;">
-                                        <input name="CleanupMinutes" id="edit-cleanup" type="number" class="admin-form-input" min="0" step="5" required style="font-size:1.2rem !important;width:60px" />
-                                        <span class="duration-unit" style="font-size:0.85rem">phút</span>
-                                    </div>
+                                <div class="duration-input-wrapper">
+                                    <input name="CleanupMinutes" id="edit-cleanup" type="number" class="duration-large-input" min="0" step="5" required style="width:70px !important" />
+                                    <span class="duration-unit">phút</span>
                                 </div>
                             </div>
                         </div>
@@ -1156,8 +1336,14 @@
                             <div class="form-field-card">
                                 <label class="admin-form-label"><i class="fas fa-play-circle me-1" style="opacity:0.5"></i> Thời điểm bắt đầu nhảy slot</label>
                                 <div class="time-pick-group">
-                                    <input name="SeedStartTime" id="edit-seed" type="time" class="admin-form-input" style="width:160px" />
-                                    <span class="time-hint"><i class="far fa-lightbulb me-1"></i> Slot đầu tiên trong ngày sẽ bắt đầu từ mốc này</span>
+                                    <div class="time-input-wrapper">
+                                        <i class="far fa-clock time-icon"></i>
+                                        <input name="SeedStartTime" id="edit-seed" type="time" class="time-picker-input" />
+                                    </div>
+                                    <div class="time-hint-alert">
+                                        <i class="far fa-lightbulb"></i>
+                                        <span>Slot đầu tiên trong ngày sẽ bắt đầu từ mốc này</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1223,6 +1409,10 @@
 
 
 <style>
+    body {
+        overflow: hidden !important;
+    }
+
     :root {
         --settings-sidebar-width: 280px;
         --settings-bg: #f8fafc;
@@ -1233,7 +1423,8 @@
     .premium-settings-wrapper {
         display: flex;
         background: #f1f5f9;
-        min-height: 100vh; /* Allow page to grow */
+        height: calc(100vh - 70px); /* Fill the viewport height below navbar */
+        overflow: hidden; /* Prevent body scrollbar */
         position: relative;
     }
 
@@ -1245,17 +1436,11 @@
         padding: 2rem 0;
         display: flex;
         flex-direction: column;
-        position: sticky; /* Anchor it like a top header */
-        top: 0;
-        height: 100vh;
+        height: 100%; /* Fill parent wrapper */
+        overflow-y: auto; /* Scroll internally if menu items exceed height */
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 1000;
+        z-index: 990;
         flex-shrink: 0;
-        overflow: visible !important;
-    }
-
-    .main-sidebar-collapsed .settings-sidebar {
-        width: 80px;
     }
 
     .main-sidebar-collapsed .settings-sidebar {
@@ -1361,10 +1546,11 @@
     .settings-content {
         flex-grow: 1;
         padding: 3rem;
-        min-height: 100vh;
+        height: 100%; /* Fill parent wrapper */
         background: transparent;
         position: relative;
-        overflow: visible; /* NO INTERNAL SCROLLBAR */
+        overflow-y: auto; /* Scrollbar on the right side content */
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .tab-content {
@@ -1504,78 +1690,6 @@
         transform: scale(1);
     }
 
-    /* Branch Settings */
-    .branch-icon-square {
-        width: 48px;
-        height: 48px;
-        background: #f1f5f9;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.2rem;
-        color: #475569;
-    }
-
-    .input-group-premium {
-        display: flex;
-        align-items: center;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 0.5rem 1rem;
-        transition: all 0.3s;
-    }
-
-    .input-group-premium:focus-within {
-        background: white;
-        border-color: #2563eb;
-        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
-    }
-
-    .form-control-premium {
-        background: transparent;
-        border: none;
-        padding: 0.5rem 0.75rem;
-        font-weight: 700;
-        font-size: 1rem;
-        color: #1e293b;
-        width: 100%;
-    }
-
-    .form-control-premium:focus {
-        outline: none;
-    }
-
-    .input-group-premium .suffix {
-        font-size: 0.8rem;
-        font-weight: 700;
-        color: #94a3b8;
-    }
-
-    .btn-save-branch {
-        width: 100%;
-        background: #f1f5f9;
-        color: #475569;
-        border: none;
-        padding: 0.8rem;
-        border-radius: 12px;
-        font-weight: 700;
-        font-size: 0.85rem;
-        transition: all 0.3s;
-    }
-
-    .btn-save-branch:hover {
-        background: #1e293b;
-        color: white;
-    }
-
-    .btn-soft-danger { background: #fee2e2; color: #dc2626; border: none; }
-    .btn-soft-danger:hover { background: #fecaca; }
-    .hover-primary:hover { color: #2563eb !important; }
-    .cursor-pointer { cursor: pointer; }
-    .transition-all { transition: all 0.2s; }
-
     /* === Template Form Premium === */
     .modal-form-divider {
         height: 1px;
@@ -1583,153 +1697,110 @@
         margin: 20px 0;
     }
 
-    .form-field-card {
-        background: var(--admin-surface-soft);
-        border: 1px solid var(--admin-border);
-        border-radius: 14px;
-        padding: 14px 18px;
-        transition: all 0.25s ease;
-        position: relative;
+    .premium-modal {
+        border-radius: 24px !important;
+        border: none !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
+        overflow: hidden;
     }
 
-    .form-field-card::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 18px;
-        right: 18px;
-        height: 2px;
-        background: #e2e8f0;
-        border-radius: 0 0 2px 2px;
-        transition: all 0.3s ease;
-        opacity: 0.4;
+    .premium-modal .modal-header {
+        background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+        border-bottom: 1px solid #f1f5f9 !important;
+    }
+
+    .form-field-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 14px 20px;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        overflow: hidden;
     }
 
     .form-field-card:focus-within {
         background: white;
-        border-color: var(--admin-primary);
-        box-shadow: 0 0 0 4px var(--admin-primary-soft);
-    }
-
-    .form-field-card:focus-within::after {
-        background: var(--admin-primary);
-        opacity: 1;
-        height: 2.5px;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+        transform: translateY(-1px);
     }
 
     .form-field-card .admin-form-label {
-        margin-bottom: 2px;
-        font-size: 0.65rem;
-        letter-spacing: 0.04em;
+        margin-bottom: 4px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
 
     .form-field-card .admin-form-input {
         padding: 4px 0;
         border: none;
         background: transparent;
-        font-size: 1rem;
-        border-radius: 0;
-        caret-color: var(--admin-primary);
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #1e293b;
+        width: 100%;
+        outline: none;
+        box-shadow: none !important;
     }
 
-    .form-field-card .admin-form-input:focus {
-        box-shadow: none;
-    }
-
-    .form-field-card .input-cursor {
-        display: inline-block;
-        width: 1.5em;
-        height: 1.4em;
-        background: #f1f4f9;
-        border-radius: 4px;
-        margin-left: 6px;
-        vertical-align: middle;
-        opacity: 0.5;
-        transition: all 0.2s;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .form-field-card .input-cursor::before {
-        content: '|';
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 1rem;
-        font-weight: 300;
+    .form-field-card .admin-form-input::placeholder {
         color: #94a3b8;
-        animation: cursor-blink 1.2s step-end infinite;
+        font-weight: 500;
     }
 
-    .form-field-card:focus-within .input-cursor {
-        opacity: 1;
-        background: var(--admin-primary-soft);
-    }
-
-    .form-field-card:focus-within .input-cursor::before {
-        color: var(--admin-primary);
-    }
-
-    @@keyframes cursor-blink {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0; }
-    }
-
-    .duration-hub {
+    /* Duration Large Input Styles */
+    .duration-input-wrapper {
         display: flex;
-        align-items: center;
-        gap: 16px;
+        align-items: baseline;
+        gap: 8px;
     }
 
-    .duration-input-area {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .duration-input-area .admin-form-input {
+    .duration-large-input {
         font-size: 1.6rem !important;
         font-weight: 800 !important;
-        color: var(--admin-primary) !important;
-        width: 80px;
-        text-align: center;
+        color: #2563eb !important;
+        width: 80px !important;
         padding: 0 !important;
-        -moz-appearance: textfield;
+        outline: none;
+        border: none;
+        background: transparent;
     }
 
-    .duration-input-area .admin-form-input::-webkit-outer-spin-button,
-    .duration-input-area .admin-form-input::-webkit-inner-spin-button {
+    .duration-large-input::-webkit-outer-spin-button,
+    .duration-large-input::-webkit-inner-spin-button {
         -webkit-appearance: none;
         margin: 0;
     }
-
-    .duration-unit {
-        font-size: 1rem;
-        font-weight: 700;
-        color: var(--admin-text-soft);
-        letter-spacing: 0.02em;
+    .duration-large-input {
+        -moz-appearance: textfield;
     }
 
-    .duration-equals {
-        font-size: 0.85rem;
-        color: var(--admin-text-soft);
-        font-weight: 500;
+    .duration-unit {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #475569;
     }
 
     .minutes-badge {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: var(--admin-primary-soft);
-        color: var(--admin-primary);
+        background: #dbeafe;
+        color: #1e40af;
         font-weight: 700;
-        font-size: 0.85rem;
-        padding: 6px 16px;
-        border-radius: 100px;
+        font-size: 0.75rem;
+        padding: 4px 12px;
+        border-radius: 9999px;
         white-space: nowrap;
-        transition: all 0.3s ease;
+        border: 1px solid rgba(30, 64, 175, 0.08);
+        box-shadow: 0 2px 4px rgba(37, 99, 235, 0.06);
     }
 
     .minutes-badge i {
@@ -1744,65 +1815,162 @@
         transition: all 0.2s ease;
     }
 
+    /* Time Picker Styles */
     .time-pick-group {
         display: flex;
-        align-items: center;
+        flex-direction: column;
         gap: 12px;
+        width: 100%;
     }
 
-    .time-pick-group .admin-form-input[type="time"] {
-        width: 140px;
-        font-weight: 600;
+    .time-input-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #f1f5f9;
+        border-radius: 12px;
+        padding: 8px 16px;
+        width: fit-content;
+        border: 1px solid #e2e8f0;
+    }
+
+    .time-input-wrapper:focus-within {
+        background: white;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .time-icon {
+        color: #64748b;
+        font-size: 1.1rem;
+    }
+
+    .time-picker-input {
+        border: none !important;
+        background: transparent !important;
+        font-weight: 700 !important;
         font-family: monospace;
-        font-size: 1.05rem;
-        letter-spacing: 0.05em;
+        font-size: 1.2rem !important;
+        color: #1e293b !important;
+        padding: 0 !important;
+        outline: none !important;
+        width: 110px !important;
     }
 
-    .time-hint {
-        font-size: 0.75rem;
-        color: var(--admin-text-soft);
-        font-weight: 500;
+    .time-hint-alert {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 12px;
+        color: #1e40af;
+        font-size: 0.8rem;
+        font-weight: 600;
+        width: 100%;
+        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.04);
     }
 
+    .time-hint-alert i {
+        font-size: 1rem;
+        color: #3b82f6;
+    }
+
+    /* Active Toggle Card */
     .template-toggle-card {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 14px 20px;
-        background: var(--admin-surface-soft);
-        border: 1px solid var(--admin-border);
-        border-radius: 14px;
+        padding: 18px 24px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
         transition: all 0.25s ease;
     }
 
     .template-toggle-card:hover {
         background: white;
         border-color: #10b981;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.08);
     }
 
     .template-toggle-card .toggle-label {
         display: flex;
         align-items: center;
         gap: 12px;
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: var(--admin-text);
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #334155;
     }
 
     .template-toggle-card .toggle-label i {
-        font-size: 1.1rem;
-        color: var(--admin-gold);
+        font-size: 1.25rem;
+        color: #10b981;
     }
 
     .template-toggle-card .form-check-input {
-        width: 3em;
-        height: 1.5em;
+        width: 3.2em;
+        height: 1.6em;
         cursor: pointer;
     }
 
     .template-toggle-card .form-check-input:checked {
         background-color: #10b981;
         border-color: #10b981;
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+    }
+
+    /* Sync Warning Banner */
+    .sync-warning-box {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 16px 20px;
+        background: #fffbeb;
+        border: 1px solid #fef3c7;
+        border-radius: 16px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.05);
+    }
+
+    .sync-warning-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        background: #fef3c7;
+        color: #d97706;
+        border-radius: 10px;
+        font-size: 1.1rem;
+        animation: spin-slow 8s linear infinite;
+        flex-shrink: 0;
+    }
+
+    @@keyframes spin-slow {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .sync-warning-content {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .sync-warning-content h6 {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #92400e;
+        margin: 0;
+    }
+
+    .sync-warning-content p {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: #b45309;
+        margin: 0;
     }
 
     /* Calendar Premium */
@@ -2122,7 +2290,57 @@
     }
 </style>
 
+<!-- Modal: IMPORT KHUNG GIỜ -->
+<div class="modal fade" id="importSlotsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content premium-modal">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold"><i class="fas fa-file-import me-2 text-primary"></i>Import Khung Giờ từ Excel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="ImportSlotTemplates" method="post" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div class="modal-body py-4">
+                    <p class="text-muted small">Vui lòng chọn file Excel cấu hình khung giờ (.xlsx) đúng định dạng mẫu.</p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Chọn file Excel</label>
+                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx" required />
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4" style="background: linear-gradient(135deg, #4F81BD 0%, #295B96 100%); border: none;">Bắt đầu Import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
+<!-- Modal: IMPORT NGÀY LỄ -->
+<div class="modal fade" id="importHolidaysModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content premium-modal">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold"><i class="fas fa-file-import me-2 text-primary"></i>Import Ngày Lễ từ Excel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="ImportHolidays" method="post" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div class="modal-body py-4">
+                    <p class="text-muted small">Vui lòng chọn file Excel danh sách ngày lễ (.xlsx) đúng định dạng mẫu.</p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Chọn file Excel</label>
+                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx" required />
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4" style="background: linear-gradient(135deg, #4F81BD 0%, #295B96 100%); border: none;">Bắt đầu Import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 @section Scripts {
     <script>
@@ -2149,7 +2367,7 @@
         }
 
         // Tab switching logic (optional, Bootstrap handles mostly)
-        document.querySelectorAll('.nav-link').forEach(tab => {
+        document.querySelectorAll('#settings-tabs .nav-link, #email-template-tabs .nav-link').forEach(tab => {
             tab.addEventListener('shown.bs.tab', function (event) {
                 // Resize or refresh elements if needed
                 if(event.target.id === 'tab-holiday') {
@@ -2381,17 +2599,21 @@
             previewEl.textContent = m;
         }
 
-        document.getElementById('create-duration-hours').addEventListener('input', function () {
-            syncDurationPreview(this, document.getElementById('durationMinutesHidden'), document.getElementById('durationPreview'));
-        });
+        const createDurationInput = document.getElementById('create-duration-hours');
+        if (createDurationInput) {
+            createDurationInput.addEventListener('input', function () {
+                syncDurationPreview(this, document.getElementById('durationMinutesHidden'), document.getElementById('durationPreview'));
+            });
+        }
         const createForm = document.querySelector('#createTemplateModal form');
         if (createForm) {
             createForm.addEventListener('submit', function () {
-                syncDurationPreview(
-                    document.getElementById('create-duration-hours'),
-                    document.getElementById('durationMinutesHidden'),
-                    document.getElementById('durationPreview')
-                );
+                const hoursInput = document.getElementById('create-duration-hours');
+                const minutesHidden = document.getElementById('durationMinutesHidden');
+                const previewEl = document.getElementById('durationPreview');
+                if (hoursInput && minutesHidden && previewEl) {
+                    syncDurationPreview(hoursInput, minutesHidden, previewEl);
+                }
             });
         }
 
@@ -2411,22 +2633,30 @@
             new bootstrap.Modal(document.getElementById('editTemplateModal')).show();
         }
 
-        document.getElementById('edit-duration-hours').addEventListener('input', function () {
-            syncDurationPreview(this, document.getElementById('edit-duration'), document.getElementById('editDurationPreview'));
-        });
+        const editDurationInput = document.getElementById('edit-duration-hours');
+        if (editDurationInput) {
+            editDurationInput.addEventListener('input', function () {
+                syncDurationPreview(this, document.getElementById('edit-duration'), document.getElementById('editDurationPreview'));
+            });
+        }
         const editForm = document.querySelector('#editTemplateModal form');
         if (editForm) {
             editForm.addEventListener('submit', function () {
-                syncDurationPreview(
-                    document.getElementById('edit-duration-hours'),
-                    document.getElementById('edit-duration'),
-                    document.getElementById('editDurationPreview')
-                );
+                const hoursInput = document.getElementById('edit-duration-hours');
+                const minutesHidden = document.getElementById('edit-duration');
+                const previewEl = document.getElementById('editDurationPreview');
+                if (hoursInput && minutesHidden && previewEl) {
+                    syncDurationPreview(hoursInput, minutesHidden, previewEl);
+                }
             });
         }
 
         // Handle tab selection from URL
         window.addEventListener('DOMContentLoaded', () => {
+            if (window.location.hash === '#') {
+                history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+            }
+
             const urlParams = new URLSearchParams(window.location.search);
             const tabParam = urlParams.get('tab');
             if (tabParam) {
@@ -2435,7 +2665,8 @@
                     'time': 'tab-time',
                     'holiday': 'tab-holiday',
                     'branch': 'tab-branch',
-                    'payment-qr': 'tab-payment-qr'
+                    'payment-qr': 'tab-payment-qr',
+                    'import': 'tab-import'
                 };
                 const tabId = tabMap[tabParam];
                 if (tabId) {
@@ -2448,7 +2679,8 @@
         });
 
         // Initialize calendar if holiday tab is active on load
-        if(document.getElementById('tab-holiday')?.classList.contains('active')) {
+        const tabHoliday = document.getElementById('tab-holiday');
+        if (tabHoliday && tabHoliday.classList.contains('active')) {
             renderCalendar();
         }
 
@@ -2601,8 +2833,161 @@
                 });
             }
         }
+
+        // Payment QR Settings Live Preview & Helpers
+        window.updateCardText = function(input, previewClass) {
+            const parentForm = input.closest('form');
+            if (!parentForm) return;
+            const target = parentForm.querySelector(previewClass);
+            if (!target) return;
+            
+            let val = input.value.trim();
+            if (previewClass === '.preview-bank-code' || previewClass === '.preview-bank-name') {
+                val = val.toUpperCase();
+            }
+            
+            if (!val) {
+                if (previewClass === '.preview-bank-code') val = "CHƯA CẤU HÌNH";
+                else if (previewClass === '.preview-bank-acc') val = "•••• •••• ••••";
+                else if (previewClass === '.preview-bank-name') val = "CHƯA CẤU HÌNH";
+            }
+            target.textContent = val;
+            
+            // Auto update representation box
+            window.updateDynamicQRState(parentForm);
+        };
+
+        window.previewUploadImage = function(input) {
+            const parentForm = input.closest('form');
+            if (!parentForm) return;
+            const qrPreviewBox = parentForm.querySelector('.qr-preview-box');
+            if (!qrPreviewBox) return;
+            
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    qrPreviewBox.innerHTML = 
+                        '<div class="qr-preview-wrapper position-relative p-2 bg-white border rounded-3 shadow-sm d-inline-block">' +
+                            '<img src="' + e.target.result + '" alt="Preview" class="img-fluid" style="max-height: 180px; object-fit: contain;" />' +
+                        '</div>' +
+                        '<div class="text-success small fw-semibold"><i class="fas fa-check-circle me-1"></i> Ảnh QR vừa được chọn (nhấn Lưu để cập nhật)</div>';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        };
+
+        window.updateQRPreview = function(input) {
+            const parentForm = input.closest('form');
+            if (!parentForm) return;
+            const qrPreviewBox = parentForm.querySelector('.qr-preview-box');
+            if (!qrPreviewBox) return;
+            
+            const val = input.value.trim();
+            if (val) {
+                qrPreviewBox.innerHTML = 
+                    '<div class="qr-preview-wrapper position-relative p-2 bg-white border rounded-3 shadow-sm d-inline-block">' +
+                        '<img src="' + val + '" alt="Preview URL" class="img-fluid" style="max-height: 180px; object-fit: contain;" onerror="window.handleQRPreviewError(this)" />' +
+                    '</div>' +
+                    '<div class="text-success small fw-semibold"><i class="fas fa-check-circle me-1"></i> Đường dẫn ảnh QR thụ hưởng (nhấn Lưu để cập nhật)</div>';
+            } else {
+                window.updateDynamicQRState(parentForm);
+            }
+        };
+
+        window.handleQRPreviewError = function(img) {
+            const wrapper = img.closest('.qr-preview-box');
+            if (wrapper) {
+                wrapper.innerHTML = 
+                    '<div class="text-danger small py-4 px-3 text-center d-flex flex-column align-items-center justify-content-center">' +
+                        '<i class="fas fa-times-circle fs-3 mb-2"></i>' +
+                        '<span>Không thể tải ảnh từ URL này.</span>' +
+                    '</div>';
+            }
+        };
+
+        window.updateDynamicQRState = function(parentForm) {
+            const fileInput = parentForm.querySelector('input[name="qrImage"]');
+            if (fileInput && fileInput.files && fileInput.files[0]) {
+                return;
+            }
+            
+            const urlInput = parentForm.querySelector('input[name="QrImageUrl"]');
+            if (urlInput && urlInput.value.trim()) {
+                return;
+            }
+            
+            const qrPreviewBox = parentForm.querySelector('.qr-preview-box');
+            if (!qrPreviewBox) return;
+            
+            const bankCodeInput = parentForm.querySelector('input[name="BankCode"]');
+            const bankAccInput = parentForm.querySelector('input[name="BankAccountNumber"]');
+            
+            const bankCode = bankCodeInput ? bankCodeInput.value.trim() : "";
+            const bankAcc = bankAccInput ? bankAccInput.value.trim() : "";
+            
+            if (bankCode && bankAcc) {
+                qrPreviewBox.innerHTML = 
+                    '<div class="vietqr-placeholder-graphic position-relative p-3 bg-slate-50 border border-slate-200 rounded-3 shadow-sm text-center d-flex flex-column align-items-center justify-content-center" style="width: 170px; height: 170px;">' +
+                        '<i class="fas fa-qrcode text-slate-300 fs-1 mb-2"></i>' +
+                        '<span class="text-slate-400 fs-8 fw-semibold text-uppercase">MÃ VIETQR ĐỘNG</span>' +
+                        '<span class="text-slate-500 extra-small">Tự động tạo khi xuất hóa đơn</span>' +
+                        '<div class="position-absolute" style="top: 8px; left: 8px; width: 16px; height: 16px; border-top: 3px solid var(--admin-primary); border-left: 3px solid var(--admin-primary);"></div>' +
+                        '<div class="position-absolute" style="top: 8px; right: 8px; width: 16px; height: 16px; border-top: 3px solid var(--admin-primary); border-right: 3px solid var(--admin-primary);"></div>' +
+                        '<div class="position-absolute" style="bottom: 8px; left: 8px; width: 16px; height: 16px; border-bottom: 3px solid var(--admin-primary); border-left: 3px solid var(--admin-primary);"></div>' +
+                        '<div class="position-absolute" style="bottom: 8px; right: 8px; width: 16px; height: 16px; border-bottom: 3px solid var(--admin-primary); border-right: 3px solid var(--admin-primary);"></div>' +
+                    '</div>' +
+                    '<div class="text-primary small fw-semibold"><i class="fas fa-magic me-1"></i> Tự động tạo VietQR theo tài khoản ngân hàng</div>';
+            } else {
+                qrPreviewBox.innerHTML = 
+                    '<div class="text-muted small py-4 px-3 text-center d-flex flex-column align-items-center justify-content-center">' +
+                        '<i class="fas fa-exclamation-triangle text-warning fs-3 mb-2"></i>' +
+                        '<span>Chưa có ảnh QR hoặc thông tin ngân hàng thụ hưởng.</span>' +
+                    '</div>';
+            }
+        };
+
+        window.insertQrPlaceholder = function(btn, placeholder) {
+            const parentContainer = btn.closest('.col-md-8');
+            if (!parentContainer) return;
+            const txtarea = parentContainer.querySelector('input[name="TransferContentTemplate"]');
+            if (!txtarea) return;
+            
+            const scrollPos = txtarea.scrollTop;
+            let strPos = 0;
+            const br = ((txtarea.selectionStart || txtarea.selectionStart == '0') ? "ff" : (document.selection ? "ie" : false));
+            
+            if (br == "ie") {
+                txtarea.focus();
+                const range = document.selection.createRange();
+                range.moveStart('character', -txtarea.value.length);
+                strPos = range.text.length;
+            } else if (br == "ff") {
+                strPos = txtarea.selectionStart;
+            }
+            
+            const front = (txtarea.value).substring(0, strPos);
+            const back = (txtarea.value).substring(strPos, txtarea.value.length);
+            txtarea.value = front + placeholder + back;
+            strPos = strPos + placeholder.length;
+            
+            if (br == "ie") {
+                txtarea.focus();
+                const ieRange = document.selection.createRange();
+                ieRange.moveStart('character', -txtarea.value.length);
+                ieRange.moveStart('character', strPos);
+                ieRange.moveEnd('character', 0);
+                ieRange.select();
+            } else if (br == "ff") {
+                txtarea.selectionStart = strPos;
+                txtarea.selectionEnd = strPos;
+                txtarea.focus();
+            }
+            
+            txtarea.scrollTop = scrollPos;
+            
+            const event = new Event('input', { bubbles: true });
+            txtarea.dispatchEvent(event);
+        };
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="~/js/admin-ai-hub.js" asp-append-version="true"></script>
 }
 

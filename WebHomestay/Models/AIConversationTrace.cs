@@ -23,5 +23,7 @@ namespace WebHomestay.Models
         public string? ErrorLog { get; set; }
         public string? PerformanceLog { get; set; }
         public string? ModelName { get; set; }
+        public string? RuntimeName { get; set; }
+        public string? RuntimeVersion { get; set; }
     }
 }

@@ -14,6 +14,7 @@ namespace WebHomestay.Services
         public DateTime? StartTime { get; set; }
         public DateTime? EndTime { get; set; }
         public int GuestCount { get; set; } = 1;
+        public string BookingMode { get; set; } = "unknown";
         public ChatMode Mode { get; set; } = ChatMode.AdminAssistant;
     }
 }

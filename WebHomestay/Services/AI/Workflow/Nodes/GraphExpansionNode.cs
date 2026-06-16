@@ -29,8 +29,11 @@ public sealed class GraphExpansionNode : IWorkflowNode
                 return;
             }
 
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(3));
+
             var context = await _graphExpansionService.ExpandAsync(
-                seeds, maxHops: 2, cancellationToken: cancellationToken);
+                seeds, maxHops: 2, cancellationToken: cts.Token);
 
             state.GraphJson = JsonSerializer.Serialize(context);
             _logger.LogInformation("Graph expansion returned {NodeCount} nodes, {EdgeCount} edges for session {SessionId}",

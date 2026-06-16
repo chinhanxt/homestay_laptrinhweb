@@ -14,11 +14,13 @@ namespace WebHomestay.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IPermissionResolveService _permissionResolve;
+        private readonly IBulkImportService _importService;
 
-        public AdminStaffController(ApplicationDbContext context, IPermissionResolveService permissionResolve)
+        public AdminStaffController(ApplicationDbContext context, IPermissionResolveService permissionResolve, IBulkImportService importService)
         {
             _context = context;
             _permissionResolve = permissionResolve;
+            _importService = importService;
         }
 
         [AdminAuthorize(Permission = "staff.view")]
@@ -157,7 +159,7 @@ namespace WebHomestay.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        [AdminAuthorize(Permission = "staff.view")]
+        [AdminAuthorize(Permission = "staff.trash")]
         [HttpGet("trash")]
         public async Task<IActionResult> Trash()
         {
@@ -169,7 +171,7 @@ namespace WebHomestay.Controllers
             return View(trash);
         }
 
-        [AdminAuthorize(Permission = "staff.edit")]
+        [AdminAuthorize(Permission = "staff.restore")]
         [HttpPost("restore/{id}")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Restore(int id)
@@ -338,13 +340,13 @@ namespace WebHomestay.Controllers
             var parentChildMap = new Dictionary<string, string[]>
             {
                 ["bookings.view"] = new[] { "bookings.detail", "bookings.create", "bookings.edit", "bookings.delete", "bookings.trash", "bookings.restore" },
-                ["branches.view"] = new[] { "branches.detail", "branches.create", "branches.edit", "branches.delete" },
-                ["rooms.view"] = new[] { "rooms.detail", "rooms.create", "rooms.edit", "rooms.delete" },
-                ["images.view"] = new[] { "images.detail" },
+                ["branches.view"] = new[] { "branches.detail", "branches.create", "branches.edit", "branches.delete", "branches.trash", "branches.restore" },
+                ["rooms.view"] = new[] { "rooms.detail", "rooms.create", "rooms.edit", "rooms.delete", "rooms.trash", "rooms.restore" },
+                ["images.view"] = new[] { "images.detail", "images.trash", "images.restore" },
                 ["statistics.view"] = new[] { "statistics.export" },
-                ["staff.view"] = new[] { "staff.create", "staff.edit", "staff.delete", "staff.permissions", "staff.logs" },
+                ["staff.view"] = new[] { "staff.create", "staff.edit", "staff.delete", "staff.trash", "staff.restore", "logs.view" },
                 ["settings.view"] = new[] { "settings.update", "holidays.manage", "slots.manage", "branch.settings", "payment.settings" },
-                ["ai.view"] = new[] { "ai.detail", "ai.create", "ai.edit", "ai.delete", "ai.knowledge", "ai.graph", "ai.response", "ai.trace" }
+                ["ai.view"] = new[] { "ai.create", "ai.edit", "ai.delete", "ai.knowledge", "ai.graph", "ai.response" }
             };
 
             var moduleNames = new Dictionary<string, string>
@@ -372,6 +374,30 @@ namespace WebHomestay.Controllers
 
             errorMessage = string.Empty;
             return true;
+        }
+
+        [AdminAuthorize(Permission = "staff.create")]
+        [HttpPost("import-zip")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ImportZip(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                TempData["ErrorMessage"] = "Vui lòng chọn file ZIP hoặc Excel để import.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var result = await _importService.ImportStaffAsync(file);
+            if (result.Errors.Any())
+            {
+                TempData["ErrorMessage"] = $"Import hoàn tất. Thành công: {result.SuccessCount}, Thất bại: {result.FailureCount}. Chi tiết lỗi: {string.Join(" | ", result.Errors.Take(5))}";
+            }
+            else
+            {
+                TempData["SuccessMessage"] = $"Đã import thành công {result.SuccessCount} nhân viên.";
+            }
+
+            return RedirectToAction(nameof(Index));
         }
     }
 }

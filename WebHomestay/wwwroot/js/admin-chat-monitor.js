@@ -61,13 +61,50 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.addEventListener('click', (e) => {
         const openButton = e.target.closest('[data-open-cancellation]');
-        if (openButton) openCancellation(openButton.dataset.openCancellation);
+        if (openButton) {
+            const card = openButton.closest('.cancellation-card');
+            const chatSessionId = card ? card.dataset.chatSessionId : currentSessionId;
+            openCancellation(openButton.dataset.openCancellation, chatSessionId);
+        }
     });
     document.getElementById('btn-manual-cancellation')?.addEventListener('click', openManualCancellationModal);
     document.getElementById('btn-lookup-booking')?.addEventListener('click', lookupBookingForCancellation);
     document.getElementById('btn-submit-manual-cancellation')?.addEventListener('click', submitManualCancellation);
     document.getElementById('manual-zalo-image')?.addEventListener('change', checkManualFormReady);
     document.getElementById('manual-cancellation-modal')?.addEventListener('hidden.bs.modal', resetManualCancellationForm);
+
+    // Sidebar Tabs Switcher Initialization
+    const tabChats = document.getElementById('tab-chats-btn');
+    const tabCancellations = document.getElementById('tab-cancellations-btn');
+    const contentChats = document.getElementById('tab-content-chats');
+    const contentCancellations = document.getElementById('tab-content-cancellations');
+
+    if (tabChats && tabCancellations && contentChats && contentCancellations) {
+        tabChats.addEventListener('click', () => {
+            tabChats.classList.add('active');
+            tabCancellations.classList.remove('active');
+            contentChats.classList.remove('d-none');
+            contentCancellations.classList.add('d-none');
+        });
+
+        tabCancellations.addEventListener('click', () => {
+            tabCancellations.classList.add('active');
+            tabChats.classList.remove('active');
+            contentCancellations.classList.remove('d-none');
+            contentChats.classList.add('d-none');
+            
+            const listContainer = document.getElementById('cancellation-list-sidebar');
+            if (listContainer && !listContainer.querySelector('.cancellation-card')) {
+                loadCancellationList('Pending');
+            }
+        });
+    }
+
+    // Mobile details toggle button listener
+    document.getElementById('btn-toggle-context')?.addEventListener('click', () => {
+        const panel = document.getElementById('chat-context-panel');
+        if (panel) panel.classList.toggle('d-none');
+    });
 });
 
 function initializeSignalR() {
@@ -128,9 +165,7 @@ function initializeSignalR() {
         }
 
         if (currentSessionId === data.sessionId) {
-            currentSessionId = null;
-            document.getElementById('chat-active-panel')?.classList.add('d-none');
-            document.getElementById('chat-placeholder')?.classList.remove('d-none');
+            hideActiveChatPanel();
         }
         renderSessionList();
     });
@@ -147,9 +182,7 @@ function initializeSignalR() {
     connection.on('sessionPurged', function (data) {
         delete sessions[data.sessionId];
         if (currentSessionId === data.sessionId) {
-            currentSessionId = null;
-            document.getElementById('chat-active-panel')?.classList.add('d-none');
-            document.getElementById('chat-placeholder')?.classList.remove('d-none');
+            hideActiveChatPanel();
         }
         renderSessionList();
     });
@@ -226,20 +259,40 @@ function updateBadge() {
     if (badge) badge.textContent = totalUnreadCount;
 }
 
-function selectSession(sessionId) {
+function selectSession(sessionId, options = {}) {
     currentSessionId = sessionId;
     document.getElementById('chat-placeholder')?.classList.add('d-none');
     const panel = document.getElementById('chat-active-panel');
     if (panel) panel.classList.remove('d-none');
     
-    // Reset active state của các nút filter yêu cầu hủy và hiện lại tất cả
-    document.querySelectorAll('[data-cancellation-filter]').forEach(button => {
-        button.classList.remove('btn-primary');
-        button.classList.add('btn-outline-secondary');
-        button.style.display = 'inline-block'; // Hiện lại tất cả 3 nút
-    });
+    // Show Right Context Panel
+    const contextPanel = document.getElementById('chat-context-panel');
+    if (contextPanel) contextPanel.classList.remove('d-none');
     
-    // Hiển thị thanh header và 2 nút Tạm dừng AI và Tin nhắn tự động
+    if (options.keepCancellationActive) {
+        document.getElementById('context-cancellation-view')?.classList.remove('d-none');
+        document.getElementById('context-session-view')?.classList.add('d-none');
+        document.querySelector('.chat-reply-area')?.classList.add('d-none');
+    } else {
+        document.getElementById('context-session-view')?.classList.remove('d-none');
+        document.getElementById('context-cancellation-view')?.classList.add('d-none');
+        document.querySelector('.chat-reply-area')?.classList.remove('d-none');
+        updateSessionInfoStatusBox(sessions[sessionId] || {});
+        // Clear active status on sidebar cancellations
+        activeCancellationId = null;
+        document.querySelectorAll('#cancellation-list-sidebar .cancellation-card').forEach(c => {
+            c.classList.remove('active');
+        });
+    }
+    
+    // Restore active state of filters back to normal when selecting a regular session
+    if (!options.keepCancellationActive) {
+        document.querySelectorAll('[data-cancellation-filter]').forEach(button => {
+            button.classList.remove('btn-primary');
+            button.classList.add('btn-outline-secondary');
+        });
+    }
+    
     const activeHeader = document.getElementById('chat-active-header');
     if (activeHeader) activeHeader.style.display = 'flex';
     
@@ -251,6 +304,30 @@ function selectSession(sessionId) {
     updateChatHeader(sessions[sessionId] || {});
     if (!sessions[sessionId]?.isDeleted) {
         markSessionRead(sessionId);
+    }
+}
+
+function hideActiveChatPanel() {
+    currentSessionId = null;
+    document.getElementById('chat-active-panel')?.classList.add('d-none');
+    document.getElementById('chat-context-panel')?.classList.add('d-none');
+    document.getElementById('chat-placeholder')?.classList.remove('d-none');
+}
+
+function updateSessionInfoStatusBox(session) {
+    const box = document.getElementById('session-info-status-box');
+    if (!box) return;
+    const isPaused = session.status === 'paused';
+    const isDeleted = session.isDeleted === true;
+    if (isDeleted) {
+        box.textContent = 'Phiên đang nằm trong thùng rác';
+        box.className = 'session-info-status deleted';
+    } else if (isPaused) {
+        box.textContent = 'AI đã tạm dừng · Nhân viên tiếp quản';
+        box.className = 'session-info-status paused';
+    } else {
+        box.textContent = 'AI đang trả lời tự động';
+        box.className = 'session-info-status auto';
     }
 }
 
@@ -815,9 +892,7 @@ async function softDeleteCurrentSession() {
         .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
         .then(() => {
             delete sessions[currentSessionId];
-            currentSessionId = null;
-            document.getElementById('chat-active-panel')?.classList.add('d-none');
-            document.getElementById('chat-placeholder')?.classList.remove('d-none');
+            hideActiveChatPanel();
             renderSessionList();
             if (currentSessionScope === 'deleted') {
                 loadSessionsFallback();
@@ -833,9 +908,7 @@ async function restoreCurrentSession() {
         .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
         .then(() => {
             delete sessions[currentSessionId];
-            currentSessionId = null;
-            document.getElementById('chat-active-panel')?.classList.add('d-none');
-            document.getElementById('chat-placeholder')?.classList.remove('d-none');
+            hideActiveChatPanel();
             renderSessionList();
             loadSessionsFallback();
             premiumToast('Khôi phục phiên chat thành công.', 'success');
@@ -858,9 +931,7 @@ async function permanentlyDeleteCurrentSession() {
         .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
         .then(() => {
             delete sessions[currentSessionId];
-            currentSessionId = null;
-            document.getElementById('chat-active-panel')?.classList.add('d-none');
-            document.getElementById('chat-placeholder')?.classList.remove('d-none');
+            hideActiveChatPanel();
             renderSessionList();
             premiumToast('Đã xóa vĩnh viễn phiên chat.', 'success');
         })
@@ -955,52 +1026,102 @@ function submitManualCancellation() {
         });
 }
 
+let activeCancellationFilter = 'Pending';
+let activeCancellationId = null;
+
 function loadCancellationList(status) {
-    const area = document.getElementById('chat-messages-area');
-    document.getElementById('chat-placeholder')?.classList.add('d-none');
-    document.getElementById('chat-active-panel')?.classList.remove('d-none');
-    
-    // Cập nhật trạng thái active cho nút được chọn
+    activeCancellationFilter = status || 'Pending';
+    const container = document.getElementById('cancellation-list-sidebar');
+    if (!container) return;
+
     document.querySelectorAll('[data-cancellation-filter]').forEach(button => {
-        const active = button.dataset.cancellationFilter === status;
+        const active = button.dataset.cancellationFilter === activeCancellationFilter;
         button.classList.toggle('btn-primary', active);
         button.classList.toggle('btn-outline-secondary', !active);
     });
-    
-    // Ẩn cả thanh header và 2 nút action
-    const activeHeader = document.getElementById('chat-active-header');
-    if (activeHeader) activeHeader.style.display = 'none';
-    
-    const actionGroup = document.querySelector('.chat-action-group');
-    if (actionGroup) actionGroup.style.display = 'none';
-    
-    // Reset currentSessionId để không có session nào được highlight
-    currentSessionId = null;
-    renderSessionList();
-    
-    if (!area) return;
-    area.innerHTML = '<div class="empty-state">Đang tải yêu cầu hủy...</div>';
-    fetch(`/chinhan/hethong/chat-monitor/cancellations?status=${encodeURIComponent(status)}`)
+
+    container.innerHTML = '<div class="empty-state">Đang tải yêu cầu...</div>';
+    fetch(`/chinhan/hethong/chat-monitor/cancellations?status=${encodeURIComponent(activeCancellationFilter)}`)
         .then(r => r.ok ? r.json() : Promise.reject(new Error('Không tải được yêu cầu hủy.')))
         .then(items => {
-            area.innerHTML = `<div class="cancellation-list-title">${escapeHtml(cancellationStatusLabel(status))}</div>`;
+            container.innerHTML = '';
             if (!items.length) {
-                area.innerHTML += '<div class="empty-state">Không có yêu cầu hủy phù hợp.</div>';
+                container.innerHTML = '<div class="empty-state">Không có yêu cầu hủy phù hợp.</div>';
                 return;
             }
-            items.forEach(item => area.appendChild(createCancellationCard(item)));
+            items.forEach(item => {
+                container.appendChild(createSidebarCancellationCard(item));
+            });
         })
         .catch(() => {
-            area.innerHTML = '<div class="empty-state text-danger">Không tải được yêu cầu hủy.</div>';
+            container.innerHTML = '<div class="empty-state text-danger">Lỗi tải dữ liệu.</div>';
         });
 }
 
-function openCancellation(id) {
+function createSidebarCancellationCard(item) {
+    const card = document.createElement('div');
+    const isActive = activeCancellationId === item.id;
+    card.className = `cancellation-card ${isActive ? 'active' : ''}`;
+    card.dataset.cancellationId = item.id;
+    card.dataset.chatSessionId = item.chatSessionId;
+    
+    const submittedCode = item.submittedBookingCode || (item.bookingId ? '#' + item.bookingId : 'Chưa liên kết');
+    
+    card.innerHTML = `
+        <div class="cancellation-card-header">
+            <div>
+                <span class="cancellation-kicker">Yêu cầu hủy phòng</span>
+                <strong>${escapeHtml(item.customerName || 'Khách')}</strong>
+            </div>
+            <span class="cancellation-status cancellation-status-${escapeHtml((item.status || '').toLowerCase())}">${escapeHtml(cancellationStatusLabel(item.status))}</span>
+        </div>
+        <div class="cancellation-card-meta">
+            <span>Mã: ${escapeHtml(submittedCode)}</span>
+            <span>${timeAgo(item.createdAt)}</span>
+        </div>
+        ${item.staffReason ? `<div class="cancellation-card-reason text-truncate" style="max-height: 38px;">${escapeHtml(item.staffReason)}</div>` : ''}
+        <button class="btn btn-sm btn-outline-primary btn-open-detail w-100 mt-2" type="button">Xem và xử lý</button>
+    `;
+    
+    const triggerDetail = () => {
+        activeCancellationId = item.id;
+        document.querySelectorAll('#cancellation-list-sidebar .cancellation-card').forEach(c => {
+            c.classList.toggle('active', Number(c.dataset.cancellationId) === Number(item.id));
+        });
+        openCancellation(item.id, item.chatSessionId);
+    };
+    
+    card.addEventListener('click', (e) => {
+        if (!e.target.closest('button')) {
+            triggerDetail();
+        }
+    });
+    card.querySelector('.btn-open-detail').addEventListener('click', triggerDetail);
+    
+    return card;
+}
+
+function openCancellation(id, chatSessionId) {
     const detail = document.getElementById('cancellation-detail');
-    const modalEl = document.getElementById('cancellation-modal');
-    if (!detail || !modalEl) return;
-    detail.innerHTML = '<div class="empty-state">Đang tải chi tiết yêu cầu hủy...</div>';
-    if (typeof bootstrap !== 'undefined') bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    if (!detail) return;
+    detail.innerHTML = '<div class="empty-state">Đang tải chi tiết...</div>';
+    
+    const contextPanel = document.getElementById('chat-context-panel');
+    if (contextPanel) contextPanel.classList.remove('d-none');
+    
+    const contextCancellationView = document.getElementById('context-cancellation-view');
+    if (contextCancellationView) contextCancellationView.classList.remove('d-none');
+    
+    const contextSessionView = document.getElementById('context-session-view');
+    if (contextSessionView) contextSessionView.classList.add('d-none');
+
+    // Hide chat reply area in cancellation mode
+    document.querySelector('.chat-reply-area')?.classList.add('d-none');
+
+    // Automatically load timeline alongside this cancellation request details
+    if (chatSessionId) {
+        selectSession(chatSessionId, { keepCancellationActive: true });
+    }
 
     fetch(`/chinhan/hethong/chat-monitor/cancellations/${encodeURIComponent(id)}`)
         .then(r => r.ok ? r.json() : Promise.reject(new Error('Không tải được chi tiết.')))
@@ -1021,44 +1142,69 @@ function renderCancellationDetail(data) {
         && booking
         && booking.status !== 'Cancelled'
         && data.handlingMode !== 'Auto';
+    
     detail.innerHTML = `
-        <div class="cancellation-detail-grid">
-            <section class="cancellation-section">
+        <div class="d-flex flex-column gap-3">
+            <section class="context-section">
                 <h3>Thông tin khách</h3>
                 <dl>
                     <dt>Họ tên</dt><dd>${escapeHtml(request.customerName)}</dd>
-                    <dt>Số điện thoại</dt><dd>${escapeHtml(request.customerPhone)}</dd>
+                    <dt>Điện thoại</dt><dd>${escapeHtml(request.customerPhone)}</dd>
                     <dt>Email</dt><dd>${escapeHtml(request.customerEmail)}</dd>
-                    <dt>Mã khách nhập</dt><dd>${escapeHtml(request.submittedBookingCode || 'Chưa có')}</dd>
+                    <dt>Mã nhập</dt><dd>${escapeHtml(request.submittedBookingCode || 'Chưa có')}</dd>
                     <dt>Trạng thái</dt><dd>${escapeHtml(cancellationStatusLabel(request.status))}</dd>
                 </dl>
             </section>
-            <section class="cancellation-section">
-                <h3>Minh chứng bảo vệ</h3>
+            
+            <section class="context-section">
+                <h3>Minh chứng</h3>
                 <div class="protected-file-links">
-                    <a class="btn btn-sm btn-outline-secondary" href="/chinhan/hethong/chat-monitor/cancellations/${request.id}/file/confirmation" target="_blank" rel="noopener">Ảnh email xác nhận</a>
-                    ${request.refundQrImagePath ? `<a class="btn btn-sm btn-outline-secondary" href="/chinhan/hethong/chat-monitor/cancellations/${request.id}/file/refundQr" target="_blank" rel="noopener">QR nhận hoàn tiền</a>` : ''}
-                    ${request.refundBillProofPath ? `<a class="btn btn-sm btn-outline-secondary" href="/chinhan/hethong/chat-monitor/cancellations/${request.id}/file/refundBill" target="_blank" rel="noopener">Bill hoàn tiền</a>` : ''}
+                    <a class="btn btn-sm" href="/chinhan/hethong/chat-monitor/cancellations/${request.id}/file/confirmation" target="_blank" rel="noopener">
+                        <i class="fas fa-envelope-open-text me-1"></i>Ảnh email xác nhận
+                    </a>
+                    ${request.refundQrImagePath ? `
+                    <a class="btn btn-sm" href="/chinhan/hethong/chat-monitor/cancellations/${request.id}/file/refundQr" target="_blank" rel="noopener">
+                        <i class="fas fa-qrcode me-1"></i>QR nhận hoàn tiền
+                    </a>` : ''}
+                    ${request.refundBillProofPath ? `
+                    <a class="btn btn-sm" href="/chinhan/hethong/chat-monitor/cancellations/${request.id}/file/refundBill" target="_blank" rel="noopener">
+                        <i class="fas fa-receipt me-1"></i>Bill hoàn tiền
+                    </a>` : ''}
                 </div>
             </section>
+            
+            ${renderBookingSummary(booking, suggestions)}
+            
+            <section class="context-section">
+                <h3>Xử lý yêu cầu</h3>
+                <div class="mb-2">
+                    <label class="form-label" for="cancellation-staff-reason">Lý do/ghi chú cho khách</label>
+                    <textarea class="form-control" id="cancellation-staff-reason" rows="3" ${canProcess ? '' : 'disabled'}>${escapeHtml(request.staffReason || '')}</textarea>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" for="cancellation-refund-percent">Phần trăm hoàn tiền (%)</label>
+                    <input class="form-control" id="cancellation-refund-percent" type="number" min="0" max="100" value="${request.appliedRefundPercent ?? request.refundPercentBeforeNoticeSnapshot ?? 0}" ${canProcess ? '' : 'disabled'} />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="cancellation-refund-bill">Bill hoàn tiền (nếu duyệt)</label>
+                    <input class="form-control" id="cancellation-refund-bill" type="file" accept="image/*,.pdf" ${canProcess ? '' : 'disabled'} />
+                </div>
+                <div class="cancellation-actions d-grid gap-2">
+                    <button class="btn btn-cancellation-approve" type="button" id="btn-approve-cancellation" ${canProcess ? '' : 'disabled'}>
+                        <i class="fas fa-check-circle me-2"></i>Chấp nhận hủy
+                    </button>
+                    <button class="btn btn-cancellation-sync" type="button" id="btn-cancel-approved-booking" ${canCancelBooking ? '' : 'disabled'}>
+                        <i class="fas fa-calendar-xmark me-2"></i>Cập nhật trạng thái Booking
+                    </button>
+                    <button class="btn btn-cancellation-reject" type="button" id="btn-reject-cancellation" ${canProcess ? '' : 'disabled'}>
+                        <i class="fas fa-ban me-2"></i>Từ chối yêu cầu
+                    </button>
+                </div>
+                <div class="cancellation-action-message" id="cancellation-action-message"></div>
+            </section>
         </div>
-        ${renderBookingSummary(booking, suggestions)}
-        <section class="cancellation-section">
-            <h3>Xử lý yêu cầu</h3>
-            <label class="form-label" for="cancellation-staff-reason">Lý do/ghi chú cho khách</label>
-            <textarea class="form-control" id="cancellation-staff-reason" rows="3" ${canProcess ? '' : 'disabled'}>${escapeHtml(request.staffReason || '')}</textarea>
-            <label class="form-label mt-3" for="cancellation-refund-percent">Phần trăm hoàn tiền áp dụng</label>
-            <input class="form-control" id="cancellation-refund-percent" type="number" min="0" max="100" value="${request.appliedRefundPercent ?? request.refundPercentBeforeNoticeSnapshot ?? 0}" ${canProcess ? '' : 'disabled'} />
-            <label class="form-label mt-3" for="cancellation-refund-bill">Bill hoàn tiền khi chấp nhận</label>
-            <input class="form-control" id="cancellation-refund-bill" type="file" accept="image/*,.pdf" ${canProcess ? '' : 'disabled'} />
-            <div class="cancellation-actions">
-                <button class="btn btn-success" type="button" id="btn-approve-cancellation" ${canProcess ? '' : 'disabled'}>Chấp nhận hủy</button>
-                <button class="btn btn-warning" type="button" id="btn-cancel-approved-booking" ${canCancelBooking ? '' : 'disabled'}>Đổi booking sang đã hủy</button>
-                <button class="btn btn-outline-danger" type="button" id="btn-reject-cancellation" ${canProcess ? '' : 'disabled'}>Từ chối</button>
-            </div>
-            <div class="cancellation-action-message" id="cancellation-action-message"></div>
-        </section>
     `;
+    
     document.getElementById('btn-approve-cancellation')?.addEventListener('click', () => approveCancellation(request.id));
     document.getElementById('btn-cancel-approved-booking')?.addEventListener('click', () => cancelApprovedBooking(request.id));
     document.getElementById('btn-reject-cancellation')?.addEventListener('click', () => rejectCancellation(request.id));
@@ -1070,19 +1216,32 @@ function renderBookingSummary(booking, suggestions) {
             <strong>#${booking.id} · ${escapeHtml(booking.roomName || 'Phòng')}</strong>
             <span>${escapeHtml(booking.customerName || '')} · ${escapeHtml(booking.customerPhone || '')}</span>
             <span>${formatDateTime(booking.startTime)} - ${formatDateTime(booking.endTime)}</span>
-            <span>Trạng thái: ${escapeHtml(booking.status)} · Tổng tiền: ${formatCurrency(booking.totalPrice)}</span>
+            <span>Trạng thái: ${escapeHtml(booking.status)} · Tổng: ${formatCurrency(booking.totalPrice)}</span>
         </div>` : '<div class="empty-state compact">Chưa liên kết booking.</div>';
+        
     const suggestionsHtml = suggestions.length
-        ? suggestions.map(b => `<div class="booking-summary-card muted"><strong>#${b.id} · ${escapeHtml(b.roomName || 'Phòng')}</strong><span>${escapeHtml(b.customerName || '')} · ${formatDateTime(b.startTime)}</span></div>`).join('')
-        : '<div class="empty-state compact">Không có booking gợi ý.</div>';
+        ? suggestions.map(b => `
+            <div class="booking-summary-card muted mb-2">
+                <strong>#${b.id} · ${escapeHtml(b.roomName || 'Phòng')}</strong>
+                <span>${escapeHtml(b.customerName || '')} · ${formatDateTime(b.startTime)}</span>
+            </div>`).join('')
+        : '<div class="empty-state compact">Không có gợi ý.</div>';
+        
     return `
-        <section class="cancellation-section">
+        <section class="context-section">
             <h3>Booking liên kết</h3>
             ${bookingHtml}
         </section>
-        <section class="cancellation-section">
-            <h3>Booking gợi ý</h3>
-            ${suggestionsHtml}
+        <section class="context-section">
+            <h3 class="d-flex justify-content-between align-items-center cursor-pointer" data-bs-toggle="collapse" data-bs-target="#suggested-bookings-collapse" aria-expanded="true" style="cursor: pointer; margin-bottom: 0;">
+                <span>Booking gợi ý</span>
+                <i class="fas fa-chevron-down collapse-icon"></i>
+            </h3>
+            <div class="collapse show mt-2" id="suggested-bookings-collapse">
+                <div class="d-flex flex-column gap-2">
+                    ${suggestionsHtml}
+                </div>
+            </div>
         </section>`;
 }
 
@@ -1090,7 +1249,7 @@ function approveCancellation(id) {
     const message = document.getElementById('cancellation-action-message');
     const file = document.getElementById('cancellation-refund-bill')?.files?.[0];
     if (!file) {
-        if (message) message.textContent = 'Vui lòng chọn bill hoàn tiền trước khi xem email duyệt.';
+        if (message) message.textContent = 'Vui lòng chọn file bill hoàn tiền trước.';
         return;
     }
     requestCancellationPreview(id, 'approve');
@@ -1110,7 +1269,7 @@ function requestCancellationPreview(id, action) {
         const file = document.getElementById('cancellation-refund-bill')?.files?.[0];
         if (file) formData.append('refundBillProof', file);
     }
-    if (message) message.textContent = 'Đang tạo bản xem trước email...';
+    if (message) message.textContent = 'Đang tạo preview email...';
     fetch(`/chinhan/hethong/chat-monitor/cancellations/${encodeURIComponent(id)}/${isApprove ? 'approval-preview' : 'rejection-preview'}`, { method: 'POST', body: formData })
         .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
         .then(preview => {
@@ -1118,7 +1277,7 @@ function requestCancellationPreview(id, action) {
             showCancellationMailPreview(id, action, preview);
         })
         .catch(err => {
-            if (message) message.textContent = err?.message || 'Không tạo được bản xem trước email.';
+            if (message) message.textContent = err?.message || 'Không tạo được preview email.';
         });
 }
 
@@ -1161,15 +1320,15 @@ function showCancellationMailPreview(id, action, preview) {
                         <input class="form-control" id="cancellation-preview-subject" type="text" value="${escapeHtml(preview?.subject || '')}" />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label" for="cancellation-preview-reason">Lý do/ghi chú gửi khách</label>
+                        <label class="form-label" for="cancellation-preview-reason">Lý do gửi khách</label>
                         <textarea class="form-control" id="cancellation-preview-reason" rows="3">${escapeHtml(cancellationMailPreviewState.currentReason)}</textarea>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Nội dung email</label>
-                        <div class="border rounded p-3 bg-light" id="cancellation-preview-body">${preview?.body || ''}</div>
+                        <div class="border rounded p-3 bg-light text-dark" id="cancellation-preview-body">${preview?.body || ''}</div>
                     </div>
                     ${isApprove ? '<div class="mb-3" id="cancellation-preview-attachment"></div>' : ''}
-                    <div class="alert alert-warning mb-0">Vui lòng kiểm tra kỹ nội dung email trước khi gửi và cập nhật trạng thái yêu cầu hủy.</div>
+                    <div class="alert alert-warning mb-0">Vui lòng kiểm tra kỹ nội dung trước khi gửi email.</div>
                     <div class="cancellation-action-message mt-2" id="cancellation-preview-message"></div>
                 </div>
                 <div class="modal-footer">
@@ -1192,10 +1351,10 @@ function renderPreviewAttachment() {
     if (!container || !cancellationMailPreviewState || cancellationMailPreviewState.action !== 'approve') return;
     const file = cancellationMailPreviewState.billFile;
     container.innerHTML = `
-        <label class="form-label">File bill hoàn tiền đính kèm</label>
+        <label class="form-label">File đính kèm</label>
         <div class="d-flex flex-wrap align-items-center gap-2">
-            <span class="badge bg-secondary">${escapeHtml(file?.name || cancellationMailPreviewState.preview?.attachmentName || 'Chưa chọn file')}</span>
-            <button class="btn btn-sm btn-outline-secondary" type="button" id="btn-replace-preview-bill">Chọn file khác</button>
+            <span class="badge bg-secondary">${escapeHtml(file?.name || cancellationMailPreviewState.preview?.attachmentName || 'Chưa chọn')}</span>
+            <button class="btn btn-sm btn-outline-secondary" type="button" id="btn-replace-preview-bill">Đổi file</button>
             <button class="btn btn-sm btn-outline-danger" type="button" id="btn-remove-preview-bill">Gỡ file</button>
             <input class="d-none" id="cancellation-preview-bill-input" type="file" accept="image/*,.pdf" />
         </div>
@@ -1227,7 +1386,7 @@ function updatePreviewSendState() {
     const needsAttachment = cancellationMailPreviewState.action === 'approve' && cancellationMailPreviewState.preview?.requiresAttachment;
     const missingAttachment = needsAttachment && !cancellationMailPreviewState.billFile;
     button.disabled = missingAttachment;
-    if (message) message.textContent = missingAttachment ? 'Cần có bill hoàn tiền trước khi gửi email chấp nhận hủy.' : '';
+    if (message) message.textContent = missingAttachment ? 'Cần đính kèm bill hoàn tiền trước khi duyệt.' : '';
 }
 
 function updatePreviewBodyReason() {
@@ -1273,6 +1432,7 @@ function postCancellationAction(url, formData, id) {
             if (message) message.textContent = 'Đã cập nhật yêu cầu hủy.';
             openCancellation(id);
             loadSessionsFallback();
+            loadCancellationList(activeCancellationFilter);
             if (currentSessionId) loadChatMessages(currentSessionId);
         })
         .catch(err => {

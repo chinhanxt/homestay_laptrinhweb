@@ -787,3 +787,309 @@
     background: #fff5f5;
     color: #dc3545;
 }
+
+/* Custom range slider styling */
+input[type="range"].form-range {
+    height: 6px;
+    padding: 0;
+    background: var(--admin-border);
+    border-radius: 3px;
+    outline: none;
+    transition: background 0.3s;
+    -webkit-appearance: none;
+}
+
+input[type="range"].form-range::-webkit-slider-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--admin-primary);
+    border: 2px solid white;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transition: transform 0.1s, background-color 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
+    margin-top: -7px;
+}
+
+input[type="range"].form-range::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    background: var(--admin-gold);
+}
+
+input[type="range"].form-range::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 6px;
+    cursor: pointer;
+    background: var(--admin-border);
+    border-radius: 3px;
+}
+
+input[type="range"].form-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--admin-primary);
+    border: 2px solid white;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transition: transform 0.1s, background-color 0.2s;
+}
+
+input[type="range"].form-range::-moz-range-thumb:hover {
+    transform: scale(1.15);
+    background: var(--admin-gold);
+}
+
+input[type="range"].form-range::-moz-range-track {
+    width: 100%;
+    height: 6px;
+    cursor: pointer;
+    background: var(--admin-border);
+    border-radius: 3px;
+}
+
+/* Premium Input Styling */
+.form-control-premium {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--admin-text);
+    background-color: #ffffff;
+    background-clip: padding-box;
+    border: 1px solid var(--admin-border);
+    appearance: none;
+    border-radius: 8px;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-control-premium:focus {
+    color: var(--admin-text);
+    background-color: #ffffff;
+    border-color: var(--admin-primary);
+    outline: 0;
+    box-shadow: 0 0 0 4px var(--admin-primary-soft);
+}
+
+.form-control-premium::placeholder {
+    color: var(--admin-text-soft);
+    opacity: 0.6;
+}
+
+/* Custom Input Group Premium */
+.input-group-premium {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--admin-border);
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 0 16px;
+    transition: all 0.2s;
+    width: 100%;
+    position: relative;
+}
+
+.input-group-premium:focus-within {
+    border-color: var(--admin-primary);
+    box-shadow: 0 0 0 4px var(--admin-primary-soft);
+}
+
+.input-group-premium i {
+    color: var(--admin-text-soft);
+    margin-right: 12px;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+.input-group-premium .form-control-premium {
+    border: none !important;
+    padding: 10px 0 !important;
+    font-size: 0.9rem;
+    font-weight: 500;
+    outline: none !important;
+    box-shadow: none !important;
+    flex: 1;
+    width: 100%;
+    background: transparent;
+}
+
+.input-group-premium .suffix {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--admin-text-soft);
+    margin-left: 12px;
+    flex-shrink: 0;
+}
+
+/* Input group integration with Bootstrap input-group */
+.input-group > .form-control-premium {
+    position: relative;
+    flex: 1 1 auto;
+    width: 1%;
+    min-width: 0;
+}
+
+.input-group > .input-group-text + .form-control-premium {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+}
+
+.input-group > .form-control-premium:not(:last-child) {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+/* Branch Settings Custom Overhauls */
+.branch-icon-square {
+    width: 44px;
+    height: 44px;
+    background: var(--admin-primary-soft);
+    color: var(--admin-primary);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+}
+
+.bento-item:hover .branch-icon-square {
+    background: var(--admin-primary);
+    color: white;
+    transform: scale(1.05);
+}
+
+.btn-save-branch {
+    background: white;
+    color: var(--admin-text);
+    border: 1px solid var(--admin-border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    margin-top: 16px;
+}
+
+.btn-save-branch:hover {
+    background: var(--admin-primary-soft);
+    border-color: var(--admin-primary);
+    color: var(--admin-primary);
+    box-shadow: 0 4px 10px rgba(36, 59, 90, 0.08);
+}
+
+/* --- Redesigned Payment QR Custom Styles --- */
+.bg-gradient-premium {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+}
+
+.bank-transfer-card {
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.25) !important;
+}
+.bank-transfer-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 25px 50px rgba(15, 23, 42, 0.35) !important;
+}
+
+.preview-card-chip i {
+    animation: pulse-chip 2s infinite ease-in-out;
+}
+
+@keyframes pulse-chip {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 0.4; }
+}
+
+.qr-preview-box {
+    transition: all 0.3s ease;
+    border-color: #cbd5e1 !important;
+}
+.qr-preview-box:hover {
+    border-color: var(--admin-gold, #c29b61) !important;
+    background-color: #fafbfc !important;
+}
+
+.qr-preview-wrapper {
+    transition: transform 0.3s ease;
+}
+.qr-preview-wrapper:hover {
+    transform: scale(1.05);
+}
+
+.vietqr-placeholder-graphic {
+    transition: all 0.3s ease;
+}
+.qr-preview-box:hover .vietqr-placeholder-graphic {
+    transform: scale(1.03);
+    border-color: var(--admin-gold, #c29b61) !important;
+}
+
+.vietqr-placeholder-graphic i {
+    animation: pulse-qr-icon 2.5s infinite ease-in-out;
+}
+
+@keyframes pulse-qr-icon {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.shadow-2xs {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+.btn-xs {
+    padding: 2px 6px !important;
+    font-size: 0.75rem !important;
+    border-radius: 4px !important;
+}
+
+.fs-8 {
+    font-size: 0.8rem !important;
+}
+.fs-9 {
+    font-size: 0.7rem !important;
+}
+.extra-small {
+    font-size: 0.65rem !important;
+    font-weight: 700;
+}
+.tracking-widest {
+    letter-spacing: 0.12em !important;
+}
+.tracking-wide {
+    letter-spacing: 0.05em !important;
+}
+
+/* Form section enhancements */
+.qr-branch-body .form-control-premium {
+    border-radius: 10px;
+    padding: 10px 14px;
+}
+.qr-branch-body textarea.form-control-premium {
+    border-radius: 12px;
+    padding: 12px 14px;
+    resize: vertical;
+}
+.qr-branch-body .input-group-premium {
+    border-radius: 10px;
+    padding: 0 14px;
+}
+.qr-branch-body .input-group-premium .form-control-premium {
+    padding: 10px 0 !important;
+}
+
+
+

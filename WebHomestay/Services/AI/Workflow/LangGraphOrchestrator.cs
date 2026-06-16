@@ -4,7 +4,7 @@ using WebHomestay.Services.AI.Workflow.Nodes;
 
 namespace WebHomestay.Services.AI.Workflow;
 
-public class LangGraphOrchestrator : IAIBrainOrchestrator
+public class LangGraphOrchestrator : IWorkflowBrainOrchestrator
 {
     private readonly IConversationManager _conversationManager;
     private readonly WorkflowRunner _runner;
@@ -71,8 +71,9 @@ public class LangGraphOrchestrator : IAIBrainOrchestrator
             ModelProvider = provider,
             IsMock = false,
             FormSchema = "[]",
-            BookingAction = "reply",
-            BookingState = sessionState
+            BookingAction = state.BookingAction,
+            BookingState = sessionState,
+            UiBlocks = state.UiBlocks
         };
     }
 

@@ -26,8 +26,8 @@ public class AdminAIStudioConfigServiceTests
 
         var config = await service.GetAsync();
 
-        Assert.Equal("Phong cách trả lời", config.Categories[0]);
-        Assert.Equal(6, config.Categories.Count);
+        Assert.Equal("Cấu hình Trợ lý & Handoff", config.Categories[0]);
+        Assert.Equal(3, config.Categories.Count);
         Assert.NotNull(config.AssistantProfile);
         Assert.Contains(config.ConversationFlows, flow => flow.Id == "hourly");
         Assert.Contains(config.ConversationFlows, flow => flow.Id == "daily");
@@ -57,7 +57,7 @@ public class AdminAIStudioConfigServiceTests
         var config = await service.GetAsync();
 
         Assert.Equal("Cu", config.AssistantProfile.Tone);
-        Assert.Equal("Phong cách trả lời", config.Categories[0]);
+        Assert.Equal("Cấu hình Trợ lý & Handoff", config.Categories[0]);
         Assert.Contains(config.ConversationFlows, flow => flow.Id == "hourly");
         Assert.DoesNotContain(config.Categories, name => name == "Thanh toán / QR");
     }

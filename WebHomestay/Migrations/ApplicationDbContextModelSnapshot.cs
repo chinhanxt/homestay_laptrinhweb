@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using Pgvector;
 using WebHomestay.Data;
 
 #nullable disable
@@ -20,6 +21,7 @@ namespace WebHomestay.Migrations
                 .HasAnnotation("ProductVersion", "8.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("WebHomestay.Models.AIAgentDefinition", b =>
@@ -169,6 +171,12 @@ namespace WebHomestay.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("retrieved_knowledge_json");
+
+                    b.Property<string>("RuntimeName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RuntimeVersion")
+                        .HasColumnType("text");
 
                     b.Property<string>("SessionId")
                         .IsRequired()
@@ -339,8 +347,8 @@ namespace WebHomestay.Migrations
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("deleted_at");
 
-                    b.Property<float[]>("Embedding")
-                        .HasColumnType("real[]")
+                    b.Property<Vector>("Embedding")
+                        .HasColumnType("vector(1536)")
                         .HasColumnName("embedding");
 
                     b.Property<bool>("IsActive")
@@ -1051,8 +1059,8 @@ namespace WebHomestay.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
-                    b.Property<float[]>("Embedding")
-                        .HasColumnType("real[]")
+                    b.Property<Vector>("Embedding")
+                        .HasColumnType("vector(1536)")
                         .HasColumnName("embedding");
 
                     b.Property<decimal>("ExtraGuestFee")

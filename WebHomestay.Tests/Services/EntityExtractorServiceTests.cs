@@ -24,4 +24,14 @@ public class EntityExtractorServiceTests
 
         Assert.Equal(3, result);
     }
+
+    [Fact]
+    public void ExtractGuestCount_ExtractsTotalGuestPhrase()
+    {
+        var service = new EntityExtractorService();
+
+        var result = service.ExtractGuestCount("tui muốn thêm 1 khách nữa tổng là 3");
+
+        Assert.Equal(3, result);
+    }
 }

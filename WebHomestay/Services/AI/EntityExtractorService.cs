@@ -79,10 +79,17 @@ namespace WebHomestay.Services.AI
         public int? ExtractGuestCount(string text)
         {
             var lowered = text.ToLowerInvariant();
-            
+            var count = 0;
+
+            var totalGuestMatch = Regex.Match(lowered, @"(?:tổng|tong|thành|thanh|còn|con)\s*(?:là|la)?\s*(\d+)\b");
+            if (totalGuestMatch.Success && int.TryParse(totalGuestMatch.Groups[1].Value, out count))
+            {
+                return count;
+            }
+
             // Vietnamese variations
             var guestMatch = Regex.Match(lowered, @"(\d+)\s*(người|ng|khách|khach|nguoi)");
-            if (guestMatch.Success && int.TryParse(guestMatch.Groups[1].Value, out var count))
+            if (guestMatch.Success && int.TryParse(guestMatch.Groups[1].Value, out count))
             {
                 return count;
             }

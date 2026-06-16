@@ -11,7 +11,7 @@ namespace WebHomestay.Models
         public int Priority { get; set; }
         public bool IsActive { get; set; } = true;
         public DateTime LastUpdated { get; set; } = DateTime.Now;
-        public float[]? Embedding { get; set; }
+        public Pgvector.Vector? Embedding { get; set; }
         public bool IsDeleted { get; set; } = false;
         public DateTime? DeletedAt { get; set; }
     }

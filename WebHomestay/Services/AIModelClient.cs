@@ -19,33 +19,30 @@ namespace WebHomestay.Services
 
         public async Task<AIModelResponse> CompleteAsync(AIModelRequest request, CancellationToken cancellationToken = default)
         {
-            var initialProvider = string.IsNullOrWhiteSpace(_options.Provider) ? "groq" : _options.Provider.Trim().ToLowerInvariant();
-            
-            try
+            var profiles = AIProviderConfigResolver.GetChatProfiles(_options);
+            if (profiles.Count == 0)
             {
-                return await ExecuteWithRetryAsync(initialProvider, request, cancellationToken);
+                throw new InvalidOperationException("Chưa cấu hình Chat API key. Hãy kiểm tra key.md hoặc AIModel:ChatApiKey.");
             }
-            catch (Exception ex)
+
+            Exception? lastError = null;
+            for (var index = 0; index < profiles.Count; index++)
             {
-                // Fallback chain
-                if (initialProvider == "gemini")
+                var profile = profiles[index];
+                try
                 {
-                    try
-                    {
-                        // Fallback to groq
-                        return await ExecuteWithRetryAsync("groq", request, cancellationToken);
-                    }
-                    catch (Exception fallbackEx)
-                    {
-                        throw new AggregateException($"Both primary ({initialProvider}) and fallback (groq) failed.", ex, fallbackEx);
-                    }
+                    return await ExecuteWithRetryAsync(profile, request, cancellationToken);
                 }
-                Console.WriteLine("AIModelClient CompleteAsync Exception: " + ex.ToString());
-                throw;
+                catch (Exception ex) when (index < profiles.Count - 1 && AIProviderConfigResolver.ShouldFailover(ex.Message))
+                {
+                    lastError = ex;
+                }
             }
+
+            throw lastError ?? new InvalidOperationException("Không thể gọi mô hình AI.");
         }
 
-        private async Task<AIModelResponse> ExecuteWithRetryAsync(string provider, AIModelRequest request, CancellationToken cancellationToken)
+        private async Task<AIModelResponse> ExecuteWithRetryAsync(AIProviderProfile profile, AIModelRequest request, CancellationToken cancellationToken)
         {
             int maxRetries = 3;
             int delayMs = 1000;
@@ -54,7 +51,7 @@ namespace WebHomestay.Services
             {
                 try
                 {
-                    return await ExecuteCoreAsync(provider, request, cancellationToken);
+                    return await ExecuteCoreAsync(profile, request, cancellationToken);
                 }
                 catch (HttpRequestException ex) when (i < maxRetries - 1 && ex.StatusCode != System.Net.HttpStatusCode.Unauthorized && ex.StatusCode != System.Net.HttpStatusCode.BadRequest)
                 {
@@ -68,26 +65,27 @@ namespace WebHomestay.Services
                 }
             }
 
-            return await ExecuteCoreAsync(provider, request, cancellationToken);
+            return await ExecuteCoreAsync(profile, request, cancellationToken);
         }
 
-        private async Task<AIModelResponse> ExecuteCoreAsync(string provider, AIModelRequest request, CancellationToken cancellationToken)
+        private async Task<AIModelResponse> ExecuteCoreAsync(AIProviderProfile profile, AIModelRequest request, CancellationToken cancellationToken)
         {
-            var model = ResolveModel(provider);
+            var provider = profile.Provider;
+            var model = profile.Model;
 
-            if (provider == "mock")
+            if (!string.Equals(provider, "gemini", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(provider, "groq", StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException("Mock AI đã bị tắt. Hãy cấu hình Groq API key trong key.md hoặc AIModel:ApiKey.");
+                throw new InvalidOperationException($"AI provider '{provider}' is not supported. Supported providers: gemini, groq.");
             }
 
-            if (string.IsNullOrWhiteSpace(_options.ApiKey))
+            if (string.IsNullOrWhiteSpace(profile.ApiKey))
             {
-                throw new InvalidOperationException($"AI provider '{provider}' cần API key. Hãy kiểm tra file key.md hoặc cấu hình AIModel:ApiKey.");
+                throw new InvalidOperationException($"AI provider '{provider}' cần API key. Hãy kiểm tra key.md hoặc cấu hình AIModel.");
             }
 
-            var endpoint = ResolveEndpoint(provider);
-            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint);
-            httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, profile.Endpoint);
+            httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", profile.ApiKey);
 
             var payload = new JsonObject
             {
@@ -129,32 +127,6 @@ namespace WebHomestay.Services
                 Model = model,
                 Content = content,
                 IsMock = false
-            };
-        }
-
-        private string ResolveModel(string provider)
-        {
-            if (!string.IsNullOrWhiteSpace(_options.Model)) return _options.Model;
-            return provider switch
-            {
-                "groq" => "llama-3.3-70b-versatile",
-                "openrouter" => "openai/gpt-4o-mini",
-                "9router" => "cx/gpt-5.3-codex",
-                "gemini" => "gemini-2.0-flash",
-                _ => "llama-3.3-70b-versatile"
-            };
-        }
-
-        private string ResolveEndpoint(string provider)
-        {
-            if (!string.IsNullOrWhiteSpace(_options.Endpoint)) return _options.Endpoint;
-            return provider switch
-            {
-                "groq" => "https://api.groq.com/openai/v1/chat/completions",
-                "openrouter" => "https://openrouter.ai/api/v1/chat/completions",
-                "9router" => "http://localhost:20128/v1/chat/completions",
-                "gemini" => "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                _ => throw new InvalidOperationException($"AI provider '{provider}' is not supported.")
             };
         }
     }

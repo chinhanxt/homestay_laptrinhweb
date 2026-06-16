@@ -3,11 +3,13 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
 using WebHomestay.Data;
 using WebHomestay.Models;
+using WebHomestay.Services.AI.Retrieval;
 
 namespace WebHomestay.Services.AI.Plugins
 {
@@ -15,16 +17,19 @@ namespace WebHomestay.Services.AI.Plugins
     {
         private readonly ApplicationDbContext _context;
         private readonly IEmbeddingService _embeddingService;
+        private readonly IVectorSearchService _vectorSearchService;
         private readonly AIBookingSessionState? _sessionState;
         private readonly StringBuilder _logs;
 
         public SemanticSearchPlugin(
             ApplicationDbContext context,
             IEmbeddingService embeddingService,
+            IVectorSearchService vectorSearchService,
             AIBookingSessionState? sessionState = null)
         {
             _context = context;
             _embeddingService = embeddingService;
+            _vectorSearchService = vectorSearchService;
             _sessionState = sessionState;
             _logs = new StringBuilder();
         }
@@ -38,88 +43,74 @@ namespace WebHomestay.Services.AI.Plugins
             
             try
             {
-                // Fetch active rooms
-                var rooms = await _context.Rooms
-                    .Include(r => r.Branch)
-                    .Where(r => r.Status == "Available")
-                    .ToListAsync();
+                var queryEmbedding = await _embeddingService.GetEmbeddingAsync(userPreference, CancellationToken.None);
+                var searchResults = await _vectorSearchService.SearchRoomsAsync(
+                    queryEmbedding,
+                    _sessionState?.BranchId,
+                    10,
+                    CancellationToken.None);
 
-                var queryEmbedding = await _embeddingService.GetEmbeddingAsync(userPreference);
+                System.Collections.Generic.List<object> matchedRooms = new System.Collections.Generic.List<object>();
 
-                var matchedRooms = rooms
-                    .Where(r => r.Embedding != null)
-                    .Select(r => {
-                        double similarity = CosineSimilarity(r.Embedding, queryEmbedding);
-                        
-                        // Boost based on current session context
-                        if (_sessionState != null)
-                        {
-                            // Boost rooms in current selected branch
-                            if (_sessionState.BranchId.HasValue && r.BranchId == _sessionState.BranchId.Value)
-                            {
-                                similarity += 0.15;
-                            }
-                            
-                            // Check capacity warning (mild penalty if capacity is strictly exceeded)
-                            var guests = _sessionState.GuestCount > 0 ? _sessionState.GuestCount : 1;
-                            if (guests > r.MaxGuests)
-                            {
-                                similarity -= 0.3; // Substantial penalty if guests exceed max capacity
-                            }
-                            else if (guests >= r.Capacity && guests <= r.MaxGuests)
-                            {
-                                similarity += 0.05; // Slight boost if guest count fits within capacity boundaries
-                            }
-                        }
-
-                        return new { Room = r, Similarity = similarity };
-                    })
-                    .Where(x => x.Similarity > 0.35) // similarity threshold
-                    .OrderByDescending(x => x.Similarity)
-                    .Take(3)
-                    .Select(x => new
-                    {
-                        RoomId = x.Room.Id,
-                        Name = x.Room.Name,
-                        BranchName = x.Room.Branch?.Name ?? "Hệ thống",
-                        PricePerHour = x.Room.PricePerHour,
-                        PricePerDay = x.Room.PricePerDay,
-                        Capacity = x.Room.Capacity,
-                        MaxGuests = x.Room.MaxGuests,
-                        Description = x.Room.Description,
-                        Similarity = Math.Round(x.Similarity, 4)
-                    })
-                    .ToList();
-
-                if (!matchedRooms.Any())
+                if (searchResults.Any())
                 {
-                    _logs.AppendLine("[SemanticSearchRooms] No semantic room matches found. Falling back to keyword search.");
-                    
-                    // Simple fallback keyword match
-                    var terms = userPreference.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
-                    matchedRooms = rooms
-                        .Where(r => terms.Any(t => 
-                            r.Name.Contains(t, StringComparison.OrdinalIgnoreCase) || 
-                            (r.Description != null && r.Description.Contains(t, StringComparison.OrdinalIgnoreCase))))
+                    var roomIds = searchResults.Select(r => int.Parse(r.EntityId)).ToList();
+                    var roomsMap = await _context.Rooms
+                        .Include(r => r.Branch)
+                        .Where(r => roomIds.Contains(r.Id))
+                        .ToDictionaryAsync(r => r.Id);
+
+                    matchedRooms = searchResults
+                        .Select(sr => {
+                            var roomId = int.Parse(sr.EntityId);
+                            if (!roomsMap.TryGetValue(roomId, out var r)) return null;
+
+                            double similarity = sr.Score;
+
+                            // Boost based on current session context
+                            if (_sessionState != null)
+                            {
+                                // Boost rooms in current selected branch
+                                if (_sessionState.BranchId.HasValue && r.BranchId == _sessionState.BranchId.Value)
+                                {
+                                    similarity += 0.15;
+                                }
+                                
+                                // Check capacity warning (mild penalty if capacity is strictly exceeded)
+                                var guests = _sessionState.GuestCount > 0 ? _sessionState.GuestCount : 1;
+                                if (guests > r.MaxGuests)
+                                {
+                                    similarity -= 0.3; // Substantial penalty if guests exceed max capacity
+                                }
+                                else if (guests >= r.Capacity && guests <= r.MaxGuests)
+                                {
+                                    similarity += 0.05; // Slight boost if guest count fits within capacity boundaries
+                                }
+                            }
+
+                            return new { Room = r, Similarity = similarity };
+                        })
+                        .Where(x => x is not null && x.Similarity > 0.35)
+                        .OrderByDescending(x => x.Similarity)
                         .Take(3)
-                        .Select(r => new
+                        .Select(x => (object)new
                         {
-                            RoomId = r.Id,
-                            Name = r.Name,
-                            BranchName = r.Branch?.Name ?? "Hệ thống",
-                            PricePerHour = r.PricePerHour,
-                            PricePerDay = r.PricePerDay,
-                            Capacity = r.Capacity,
-                            MaxGuests = r.MaxGuests,
-                            Description = r.Description,
-                            Similarity = 0.5 // Static fallback score
+                            RoomId = x!.Room.Id,
+                            Name = x.Room.Name,
+                            BranchName = x.Room.Branch?.Name ?? "Hệ thống",
+                            PricePerHour = x.Room.PricePerHour,
+                            PricePerDay = x.Room.PricePerDay,
+                            Capacity = x.Room.Capacity,
+                            MaxGuests = x.Room.MaxGuests,
+                            Description = x.Room.Description,
+                            Similarity = Math.Round(x.Similarity, 4)
                         })
                         .ToList();
                 }
 
                 if (!matchedRooms.Any())
                 {
-                    var failStr = "Không tìm thấy phòng nào phù hợp với mô tả của bạn.";
+                    var failStr = "Không tìm thấy phòng phù hợp từ semantic retrieval trong nguồn dữ liệu hiện tại.";
                     _logs.AppendLine($"[Result SemanticSearchRooms] {failStr}");
                     return failStr;
                 }
@@ -127,6 +118,11 @@ namespace WebHomestay.Services.AI.Plugins
                 var successStr = "Tìm thấy các phòng phù hợp sau:\n" + JsonSerializer.Serialize(matchedRooms);
                 _logs.AppendLine($"[Result SemanticSearchRooms] {successStr}");
                 return successStr;
+            }
+            catch (EmbeddingUnavailableException ex)
+            {
+                _logs.AppendLine($"[SemanticSearchRooms Error] {ex.Message}");
+                return "Hệ thống semantic retrieval hiện chưa sẵn sàng vì embedding chưa khả dụng.";
             }
             catch (Exception ex)
             {
@@ -136,20 +132,5 @@ namespace WebHomestay.Services.AI.Plugins
         }
 
         public string GetLogs() => _logs.ToString();
-
-        private static double CosineSimilarity(float[]? v1, float[]? v2)
-        {
-            if (v1 == null || v2 == null || v1.Length != v2.Length) return 0.0;
-            double dot = 0.0;
-            double n1 = 0.0;
-            double n2 = 0.0;
-            for (int i = 0; i < v1.Length; i++)
-            {
-                dot += v1[i] * v2[i];
-                n1 += v1[i] * v1[i];
-                n2 += v2[i] * v2[i];
-            }
-            return (n1 == 0.0 || n2 == 0.0) ? 0.0 : dot / (Math.Sqrt(n1) * Math.Sqrt(n2));
-        }
     }
 }

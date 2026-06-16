@@ -273,6 +273,59 @@ public class AdminChatServiceTests
     }
 
     [Fact]
+    public async Task GetSessionsAsync_Returns_All_NonDeleted_Sessions_From_Database()
+    {
+        var ctx = CreateContext();
+        ctx.AdminChatSessions.AddRange(
+            new AdminChatSession
+            {
+                SessionId = "recent-1",
+                CustomerName = "Recent",
+                LastActivityAt = DateTime.Now
+            },
+            new AdminChatSession
+            {
+                SessionId = "old-1",
+                CustomerName = "Old",
+                LastActivityAt = DateTime.Now.AddDays(-10)
+            }
+        );
+        await ctx.SaveChangesAsync();
+        var svc = new AdminChatService(ctx);
+
+        var sessions = await svc.GetSessionsAsync(false, 30);
+
+        Assert.Equal(2, sessions.Count);
+        Assert.Contains(sessions, s => s.SessionId == "recent-1");
+        Assert.Contains(sessions, s => s.SessionId == "old-1");
+    }
+
+    [Fact]
+    public async Task GetSessionsAsync_Backfills_TraceOnly_Sessions_And_Messages()
+    {
+        var ctx = CreateContext();
+        ctx.AIConversationTraces.Add(new AIConversationTrace
+        {
+            SessionId = "trace-only-1",
+            CustomerMessage = "Cho toi xem phong trong",
+            FinalAnswer = "Minh gui danh sach phong cho ban",
+            CreatedAt = DateTime.Now.AddDays(-3)
+        });
+        await ctx.SaveChangesAsync();
+        var svc = new AdminChatService(ctx);
+
+        var sessions = await svc.GetSessionsAsync(false, 30);
+        var messages = await svc.GetSessionMessagesAsync("trace-only-1");
+
+        Assert.Contains(sessions, s => s.SessionId == "trace-only-1");
+        Assert.Collection(messages,
+            m => Assert.Equal("user", m.Role),
+            m => Assert.Equal("ai", m.Role));
+        Assert.Equal("Cho toi xem phong trong", messages[0].Content);
+        Assert.Equal("Minh gui danh sach phong cho ban", messages[1].Content);
+    }
+
+    [Fact]
     public async Task RestoreSessionAsync_Clears_Delete_Metadata_And_Resurfaces_Session()
     {
         var ctx = CreateContext();
@@ -371,4 +424,3 @@ public class AdminChatServiceTests
         Assert.Equal("{}", msg.FormBlockJson);
     }
 }
-

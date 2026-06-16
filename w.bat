@@ -1,2 +1,2 @@
 @echo off
-dotnet watch --project WebHomestay/WebHomestay.csproj
+powershell -ExecutionPolicy Bypass -File "%~dp0r.ps1" w

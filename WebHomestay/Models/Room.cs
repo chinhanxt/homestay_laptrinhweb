@@ -53,7 +53,7 @@ namespace WebHomestay.Models
         public virtual ICollection<RoomSlotTemplateAssignment> SlotAssignments { get; set; } = new List<RoomSlotTemplateAssignment>();
         public virtual ICollection<RoomSlotInventory> SlotInventories { get; set; } = new List<RoomSlotInventory>();
         public virtual ICollection<RoomSlotOverride> SlotOverrides { get; set; } = new List<RoomSlotOverride>();
-        public float[]? Embedding { get; set; }
+        public Pgvector.Vector? Embedding { get; set; }
 
         // Soft delete
         public bool IsDeleted { get; set; } = false;

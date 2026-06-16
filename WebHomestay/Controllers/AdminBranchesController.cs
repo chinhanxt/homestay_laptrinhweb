@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
 using WebHomestay.Models;
 using WebHomestay.Filters;
+using WebHomestay.Services;
 
 namespace WebHomestay.Controllers
 {
@@ -12,10 +13,12 @@ namespace WebHomestay.Controllers
     public class AdminBranchesController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly IBulkImportService _importService;
 
-        public AdminBranchesController(ApplicationDbContext context)
+        public AdminBranchesController(ApplicationDbContext context, IBulkImportService importService)
         {
             _context = context;
+            _importService = importService;
         }
 
         // GET: admin/branches
@@ -182,7 +185,7 @@ namespace WebHomestay.Controllers
         }
 
         // GET: admin/branches/trash
-        [AdminAuthorize(Permission = "branches.view")]
+        [AdminAuthorize(Permission = "branches.trash")]
         [HttpGet("trash")]
         public async Task<IActionResult> Trash()
         {
@@ -194,7 +197,7 @@ namespace WebHomestay.Controllers
         }
 
         // POST: admin/branches/restore/5
-        [AdminAuthorize(Permission = "branches.edit")]
+        [AdminAuthorize(Permission = "branches.restore")]
         [HttpPost("restore/{id}")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Restore(int id)
@@ -238,6 +241,30 @@ namespace WebHomestay.Controllers
         private bool BranchExists(int id)
         {
             return _context.Branches.Any(e => e.Id == id);
+        }
+
+        [AdminAuthorize(Permission = "branches.create")]
+        [HttpPost("import-zip")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ImportZip(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                TempData["ErrorMessage"] = "Vui lòng chọn file ZIP hoặc Excel để import.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var result = await _importService.ImportBranchesAsync(file);
+            if (result.Errors.Any())
+            {
+                TempData["ErrorMessage"] = $"Import hoàn tất. Thành công: {result.SuccessCount}, Thất bại: {result.FailureCount}. Chi tiết lỗi: {string.Join(" | ", result.Errors.Take(5))}";
+            }
+            else
+            {
+                TempData["SuccessMessage"] = $"Đã import thành công {result.SuccessCount} chi nhánh.";
+            }
+
+            return RedirectToAction(nameof(Index));
         }
     }
 }

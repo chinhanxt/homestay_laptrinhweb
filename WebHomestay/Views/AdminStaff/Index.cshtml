@@ -39,6 +39,10 @@
                         <i class="fas fa-plus"></i>
                         <span>Thêm nhân sự</span>
                     </a>
+                    <button type="button" class="btn-premium-outline me-2" data-bs-toggle="modal" data-bs-target="#importStaffModal">
+                        <i class="fas fa-file-import"></i>
+                        <span>Import Excel/ZIP</span>
+                    </button>
                 }
                 @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.edit"))
                 {
@@ -46,7 +50,7 @@
                         <i class="fas fa-lock"></i><span>Ma trận phân quyền</span>
                     </a>
                 }
-                @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.view"))
+                @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.trash"))
                 {
                     <a asp-action="Trash" class="btn-premium-outline"><i class="fas fa-trash-alt"></i><span>Thùng rác</span></a>
                 }
@@ -363,3 +367,29 @@
     });
 })();
 </script>
+
+<!-- Modal: IMPORT NHÂN VIÊN -->
+<div class="modal fade" id="importStaffModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content premium-modal">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold"><i class="fas fa-file-import me-2 text-primary"></i>Import Nhân Viên</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="ImportZip" method="post" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div class="modal-body py-4">
+                    <p class="text-muted small">Chọn file Excel (.xlsx) hoặc file nén ZIP chứa file excel để nhập hàng loạt tài khoản nhân viên và phân quyền.</p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Chọn file (.xlsx hoặc .zip)</label>
+                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx,.zip" required />
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4" style="background: linear-gradient(135deg, #4F81BD 0%, #295B96 100%); border: none;">Bắt đầu Import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

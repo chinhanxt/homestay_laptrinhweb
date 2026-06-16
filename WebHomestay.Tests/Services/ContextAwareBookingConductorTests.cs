@@ -6,6 +6,14 @@ using WebHomestay.Models;
 using WebHomestay.Models.ViewModels;
 using WebHomestay.Services;
 using Xunit;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
+using WebHomestay.Hubs;
+using WebHomestay.Services.AI;
+using Moq;
+using AdminAIStudioConfigResponse = WebHomestay.Models.AI.AdminAIStudioConfigResponse;
+using AdminAIHandoffConfig = WebHomestay.Models.AI.AdminAIHandoffConfig;
+using AdminAIConversationFlow = WebHomestay.Models.AI.AdminAIConversationFlow;
 
 namespace WebHomestay.Tests.Services;
 
@@ -27,12 +35,16 @@ public class ContextAwareBookingConductorTests
     private static ContextAwareBookingConductor CreateConductor(
         ApplicationDbContext context,
         IMemoryCache cache,
-        Action<Moq.Mock<WebHomestay.Services.AI.IEntityExtractorService>>? configureExtractor = null)
+        Action<Moq.Mock<WebHomestay.Services.AI.IEntityExtractorService>>? configureExtractor = null,
+        Action<ServiceCollection>? configureServices = null,
+        IAdminChatService? adminChatService = null)
     {
-        var scopeFactory = new FakeServiceScopeFactory(context);
+        var scopeFactory = new FakeServiceScopeFactory(context, configureServices);
         var bookingCreation = new FakeBookingCreationService(context);
         
         var mockAdminChat = new Moq.Mock<IAdminChatService>();
+        var adminChat = adminChatService ?? mockAdminChat.Object;
+        
         var mockExtractor = new Moq.Mock<WebHomestay.Services.AI.IEntityExtractorService>();
         mockExtractor.Setup(e => e.ExtractDateTime(Moq.It.IsAny<string>())).Returns((null, null));
         mockExtractor.Setup(e => e.ExtractGuestCount(Moq.It.IsAny<string>())).Returns((int?)null);
@@ -48,7 +60,7 @@ public class ContextAwareBookingConductorTests
             cache, 
             scopeFactory, 
             bookingCreation, 
-            mockAdminChat.Object, 
+            adminChat, 
             intentClassifier, 
             mockExtractor.Object,
             explanationService,
@@ -98,7 +110,7 @@ public class ContextAwareBookingConductorTests
         context.SaveChanges();
     }
 
-    private static AIBrainChatRequest MakeRequest(string message, int? branchId = null, DateTime? startTime = null, int guestCount = 0)
+    private static AIBrainChatRequest MakeRequest(string message, int? branchId = null, DateTime? startTime = null, int guestCount = 0, string bookingMode = "unknown")
     {
         return new AIBrainChatRequest
         {
@@ -107,6 +119,7 @@ public class ContextAwareBookingConductorTests
             BranchId = branchId,
             StartTime = startTime,
             GuestCount = guestCount,
+            BookingMode = bookingMode,
             Mode = ChatMode.PublicBooking
         };
     }
@@ -122,6 +135,20 @@ public class ContextAwareBookingConductorTests
         var result = await conductor.DecideAsync("s1", request.Message, request, CancellationToken.None);
 
         Assert.Equal(ConductorAction.AskInfo, result.Action);
+    }
+
+    [Fact]
+    public async Task SemanticStyleRoomRequest_WithoutRequiredInfo_ReturnsAskInfoWithBranchSelector()
+    {
+        using var context = CreateContext();
+        var cache = CreateCache();
+        var conductor = CreateConductor(context, cache);
+        var request = MakeRequest("tui cần tìm 1 phòng lãng mạn");
+
+        var result = await conductor.DecideAsync("semantic-style-1", request.Message, request, CancellationToken.None);
+
+        Assert.Equal(ConductorAction.AskInfo, result.Action);
+        Assert.Contains(result.UiBlocks, block => JsonSerializer.Serialize(block).Contains("branchSelector"));
     }
 
     [Fact]
@@ -180,7 +207,7 @@ public class ContextAwareBookingConductorTests
         SeedSetting(context, "AIPublicBookingRoomCooldown", "3");
         SeedSetting(context, "AIPublicBookingProactiveMode", "balanced");
         var conductor = CreateConductor(context, cache);
-        var request = MakeRequest("đặt phòng", branchId: 1, startTime: DateTime.Today.AddDays(1), guestCount: 2);
+        var request = MakeRequest("đặt phòng", branchId: 1, startTime: DateTime.Today.AddDays(1), guestCount: 2, bookingMode: "hourly");
 
         var result = await conductor.DecideAsync("s2", request.Message, request, CancellationToken.None);
 
@@ -205,7 +232,7 @@ public class ContextAwareBookingConductorTests
 
         var conductor = CreateConductor(context, cache);
 
-        var request = MakeRequest("đặt phòng", branchId: 1, startTime: DateTime.Today.AddDays(2), guestCount: 3);
+        var request = MakeRequest("đặt phòng", branchId: 1, startTime: DateTime.Today.AddDays(2), guestCount: 3, bookingMode: "hourly");
         var result = await conductor.DecideAsync("gate-2", request.Message, request, CancellationToken.None);
 
         var json = JsonSerializer.Serialize(result.UiBlocks);
@@ -232,7 +259,7 @@ public class ContextAwareBookingConductorTests
             extractor.Setup(e => e.ExtractDateTime("14/6, 3 người ạ")).Returns((targetDate.ToDateTime(TimeOnly.MinValue), null));
         });
 
-        var request = MakeRequest("14/6, 3 người ạ", branchId: 1, startTime: targetDate.ToDateTime(TimeOnly.MinValue), guestCount: 3);
+        var request = MakeRequest("14/6, 3 người ạ", branchId: 1, startTime: targetDate.ToDateTime(TimeOnly.MinValue), guestCount: 3, bookingMode: "hourly");
         var result = await conductor.DecideAsync("gate-hourly-rooms", request.Message, request, CancellationToken.None);
 
         var json = JsonSerializer.Serialize(result.UiBlocks);
@@ -289,7 +316,7 @@ public class ContextAwareBookingConductorTests
         SeedSetting(context, "AIPublicBookingMaxRoomShows", "1");
         SeedSetting(context, "AIPublicBookingProactiveMode", "balanced");
         var conductor = CreateConductor(context, cache);
-        var request = MakeRequest("xem phòng", branchId: 1, startTime: DateTime.Today.AddDays(1), guestCount: 2);
+        var request = MakeRequest("xem phòng", branchId: 1, startTime: DateTime.Today.AddDays(1), guestCount: 2, bookingMode: "hourly");
 
         // First call: show rooms (count 0 -> 1)
         var result1 = await conductor.DecideAsync("s5", request.Message, request, CancellationToken.None);
@@ -673,6 +700,59 @@ public class ContextAwareBookingConductorTests
     }
 
     [Fact]
+    public async Task GuestCountUpdate_OnSelectedDailyRoom_RecalculatesSummaryAndKeepsCheckoutFlow()
+    {
+        using var context = CreateContext();
+        var cache = CreateCache();
+        context.Rooms.Add(new Room
+        {
+            Id = 81,
+            BranchId = 1,
+            Name = "Song Xanh Q1-401",
+            PricePerHour = 230000m,
+            PricePerDay = 1650000m,
+            PriceWeekendPerDay = 2600000m,
+            Capacity = 2,
+            MaxGuests = 5,
+            ExtraGuestFee = 200000m,
+            Status = "Available"
+        });
+        context.SaveChanges();
+
+        var conductor = CreateConductor(context, cache);
+        cache.Set("ai-booking-conductor:guest-update-daily", new BookingSessionContainer
+        {
+            Confirmed = new BookingConfirmedState
+            {
+                BranchId = 1,
+                CheckInDate = new DateOnly(2026, 6, 13),
+                CheckOutDate = new DateOnly(2026, 6, 16),
+                GuestCount = 2,
+                BookingMode = "daily"
+            },
+            Progress = new BookingProgressState
+            {
+                SelectedRoomId = 81,
+                ActiveRoomContextId = 81
+            }
+        }, TimeSpan.FromMinutes(30));
+
+        var request = MakeRequest("tui muốn thêm 1 khách nữa tổng là 3", branchId: 1, guestCount: 2);
+        var result = await conductor.DecideAsync("guest-update-daily", request.Message, request, CancellationToken.None);
+
+        var json = JsonSerializer.Serialize(result.UiBlocks);
+        Assert.Equal(ConductorAction.AskInfo, result.Action);
+        Assert.Equal(3, result.State.Confirmed.GuestCount);
+        Assert.Equal(81, result.State.Progress?.SelectedRoomId);
+        Assert.Equal("room-context-guest-update", result.Reason);
+        Assert.Contains("bookingSummary", json);
+        Assert.Contains("roomDecisionCta", json);
+        Assert.Contains("\"showCommitButton\":true", json);
+        Assert.Contains("commitLabel", json);
+        Assert.Contains("6850000", json);
+    }
+
+    [Fact]
     public async Task RoomNamePriceQuestion_BindsRoomContextAndReturnsReply()
     {
         using var context = CreateContext();
@@ -825,6 +905,111 @@ public class ContextAwareBookingConductorTests
 
         Assert.Equal(ConductorAction.AskInfo, result.Action);
         Assert.Contains(result.UiBlocks, block => JsonSerializer.Serialize(block).Contains("singleDatePicker"));
+    }
+
+    [Fact]
+    public async Task HandoffTriggered_ByKeyword_PausesSessionAndReturnsHandoffBlock()
+    {
+        using var context = CreateContext();
+        var cache = CreateCache();
+
+        var sessionId = "handoff-test-session";
+        var chatSession = new AdminChatSession
+        {
+            SessionId = sessionId,
+            CustomerName = "Test Guest",
+            Status = "active",
+            CreatedAt = DateTime.Now,
+            LastActivityAt = DateTime.Now
+        };
+        context.AdminChatSessions.Add(chatSession);
+        context.SaveChanges();
+
+        var mockConfigService = new Moq.Mock<IAdminAIStudioConfigService>();
+        var studioConfig = new AdminAIStudioConfigResponse
+        {
+            Handoff = new AdminAIHandoffConfig
+            {
+                Enabled = true,
+                Keywords = new List<string> { "gặp người", "nhân viên" },
+                ContactInstruction = "Liên hệ hotline của chúng tôi."
+            }
+        };
+        mockConfigService.Setup(s => s.GetAsync()).ReturnsAsync(studioConfig);
+
+        var mockHubContext = new Moq.Mock<IHubContext<ChatHub>>();
+        var mockClients = new Moq.Mock<IHubClients>();
+        var mockClientProxy = new Moq.Mock<IClientProxy>();
+        
+        mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
+        mockClients.Setup(c => c.Group("admin_monitor")).Returns(mockClientProxy.Object);
+        mockClientProxy
+            .Setup(cp => cp.SendCoreAsync("sessionUpdate", Moq.It.IsAny<object[]>(), Moq.It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var conductor = CreateConductor(context, cache, configureServices: services =>
+        {
+            services.AddSingleton(mockConfigService.Object);
+            services.AddSingleton(mockHubContext.Object);
+        });
+
+        var request = MakeRequest("Tôi muốn gặp người hỗ trợ", branchId: 1);
+        var result = await conductor.DecideAsync(sessionId, request.Message, request, CancellationToken.None);
+
+        Assert.Equal(ConductorAction.Reply, result.Action);
+        Assert.Equal("handoff-requested", result.Reason);
+        Assert.Single(result.UiBlocks);
+
+        var block = result.UiBlocks[0];
+        var blockJson = JsonSerializer.Serialize(block);
+        
+        using var doc = JsonDocument.Parse(blockJson);
+        var type = doc.RootElement.GetProperty("type").GetString();
+        var data = doc.RootElement.GetProperty("data");
+        var contactInstruction = data.GetProperty("contactInstruction").GetString();
+
+        Assert.Equal("handoffContact", type);
+        Assert.Equal("Liên hệ hotline của chúng tôi.", contactInstruction);
+
+        var updatedSession = await context.AdminChatSessions.AsNoTracking().FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        Assert.NotNull(updatedSession);
+        Assert.Equal("paused", updatedSession.Status);
+        Assert.Equal("AI Handoff", updatedSession.PausedBy);
+        Assert.Equal("handoff_request", updatedSession.PauseReason);
+    }
+
+    [Fact]
+    public async Task DynamicGating_BasedOnStudioConfig_HidesOrShowsFields()
+    {
+        using var context = CreateContext();
+        var cache = CreateCache();
+
+        var mockConfigService = new Moq.Mock<IAdminAIStudioConfigService>();
+        var studioConfig = new AdminAIStudioConfigResponse
+        {
+            ConversationFlows = new List<AdminAIConversationFlow>
+            {
+                new AdminAIConversationFlow
+                {
+                    Id = "daily",
+                    Enabled = true,
+                    RequiredFieldKeys = new List<string> { "branchId" }
+                }
+            }
+        };
+        mockConfigService.Setup(s => s.GetAsync()).ReturnsAsync(studioConfig);
+
+        var conductor = CreateConductor(context, cache, configureServices: services =>
+        {
+            services.AddSingleton(mockConfigService.Object);
+        });
+
+        var request = MakeRequest("đặt phòng theo ngày", bookingMode: "daily");
+        var result = await conductor.DecideAsync("gating-session", request.Message, request, CancellationToken.None);
+
+        Assert.NotNull(result.State.Confirmed.MissingRequiredFields);
+        Assert.Single(result.State.Confirmed.MissingRequiredFields);
+        Assert.Equal("branchId", result.State.Confirmed.MissingRequiredFields[0]);
     }
 }
 

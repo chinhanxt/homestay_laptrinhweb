@@ -59,6 +59,7 @@ namespace WebHomestay.Services
         public bool HasExtraGuestSurcharge { get; set; }
         public List<string> MissingRequiredFields { get; set; } = new();
         public string? LastRecommendationReason { get; set; }
+        public string? SemanticPreference { get; set; }
         public int? ActiveRoomContextId { get; set; }
     }
 
@@ -74,10 +75,10 @@ namespace WebHomestay.Services
         public string Message { get; set; } = string.Empty;
         public string? CustomerName { get; set; }
         public int? BranchId { get; set; }
-        public string BookingMode { get; set; } = "hourly";
+        public string BookingMode { get; set; } = "unknown";
         public DateTime? StartTime { get; set; }
         public DateTime? EndTime { get; set; }
-        public int GuestCount { get; set; } = 1;
+        public int GuestCount { get; set; }
     }
 
     public class AIBookingActionRequest
@@ -171,7 +172,7 @@ namespace WebHomestay.Services
         public DateOnly? CheckInDate { get; set; }
         public DateOnly? CheckOutDate { get; set; }
         public int GuestCount { get; set; }
-        public string BookingMode { get; set; } = "hourly";
+        public string BookingMode { get; set; } = "unknown";
         public TimeOnly? RequestedTimeStart { get; set; }
         public TimeOnly? RequestedTimeEnd { get; set; }
         public string? RequestedTimeLabel { get; set; }
@@ -180,6 +181,7 @@ namespace WebHomestay.Services
         public bool NeedsWeekendPricingExplanation { get; set; }
         public bool NeedsHolidayPricingExplanation { get; set; }
         public string? LastRecommendationReason { get; set; }
+        public string? SemanticPreference { get; set; }
     }
 
     public class BookingProgressState

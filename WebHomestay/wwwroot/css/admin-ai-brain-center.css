@@ -550,8 +550,12 @@
 
 .studio-shell {
     display: grid;
-    grid-template-columns: 280px minmax(0, 1fr) 360px;
-    gap: 1rem;
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: 1.5rem;
+}
+
+.col-span-2 {
+    grid-column: span 2 / span 2;
 }
 
 .studio-nav,

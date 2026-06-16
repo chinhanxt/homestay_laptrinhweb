@@ -11,6 +11,7 @@
 }
 
 <div class="chat-monitor-shell ai-control-room">
+    <!-- Cột 1: Sidebar (Trái) -->
     <aside class="chat-session-sidebar" id="session-sidebar" aria-label="Danh sách hội thoại">
         <div class="sidebar-header">
             <div>
@@ -19,37 +20,61 @@
             </div>
             <span class="session-count" id="session-count-badge">0</span>
         </div>
-        <div class="chat-filter-row">
-            <button class="btn btn-sm btn-outline-secondary" data-cancellation-filter="Pending">Yêu cầu hủy chờ xử lý</button>
-            <button class="btn btn-sm btn-outline-secondary" data-cancellation-filter="Approved">Đã chấp nhận</button>
-            <button class="btn btn-sm btn-outline-secondary" data-cancellation-filter="Rejected">Đã từ chối</button>
-        </div>
-            <button class="btn btn-sm btn-outline-warning w-100 mt-1" id="btn-manual-cancellation" type="button">
-                <i class="fas fa-file-pen me-1"></i>Hủy thủ công (Zalo)
+        
+        <!-- Tab Navigation Switcher -->
+        <div class="sidebar-tabs-nav">
+            <button class="sidebar-tab-btn active" id="tab-chats-btn" type="button">
+                <i class="fas fa-comment-dots"></i> Hội thoại
             </button>
-        <div class="chat-scope-row">
-            <button class="btn btn-sm btn-primary" type="button" data-session-scope="active">Đang theo dõi</button>
-            <button class="btn btn-sm btn-outline-secondary" type="button" data-session-scope="deleted">Thùng rác</button>
+            <button class="sidebar-tab-btn" id="tab-cancellations-btn" type="button">
+                <i class="fas fa-receipt"></i> Yêu cầu hủy
+            </button>
         </div>
-        <div class="trash-retention-info d-none" id="trash-retention-info">
-            <i class="fas fa-info-circle me-1"></i>
-            Các phiên trong này sẽ tự động bị xóa vĩnh viễn sau @retentionDays ngày.
+
+        <!-- Tab Content 1: Chat Sessions -->
+        <div class="sidebar-tab-content" id="tab-content-chats">
+            <div class="chat-scope-row">
+                <button class="btn btn-sm btn-primary" type="button" data-session-scope="active">Đang theo dõi</button>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-session-scope="deleted">Thùng rác</button>
+            </div>
+            <div class="trash-retention-info d-none" id="trash-retention-info">
+                <i class="fas fa-info-circle me-1"></i>
+                Các phiên trong này sẽ tự động bị xóa vĩnh viễn sau @retentionDays ngày.
+            </div>
+            <div class="sidebar-search">
+                <i class="fas fa-magnifying-glass"></i>
+                <input type="text" class="form-control" placeholder="Tìm theo tên hoặc mã phiên..." id="session-search" />
+            </div>
+            <div class="session-list" id="session-list">
+                <div class="empty-state">Đang tải hội thoại...</div>
+            </div>
         </div>
-        <div class="sidebar-search">
-            <i class="fas fa-magnifying-glass"></i>
-            <input type="text" class="form-control" placeholder="Tìm theo tên hoặc mã phiên..." id="session-search" />
-        </div>
-        <div class="session-list" id="session-list">
-            <div class="empty-state">Đang tải hội thoại...</div>
+
+        <!-- Tab Content 2: Cancellation Requests -->
+        <div class="sidebar-tab-content d-none" id="tab-content-cancellations">
+            <div class="chat-filter-row">
+                <button class="btn btn-sm btn-outline-secondary" data-cancellation-filter="Pending">Yêu cầu hủy chờ xử lý</button>
+                <button class="btn btn-sm btn-outline-secondary" data-cancellation-filter="Approved">Đã chấp nhận</button>
+                <button class="btn btn-sm btn-outline-secondary" data-cancellation-filter="Rejected">Đã từ chối</button>
+            </div>
+            <div class="px-3 pt-2">
+                <button class="btn btn-sm btn-outline-warning w-100 btn-manual-cancellation" id="btn-manual-cancellation" type="button">
+                    <i class="fas fa-file-pen me-1"></i>Hủy thủ công (Zalo)
+                </button>
+            </div>
+            <div class="cancellation-list-sidebar" id="cancellation-list-sidebar">
+                <div class="empty-state">Chọn bộ lọc để tải yêu cầu...</div>
+            </div>
         </div>
     </aside>
 
+    <!-- Cột 2: Timeline Panel (Giữa) -->
     <main class="chat-main-panel" aria-label="Nội dung hội thoại">
         <div class="chat-placeholder" id="chat-placeholder">
             <div class="chat-placeholder-card">
                 <i class="fas fa-comment-dots"></i>
                 <h2>Chọn một hội thoại</h2>
-                <p>Chọn khách ở cột bên trái để xem tin nhắn và hỗ trợ khi cần.</p>
+                <p>Chọn khách hoặc yêu cầu hủy ở cột bên trái để xem tin nhắn và hỗ trợ khi cần.</p>
             </div>
         </div>
 
@@ -63,24 +88,10 @@
                     </div>
                     <span class="badge chat-status-badge" id="chat-status-badge">Đang tải trạng thái</span>
                 </div>
-                <div class="chat-action-group" style="display: none;">
-                    <button class="btn btn-sm btn-outline-warning" id="btn-pause-ai" type="button">
-                        <i class="fas fa-pause me-1"></i>Tạm dừng AI
-                    </button>
-                    <button class="btn btn-sm btn-outline-success d-none" id="btn-resume-ai" type="button">
-                        <i class="fas fa-play me-1"></i>Bật lại AI
-                    </button>
-                    <button class="btn btn-sm btn-outline-secondary" id="btn-config-auto-reply" type="button">
-                        <i class="fas fa-message me-1"></i>Tin nhắn tự động
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger" id="btn-soft-delete-session" type="button">
-                        <i class="fas fa-trash me-1"></i>Xóa phiên
-                    </button>
-                    <button class="btn btn-sm btn-outline-success d-none" id="btn-restore-session" type="button">
-                        <i class="fas fa-rotate-left me-1"></i>Khôi phục
-                    </button>
-                    <button class="btn btn-sm btn-danger d-none" id="btn-permanent-delete-session" type="button">
-                        <i class="fas fa-trash-can me-1"></i>Xóa vĩnh viễn
+                <!-- Toggle Context Button (Optional, standard on desktop) -->
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary d-lg-none" id="btn-toggle-context" type="button">
+                        <i class="fas fa-info-circle"></i> Chi tiết
                     </button>
                 </div>
             </div>
@@ -109,27 +120,59 @@
             </div>
         </div>
     </main>
-</div>
 
-<div class="modal fade cancellation-modal" id="cancellation-modal" tabindex="-1" aria-labelledby="cancellation-modal-title" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div>
-                    <span class="modal-kicker">Duyệt yêu cầu hủy</span>
-                    <h2 class="modal-title" id="cancellation-modal-title">Chi tiết yêu cầu hủy phòng</h2>
+    <!-- Cột 3: Pinned Details Panel (Phải) -->
+    <aside class="chat-context-panel d-none" id="chat-context-panel">
+        <div class="context-view-container">
+            
+            <!-- View 3.1: Session AI & Controls -->
+            <div id="context-session-view" class="d-none">
+                <div class="context-header">
+                    <span class="context-kicker">Quản lý hội thoại</span>
+                    <h2>Cấu hình & AI</h2>
                 </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                <div class="session-info-card">
+                    <div class="session-info-status auto" id="session-info-status-box">
+                        AI đang trả lời
+                    </div>
+                    <div class="session-info-actions">
+                        <button class="btn btn-sm" id="btn-pause-ai" type="button">
+                            <i class="fas fa-pause me-2"></i>Tạm dừng AI
+                        </button>
+                        <button class="btn btn-sm d-none" id="btn-resume-ai" type="button">
+                            <i class="fas fa-play me-2"></i>Kích hoạt lại AI
+                        </button>
+                        <button class="btn btn-sm" id="btn-config-auto-reply" type="button">
+                            <i class="fas fa-message me-2"></i>Tin nhắn tự động
+                        </button>
+                        <button class="btn btn-sm btn-danger" id="btn-soft-delete-session" type="button">
+                            <i class="fas fa-trash me-2"></i>Đưa vào thùng rác
+                        </button>
+                        <button class="btn btn-sm btn-outline-success d-none" id="btn-restore-session" type="button">
+                            <i class="fas fa-rotate-left me-2"></i>Khôi phục phiên
+                        </button>
+                        <button class="btn btn-sm btn-danger d-none" id="btn-permanent-delete-session" type="button">
+                            <i class="fas fa-trash-can me-2"></i>Xóa vĩnh viễn
+                        </button>
+                    </div>
+                </div>
             </div>
-            <div class="modal-body">
+
+            <!-- View 3.2: Cancellation detail & processing form -->
+            <div id="context-cancellation-view" class="d-none">
+                <div class="context-header">
+                    <span class="context-kicker">Duyệt yêu cầu hủy</span>
+                    <h2>Chi tiết hủy phòng</h2>
+                </div>
                 <div id="cancellation-detail" class="cancellation-detail">
                     <div class="empty-state">Chọn yêu cầu hủy để xem chi tiết.</div>
                 </div>
             </div>
         </div>
-    </div>
+    </aside>
 </div>
 
+<!-- Modal 1: Tin nhắn tự động -->
 <div class="modal fade auto-reply-modal" id="auto-reply-modal" tabindex="-1" aria-labelledby="auto-reply-modal-title" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -141,18 +184,21 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
             </div>
             <div class="modal-body">
-                <label class="auto-reply-label" for="auto-reply-message">Nội dung gửi cho khách khi AI tạm dừng</label>
-                <textarea class="form-control" id="auto-reply-message" rows="4" maxlength="500" placeholder="Ví dụ: Nhân viên đang kiểm tra thông tin và sẽ phản hồi bạn ngay."></textarea>
-                <p class="auto-reply-hint">Tin nhắn này giúp khách biết rằng nhân viên đang tiếp nhận hội thoại.</p>
+                <div class="mb-3">
+                    <label class="auto-reply-label form-label" for="auto-reply-message">Nội dung gửi cho khách khi AI tạm dừng</label>
+                    <textarea class="form-control" id="auto-reply-message" rows="4" maxlength="500" placeholder="Ví dụ: Nhân viên đang kiểm tra thông tin và sẽ phản hồi bạn ngay."></textarea>
+                    <p class="auto-reply-hint">Tin nhắn này giúp khách biết rằng nhân viên đang tiếp nhận hội thoại.</p>
+                </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-primary" id="btn-save-auto-reply">Lưu tin nhắn</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" id="btn-save-auto-reply">Lưu cấu hình</button>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Modal 2: Hủy thủ công (Zalo) -->
 <div class="modal fade" id="manual-cancellation-modal" tabindex="-1" aria-labelledby="manual-cancellation-title" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -168,7 +214,7 @@
                     <label class="form-label" for="manual-booking-code">Mã đặt phòng</label>
                     <div class="input-group">
                         <input class="form-control" id="manual-booking-code" type="text" placeholder="Nhập mã booking..." />
-                        <button class="btn btn-outline-primary" type="button" id="btn-lookup-booking">
+                        <button class="btn btn-primary" type="button" id="btn-lookup-booking">
                             <i class="fas fa-search me-1"></i>Tra cứu
                         </button>
                     </div>
@@ -189,14 +235,14 @@
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label" for="manual-zalo-image">Ảnh chụp Zalo</label>
+                    <label class="form-label" for="manual-zalo-image">Ảnh chụp tin nhắn Zalo</label>
                     <input class="form-control" id="manual-zalo-image" type="file" accept="image/png,image/jpeg,image/gif,image/webp" />
-                    <div class="form-text">Chụp màn hình tin nhắn Zalo khách yêu cầu hủy (PNG/JPG, tối đa 5MB).</div>
+                    <div class="form-text text-muted" style="font-size: 0.78rem;">Định dạng PNG/JPG/WebP, tối đa 5MB.</div>
                 </div>
                 <div id="manual-cancellation-message" class="cancellation-action-message"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Quay lại</button>
                 <button type="button" class="btn btn-warning" id="btn-submit-manual-cancellation" disabled>
                     <i class="fas fa-file-pen me-1"></i>Tạo đơn hủy
                 </button>

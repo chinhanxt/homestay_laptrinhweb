@@ -31,56 +31,56 @@ namespace WebHomestay.Services.AI
         {
             if (string.IsNullOrWhiteSpace(text))
             {
-                return GetDeterministicMockEmbedding(string.Empty);
+                throw new EmbeddingUnavailableException("Cannot generate embedding for empty text.");
             }
 
-            var provider = string.IsNullOrWhiteSpace(_options.Provider) ? "groq" : _options.Provider.Trim().ToLowerInvariant();
-            
-            // If the provider is groq, we fall back to mock since Groq doesn't support embeddings.
-            if (provider == "groq" || provider == "mock" || string.IsNullOrWhiteSpace(_options.ApiKey))
+            var profiles = AIProviderConfigResolver.GetEmbeddingProfiles(_options);
+            if (profiles.Count == 0)
             {
-                _logger.LogInformation("Using deterministic mock embedding for provider: {Provider}", provider);
-                return GetDeterministicMockEmbedding(text);
+                throw new EmbeddingUnavailableException("AI embedding API key is missing.");
+            }
+
+            Exception? lastError = null;
+            for (var index = 0; index < profiles.Count; index++)
+            {
+                var profile = profiles[index];
+
+                try
+                {
+                    return await ExecuteEmbeddingRequestAsync(profile, text, cancellationToken);
+                }
+                catch (EmbeddingUnavailableException ex) when (index < profiles.Count - 1 && AIProviderConfigResolver.ShouldFailover(ex.Message))
+                {
+                    lastError = ex;
+                }
+            }
+
+            if (lastError is EmbeddingUnavailableException embeddingError)
+            {
+                throw embeddingError;
+            }
+
+            throw new EmbeddingUnavailableException("Failed to get embedding from configured providers.");
+        }
+
+        private async Task<float[]> ExecuteEmbeddingRequestAsync(AIProviderProfile profile, string text, CancellationToken cancellationToken)
+        {
+            if (!string.Equals(profile.Provider, "gemini", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new EmbeddingUnavailableException(
+                    $"Provider '{profile.Provider}' is not supported for embeddings. Supported provider: gemini.");
             }
 
             try
             {
-                string endpoint;
-                string model;
-
-                if (provider == "gemini")
-                {
-                    endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/v1/embeddings";
-                    // Try to check if override is present
-                    var overrideEndpoint = Environment.GetEnvironmentVariable("AI_ENDPOINT_OVERRIDE");
-                    if (!string.IsNullOrWhiteSpace(overrideEndpoint))
-                    {
-                        // Parse embeddings endpoint from completions endpoint
-                        endpoint = overrideEndpoint.Replace("/chat/completions", "/embeddings");
-                    }
-                    model = "text-embedding-004";
-                }
-                else if (provider == "openrouter")
-                {
-                    endpoint = "https://openrouter.ai/api/v1/embeddings";
-                    model = "openai/text-embedding-3-small";
-                }
-                else
-                {
-                    // Fallback to OpenAI-compatible generic
-                    endpoint = string.IsNullOrWhiteSpace(_options.Endpoint) 
-                        ? "https://api.openai.com/v1/embeddings" 
-                        : _options.Endpoint.Replace("/chat/completions", "/embeddings");
-                    model = "text-embedding-3-small";
-                }
-
-                using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint);
-                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+                using var httpRequest = new HttpRequestMessage(HttpMethod.Post, profile.Endpoint);
+                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", profile.ApiKey);
 
                 var payload = new JsonObject
                 {
-                    ["model"] = model,
-                    ["input"] = text
+                    ["model"] = string.IsNullOrWhiteSpace(profile.Model) ? "gemini-embedding-001" : profile.Model,
+                    ["input"] = text,
+                    ["dimensions"] = 1536
                 };
 
                 httpRequest.Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json");
@@ -89,8 +89,9 @@ namespace WebHomestay.Services.AI
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                    _logger.LogWarning("Embedding API failed with status {Status}: {Error}. Falling back to mock.", response.StatusCode, errorBody);
-                    return GetDeterministicMockEmbedding(text);
+                    _logger.LogWarning("Embedding API failed with status {Status}: {Error}.", response.StatusCode, errorBody);
+                    throw new EmbeddingUnavailableException(
+                        $"Embedding request failed for provider '{profile.Provider}'. Status: {response.StatusCode}, Error: {errorBody}");
                 }
 
                 using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -107,101 +108,31 @@ namespace WebHomestay.Services.AI
                             embeddingList.Add((float)val.GetDouble());
                         }
 
-                        // Ensure vector has exactly 1536 dimension by padding or truncating if needed
                         var result = embeddingList.ToArray();
-                        if (result.Length == 1536)
+                        if (result.Length != 1536)
                         {
-                            return result;
+                            throw new EmbeddingUnavailableException(
+                                $"Embedding size {result.Length} does not match required size 1536.");
                         }
-                        
-                        _logger.LogWarning("Embedding size returned was {Length} instead of 1536. Resizing...", result.Length);
-                        return ResizeVector(result, 1536);
+
+                        return result;
                     }
                 }
 
-                _logger.LogWarning("Embedding API response structure invalid. Falling back to mock.");
-                return GetDeterministicMockEmbedding(text);
+                throw new EmbeddingUnavailableException(
+                    $"Failed to deserialize embedding response from provider '{profile.Provider}'.");
+            }
+            catch (EmbeddingUnavailableException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to get embedding from API. Falling back to mock.");
-                return GetDeterministicMockEmbedding(text);
+                _logger.LogWarning(ex, "Failed to get embedding from API.");
+                throw new EmbeddingUnavailableException(
+                    $"Failed to get embedding from provider '{profile.Provider}'.",
+                    ex);
             }
-        }
-
-        /// <summary>
-        /// Generates a deterministic mock embedding of size 1536 based on text hashing.
-        /// This ensures the application runs and compiles locally without external dependencies.
-        /// </summary>
-        private float[] GetDeterministicMockEmbedding(string text)
-        {
-            var vector = new float[1536];
-            if (string.IsNullOrEmpty(text))
-            {
-                vector[0] = 1.0f; // Unit vector
-                return vector;
-            }
-
-            // Simple deterministic generation based on text segments
-            var hashSeed = 17;
-            foreach (var c in text)
-            {
-                hashSeed = hashSeed * 31 + c;
-            }
-
-            var random = new Random(hashSeed);
-            double sumOfSquares = 0;
-
-            for (int i = 0; i < 1536; i++)
-            {
-                // Generate values between -1.0 and 1.0
-                double value = random.NextDouble() * 2.0 - 1.0;
-                
-                // Add some keyword characteristics to mock semantic grouping
-                // Words starting with similar characters or having similar lengths will have slightly correlated vectors
-                if (text.Length > 0 && i % 10 == 0)
-                {
-                    value += (text[i % text.Length] - 96) / 26.0;
-                }
-
-                vector[i] = (float)value;
-                sumOfSquares += value * value;
-            }
-
-            // Normalize vector to unit length (L2 norm) so CosineDistance works correctly
-            float norm = (float)Math.Sqrt(sumOfSquares);
-            if (norm > 0)
-            {
-                for (int i = 0; i < 1536; i++)
-                {
-                    vector[i] /= norm;
-                }
-            }
-
-            return vector;
-        }
-
-        private float[] ResizeVector(float[] original, int targetSize)
-        {
-            var resized = new float[targetSize];
-            int sizeToCopy = Math.Min(original.Length, targetSize);
-            Array.Copy(original, resized, sizeToCopy);
-
-            // Normalize again
-            double sumOfSquares = 0;
-            for (int i = 0; i < targetSize; i++)
-            {
-                sumOfSquares += resized[i] * resized[i];
-            }
-            float norm = (float)Math.Sqrt(sumOfSquares);
-            if (norm > 0)
-            {
-                for (int i = 0; i < targetSize; i++)
-                {
-                    resized[i] /= norm;
-                }
-            }
-            return resized;
         }
     }
 }

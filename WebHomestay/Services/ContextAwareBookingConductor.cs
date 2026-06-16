@@ -9,6 +9,10 @@ using WebHomestay.Models;
 using WebHomestay.Models.AI;
 using WebHomestay.Models.ViewModels;
 using WebHomestay.Services.AI;
+using WebHomestay.Services.AI.Retrieval;
+
+using Microsoft.AspNetCore.SignalR;
+using WebHomestay.Hubs;
 
 namespace WebHomestay.Services;
 
@@ -75,7 +79,11 @@ public class ContextAwareBookingConductor : IBookingConductor
         container.Confirmed = MergeFromRequest(container.Confirmed, request);
         HydrateStateFromMessage(container, message);
 
-        var guestCount = _entityExtractor.ExtractGuestCount(message);
+        var previousGuestCount = Math.Max(container.Confirmed.GuestCount, 1);
+        var guestCount = ResolveGuestCountFromMessage(
+            message,
+            previousGuestCount,
+            container.Progress?.ActiveRoomContextId.HasValue == true);
         if (guestCount.HasValue) container.Confirmed.GuestCount = guestCount.Value;
 
         var (date, time) = _entityExtractor.ExtractDateTime(message);
@@ -96,10 +104,31 @@ public class ContextAwareBookingConductor : IBookingConductor
             container.Confirmed.RequestedTimeLabel = $"{container.Confirmed.RequestedTimeStart:HH\\:mm}";
         }
 
+        var studioConfig = await LoadStudioConfigAsync(cancellationToken);
+
         var (llmIntentStr, confidence) = await _intentClassifier.ClassifyIntentAsync(message, cancellationToken);
         MessageIntent intent;
 
-        if (confidence >= 0.7 && llmIntentStr == "Hourly_Booking")
+        var isHandoffTriggered = false;
+        if (studioConfig?.Handoff?.Enabled ?? true)
+        {
+            var loweredMsg = message.ToLowerInvariant().Trim();
+            var keywords = studioConfig?.Handoff?.Keywords ?? new List<string> { "nhân viên", "gặp người", "khiếu nại", "hỗ trợ gấp" };
+            if (keywords.Any(kw => !string.IsNullOrWhiteSpace(kw) && loweredMsg.Contains(kw.ToLowerInvariant())))
+            {
+                isHandoffTriggered = true;
+            }
+            else if (confidence >= 0.7 && (llmIntentStr == "Handoff" || llmIntentStr == "HandoffRequest" || llmIntentStr == "Handoff_Request"))
+            {
+                isHandoffTriggered = true;
+            }
+        }
+
+        if (isHandoffTriggered)
+        {
+            intent = MessageIntent.HandoffRequest;
+        }
+        else if (confidence >= 0.7 && llmIntentStr == "Hourly_Booking")
         {
             intent = MessageIntent.BookingIntent;
             container.Confirmed.BookingMode = "hourly";
@@ -111,14 +140,59 @@ public class ContextAwareBookingConductor : IBookingConductor
         }
         else
         {
-            intent = ClassifyIntent(message, container); // fallback
+            intent = ClassifyIntent(message, container, studioConfig); // fallback
+        }
+
+        if (intent == MessageIntent.HandoffRequest)
+        {
+            await TriggerHandoffAsync(sessionId, cancellationToken);
+            
+            Branch? branch = null;
+            if (container.Confirmed.BranchId.HasValue)
+            {
+                branch = await _context.Branches.FindAsync(new object[] { container.Confirmed.BranchId.Value }, cancellationToken);
+            }
+
+            var contactInstruction = !string.IsNullOrWhiteSpace(studioConfig?.Handoff?.ContactInstruction)
+                ? studioConfig.Handoff.ContactInstruction
+                : "Yêu cầu của bạn đã được ghi nhận. Nhân viên hỗ trợ sẽ liên hệ với bạn ngay.";
+
+            var handoffBlock = new
+            {
+                type = "handoffContact",
+                data = new
+                {
+                    branchId = branch?.Id,
+                    branchName = branch?.Name ?? "StayEasy Homestay",
+                    address = branch?.Address ?? "Hệ thống StayEasy Homestay",
+                    hotline = branch?.Hotline ?? "0900000000",
+                    email = branch?.Email ?? "contact@stayeasy.com",
+                    mapUrl = branch?.MapUrl ?? "",
+                    contactInstruction = contactInstruction
+                }
+            };
+
+            CacheState(sessionId, container);
+
+            return new ConductorResult
+            {
+                Action = ConductorAction.Reply,
+                State = container,
+                UiBlocks = new List<object> { handoffBlock },
+                Reason = "handoff-requested"
+            };
+        }
+
+        if (intent == MessageIntent.BrowsingRooms)
+        {
+            CaptureSemanticPreference(container.Confirmed, message);
         }
 
         await TryBindBranchContextFromMessageAsync(container, message, cancellationToken);
-        container.Confirmed.MissingRequiredFields = GetMissingRequiredFields(container.Confirmed);
+        container.Confirmed.MissingRequiredFields = GetMissingRequiredFields(container.Confirmed, studioConfig);
 
         await TryBindRoomContextFromMessageAsync(container, message, cancellationToken);
-        container.Confirmed.MissingRequiredFields = GetMissingRequiredFields(container.Confirmed);
+        container.Confirmed.MissingRequiredFields = GetMissingRequiredFields(container.Confirmed, studioConfig);
 
         if (IsRoomContextOccupancyQuestion(message, container))
         {
@@ -160,8 +234,8 @@ public class ContextAwareBookingConductor : IBookingConductor
         {
             if (!container.Confirmed.HourlyDate.HasValue)
             {
-                container.Confirmed.MissingRequiredFields = ["hourlyDate"];
-                var slotDateBlocks = await BuildMissingFieldBlocksAsync(container.Confirmed, cancellationToken);
+                container.Confirmed.MissingRequiredFields = new List<string> { "hourlyDate" };
+                var slotDateBlocks = await BuildMissingFieldBlocksAsync(container.Confirmed, studioConfig, cancellationToken);
                 CacheState(sessionId, container);
                 return new ConductorResult
                 {
@@ -184,15 +258,20 @@ public class ContextAwareBookingConductor : IBookingConductor
             };
         }
 
+        if (await TryHandleRoomContextGuestCountUpdateAsync(sessionId, message, container, guestCount, previousGuestCount, cancellationToken) is { } guestUpdateResult)
+        {
+            return guestUpdateResult;
+        }
+
         var showCount = GetShowCount(sessionId);
 
-        var studioConfig = await LoadStudioConfigAsync(cancellationToken);
+        studioConfig = await LoadStudioConfigAsync(cancellationToken);
         var action = ResolveAction(intent, container, showCount, studioConfig?.RuntimePolicies);
         var uiBlocks = new List<object>();
 
         if (action == ConductorAction.AskInfo)
         {
-            uiBlocks = await BuildMissingFieldBlocksAsync(container.Confirmed, cancellationToken);
+            uiBlocks = await BuildMissingFieldBlocksAsync(container.Confirmed, studioConfig, cancellationToken);
         }
 
         if (action == ConductorAction.ShowRooms)
@@ -217,6 +296,8 @@ public class ContextAwareBookingConductor : IBookingConductor
 
         CacheState(sessionId, container);
 
+        Console.WriteLine($"DEBUG: sessionId={sessionId}, mode={container.Confirmed.BookingMode}, branch={container.Confirmed.BranchId}, guests={container.Confirmed.GuestCount}, hourlyDate={container.Confirmed.HourlyDate}, Action={action}, Reason={intent}, missing={string.Join(",", container.Confirmed.MissingRequiredFields)}");
+
         return new ConductorResult
         {
             Action = action,
@@ -226,9 +307,120 @@ public class ContextAwareBookingConductor : IBookingConductor
         };
     }
 
-    private MessageIntent ClassifyIntent(string message, BookingSessionContainer container)
+    private int? ResolveGuestCountFromMessage(string message, int currentGuestCount, bool hasActiveRoomContext)
+    {
+        var extractedGuestCount = _entityExtractor.ExtractGuestCount(message);
+        if (extractedGuestCount.HasValue)
+        {
+            return extractedGuestCount.Value;
+        }
+
+        if (!hasActiveRoomContext)
+        {
+            return null;
+        }
+
+        var lowered = message.ToLowerInvariant();
+
+        var totalMatch = Regex.Match(lowered, @"(?:tổng|tong|thành|thanh|còn|con)\s*(?:là|la)?\s*(\d+)\s*(?:người|ng|khách|khach|nguoi)?");
+        if (totalMatch.Success && int.TryParse(totalMatch.Groups[1].Value, out var totalGuests) && totalGuests > 0)
+        {
+            return totalGuests;
+        }
+
+        var addMatch = Regex.Match(lowered, @"(?:thêm|them)\s*(\d+)\s*(?:người|ng|khách|khach|nguoi)?");
+        if (addMatch.Success && int.TryParse(addMatch.Groups[1].Value, out var extraGuests) && extraGuests > 0)
+        {
+            return currentGuestCount + extraGuests;
+        }
+
+        var reduceMatch = Regex.Match(lowered, @"(?:bớt|bot|giảm|giam)\s*(\d+)\s*(?:người|ng|khách|khach|nguoi)?");
+        if (reduceMatch.Success && int.TryParse(reduceMatch.Groups[1].Value, out var reducedGuests) && reducedGuests > 0)
+        {
+            return Math.Max(1, currentGuestCount - reducedGuests);
+        }
+
+        return null;
+    }
+
+    private async Task<ConductorResult?> TryHandleRoomContextGuestCountUpdateAsync(
+        string sessionId,
+        string message,
+        BookingSessionContainer container,
+        int? updatedGuestCount,
+        int previousGuestCount,
+        CancellationToken cancellationToken)
+    {
+        if (!IsRoomContextGuestCountUpdate(message, container, updatedGuestCount, previousGuestCount))
+        {
+            return null;
+        }
+
+        var roomId = container.Progress?.SelectedRoomId ?? container.Progress?.ActiveRoomContextId;
+        if (!roomId.HasValue)
+        {
+            return null;
+        }
+
+        var room = await _context.Rooms
+            .AsNoTracking()
+            .Where(r => r.Id == roomId.Value)
+            .Select(r => new { r.Id, r.Name, r.MaxGuests })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (room == null)
+        {
+            return null;
+        }
+
+        container.Progress ??= new BookingProgressState();
+        container.Progress.SelectedRoomId = room.Id;
+        container.Progress.ActiveRoomContextId = room.Id;
+
+        if (container.Confirmed.GuestCount > room.MaxGuests)
+        {
+            container.Progress.SelectedRoomId = null;
+            var roomCards = await BuildRoomCardsAsync(container.Confirmed, cancellationToken);
+            IncrementShowCount(sessionId);
+            CacheState(sessionId, container);
+
+            return new ConductorResult
+            {
+                Action = ConductorAction.ShowRooms,
+                State = container,
+                UiBlocks = roomCards,
+                Reason = "room-context-guest-update-over-capacity"
+            };
+        }
+
+        var consultResult = await BuildSelectedRoomConsultResponseAsync(container, room.Id, cancellationToken);
+        consultResult.Answer = IsDailyConsultContext(container.Confirmed)
+            ? "Mình đã cộng thêm khách và cập nhật lại tạm tính cho đúng phòng bạn đang xem. Nếu mức này ổn, bạn bấm \"Xác nhận phòng này\" để sang bước điền thông tin đặt phòng."
+            : "Mình đã cập nhật lại số khách cho đúng phòng bạn đang xem. Bạn chọn khung giờ còn trống bên dưới để chốt tiếp nhé.";
+
+        CacheState(sessionId, container);
+
+        return new ConductorResult
+        {
+            Action = consultResult.Action,
+            State = consultResult.State,
+            UiBlocks = consultResult.UiBlocks,
+            Reason = "room-context-guest-update"
+        };
+    }
+
+    private MessageIntent ClassifyIntent(string message, BookingSessionContainer container, AdminAIStudioConfigResponse? studioConfig)
     {
         var lowered = message.ToLowerInvariant().Trim();
+
+        if (studioConfig?.Handoff?.Enabled ?? true)
+        {
+            var keywords = studioConfig?.Handoff?.Keywords ?? new List<string> { "nhân viên", "gặp người", "khiếu nại", "hỗ trợ gấp" };
+            if (keywords.Any(kw => !string.IsNullOrWhiteSpace(kw) && lowered.Contains(kw.ToLowerInvariant())))
+            {
+                return MessageIntent.HandoffRequest;
+            }
+        }
 
         var exitKeywords = GetSetting("AIPublicBookingExitKeywords", "thôi,bỏ,khác,xóa,hủy,không,để sau")
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -268,6 +460,15 @@ public class ContextAwareBookingConductor : IBookingConductor
             || lowered.Contains("rẻ") || lowered.Contains("đắt") || lowered.Contains("chi phí"))
             return MessageIntent.PriceQuestion;
 
+        if (WebHomestay.Services.AI.Workflow.SemanticQueryHelper.IsSemanticQuery(lowered)
+            || lowered.Contains("tìm phòng")
+            || lowered.Contains("tim phong")
+            || lowered.Contains("cần tìm")
+            || lowered.Contains("muốn tìm")
+            || lowered.Contains("kiem phong")
+            || lowered.Contains("kiếm phòng"))
+            return MessageIntent.BrowsingRooms;
+
         if (IsImplicitBookingSignal(lowered, container.Confirmed))
             return MessageIntent.BrowsingRooms;
 
@@ -288,10 +489,44 @@ public class ContextAwareBookingConductor : IBookingConductor
 
     private bool HasEnoughInfo(BookingConfirmedState state)
         => state.BranchId.HasValue
+           && IsKnownBookingMode(state.BookingMode)
            && state.GuestCount > 0
            && (string.Equals(state.BookingMode, "daily", StringComparison.OrdinalIgnoreCase)
                ? state.CheckInDate.HasValue && state.CheckOutDate.HasValue
                : state.HourlyDate.HasValue || state.CheckInDate.HasValue);
+
+    private static void CaptureSemanticPreference(BookingConfirmedState state, string message)
+    {
+        var normalized = NormalizeSemanticPreference(message);
+        if (!string.IsNullOrWhiteSpace(normalized))
+        {
+            state.SemanticPreference = normalized;
+        }
+    }
+
+    private static string? NormalizeSemanticPreference(string message)
+    {
+        var text = (message ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        var lowered = text.ToLowerInvariant();
+        if (!WebHomestay.Services.AI.Workflow.SemanticQueryHelper.IsSemanticQuery(lowered))
+        {
+            return null;
+        }
+
+        if (lowered.Contains("địa chỉ") || lowered.Contains("dia chi")
+            || lowered.Contains("ở đâu") || lowered.Contains("o dau")
+            || lowered.Contains("wifi") || lowered.Contains("chính sách") || lowered.Contains("chinh sach"))
+        {
+            return null;
+        }
+
+        return text.Length > 240 ? text[..240] : text;
+    }
 
     private ConductorAction ResolveAction(
         MessageIntent intent,
@@ -348,6 +583,7 @@ public class ContextAwareBookingConductor : IBookingConductor
     private BookingConfirmedState MergeFromRequest(BookingConfirmedState state, AIBrainChatRequest request)
     {
         if (request.BranchId.HasValue) state.BranchId = request.BranchId;
+        if (IsKnownBookingMode(request.BookingMode)) state.BookingMode = request.BookingMode;
         if (request.StartTime.HasValue)
         {
             if (string.Equals(state.BookingMode, "daily", StringComparison.OrdinalIgnoreCase))
@@ -447,32 +683,63 @@ public class ContextAwareBookingConductor : IBookingConductor
                     container.Confirmed.GuestCount = actionRequest.GuestCount;
                 CacheState(actionRequest.SessionId, container);
 
+                if (!container.Confirmed.BranchId.HasValue)
+                {
+                    return new BookingActionResult
+                    {
+                        Answer = container.Confirmed.BookingMode == "daily"
+                            ? "Mình sẽ tư vấn đặt theo ngày. Bạn chọn chi nhánh trước nhé."
+                            : "Mình sẽ tư vấn đặt theo giờ. Bạn chọn chi nhánh trước nhé.",
+                        Action = ConductorAction.AskInfo,
+                        State = container,
+                        UiBlocks = new List<object>
+                        {
+                            await BuildBranchSelectorBlockAsync(cancellationToken)
+                        }
+                    };
+                }
+
                 return new BookingActionResult
                 {
                     Answer = container.Confirmed.BookingMode == "daily"
-                        ? "Mình sẽ tư vấn đặt theo ngày. Bạn chọn chi nhánh trước nhé."
-                        : "Mình sẽ tư vấn đặt theo giờ. Bạn chọn chi nhánh trước nhé.",
+                        ? "Bạn chọn ngày nhận và ngày trả phòng nhé."
+                        : "Bạn chọn ngày muốn đặt theo giờ nhé.",
                     Action = ConductorAction.AskInfo,
                     State = container,
                     UiBlocks = new List<object>
                     {
-                        await BuildBranchSelectorBlockAsync(cancellationToken)
+                        new
+                        {
+                            type = container.Confirmed.BookingMode == "daily" ? "dateRangePicker" : "singleDatePicker",
+                            data = new { }
+                        }
                     }
                 };
 
             case "select-branch":
                 if (actionRequest.BranchId.HasValue)
                     container.Confirmed.BranchId = actionRequest.BranchId.Value;
-                if (!IsKnownBookingMode(container.Confirmed.BookingMode))
+                if (IsKnownBookingMode(actionRequest.BookingMode))
                 {
-                    var requestedBookingMode = actionRequest.BookingMode;
-                    container.Confirmed.BookingMode = IsKnownBookingMode(requestedBookingMode)
-                        ? requestedBookingMode!
-                        : "hourly";
+                    container.Confirmed.BookingMode = actionRequest.BookingMode!;
                 }
                 if (actionRequest.GuestCount > 0)
                     container.Confirmed.GuestCount = actionRequest.GuestCount;
                 CacheState(actionRequest.SessionId, container);
+
+                if (!IsKnownBookingMode(container.Confirmed.BookingMode))
+                {
+                    return new BookingActionResult
+                    {
+                        Answer = "Mình đã ghi nhận chi nhánh rồi. Bạn chọn hình thức đặt phòng giúp mình nhé.",
+                        Action = ConductorAction.AskInfo,
+                        State = container,
+                        UiBlocks = new List<object>
+                        {
+                            await BuildBookingModeChoiceBlockAsync(cancellationToken)
+                        }
+                    };
+                }
 
                 return new BookingActionResult
                 {
@@ -655,6 +922,7 @@ public class ContextAwareBookingConductor : IBookingConductor
                         CustomerEmail = container.Progress.CustomerEmail,
                         GuestCount = Math.Max(container.Confirmed.GuestCount, 1),
                         CustomerNote = actionRequest.FormData?.GetValueOrDefault("notes")
+                            ?? actionRequest.FormData?.GetValueOrDefault("customerNote")
                     };
 
                     var booking = isDaily
@@ -819,8 +1087,7 @@ public class ContextAwareBookingConductor : IBookingConductor
         consultLines.AddRange(explanation.Lines);
 
         var consultBlocks = new List<object>();
-        var isDailyConsult = container.Confirmed.CheckOutDate.HasValue
-            || string.Equals(container.Confirmed.BookingMode, "daily", StringComparison.OrdinalIgnoreCase);
+        var isDailyConsult = IsDailyConsultContext(container.Confirmed);
         decimal baseTotalPrice = 0m;
 
         if (isDailyConsult
@@ -832,11 +1099,12 @@ public class ContextAwareBookingConductor : IBookingConductor
                 container.Confirmed.CheckInDate.Value.ToDateTime(TimeOnly.MinValue),
                 container.Confirmed.CheckOutDate.Value.ToDateTime(TimeOnly.MinValue),
                 false);
-            var extraGuestTotal = Math.Max(0, container.Confirmed.GuestCount - selectedRoom.Capacity) * selectedRoom.ExtraGuestFee;
+            var extraGuests = Math.Max(0, container.Confirmed.GuestCount - selectedRoom.Capacity);
+            var extraGuestTotal = extraGuests * selectedRoom.ExtraGuestFee;
             consultLines.Add($"Tạm tính {Math.Max(1, container.Confirmed.CheckOutDate.Value.DayNumber - container.Confirmed.CheckInDate.Value.DayNumber)} đêm: {baseTotalPrice:N0}đ.");
             if (extraGuestTotal > 0)
             {
-                consultLines.Add($"Phụ thu thêm khách dự kiến: {extraGuestTotal:N0}đ.");
+                consultLines.Add($"Phụ thu khách thêm: {extraGuestTotal:N0}đ (vượt sức chứa chuẩn {selectedRoom.Capacity} người: +{extraGuests} khách x {selectedRoom.ExtraGuestFee:N0}đ/khách).");
             }
         }
 
@@ -866,7 +1134,7 @@ public class ContextAwareBookingConductor : IBookingConductor
                 selectedRoom.Capacity,
                 selectedRoom.ExtraGuestFee,
                 $"/Rooms/Details/{selectedRoom.Id}",
-                "Bạn chỉnh số khách nếu cần. Mình đã tạm tính tiền và phụ thu trước khi bạn quyết định chốt phòng.",
+                "Bạn chỉnh số khách nếu cần. Nếu mức này ổn, bấm \"Xác nhận phòng này\" để sang bước điền thông tin đặt phòng chính thức.",
                 Math.Max(container.Confirmed.GuestCount, 1),
                 baseTotalPrice,
                 showCommitButton: true,
@@ -874,7 +1142,7 @@ public class ContextAwareBookingConductor : IBookingConductor
 
             return new BookingActionResult
             {
-                Answer = "Mình đã tính trước tổng tiền và phụ thu dự kiến cho phòng này. Bạn xem kỹ rồi quyết định chốt nhé.",
+                Answer = "Mình đã tính trước tổng tiền và phụ thu dự kiến cho phòng này. Nếu phù hợp, bạn bấm \"Xác nhận phòng này\" để đi tiếp sang bước đặt phòng chính thức.",
                 Action = ConductorAction.AskInfo,
                 State = container,
                 UiBlocks = consultBlocks
@@ -925,6 +1193,10 @@ public class ContextAwareBookingConductor : IBookingConductor
             UiBlocks = consultBlocks
         };
     }
+
+    private static bool IsDailyConsultContext(BookingConfirmedState state)
+        => state.CheckOutDate.HasValue
+           || string.Equals(state.BookingMode, "daily", StringComparison.OrdinalIgnoreCase);
 
     private object BuildRoomDecisionBlock(
         int roomId,
@@ -997,7 +1269,9 @@ public class ContextAwareBookingConductor : IBookingConductor
             .Where(r => r.Id == roomId)
             .FirstOrDefaultAsync(cancellationToken);
         var baseTotalPrice = await _pricingService.CalculateStayPriceAsync(roomId, interval.Start, interval.End, false);
-        var extraGuestTotal = room == null ? 0m : Math.Max(0, Math.Max(container.Confirmed.GuestCount, 1) - room.Capacity) * room.ExtraGuestFee;
+        var extraGuests = room == null ? 0 : Math.Max(0, Math.Max(container.Confirmed.GuestCount, 1) - room.Capacity);
+        var extraGuestFeeValue = room?.ExtraGuestFee ?? 0m;
+        var extraGuestTotal = extraGuests * extraGuestFeeValue;
         var finalTotal = baseTotalPrice + extraGuestTotal;
 
         var checkoutUrl = $"/Bookings/CheckoutDaily?roomId={roomId}&checkInDate={checkInDate:yyyy-MM-dd}&checkOutDate={checkOutDate:yyyy-MM-dd}&guestCount={Math.Max(container.Confirmed.GuestCount, 1)}";
@@ -1012,7 +1286,9 @@ public class ContextAwareBookingConductor : IBookingConductor
                 $"Trả: {checkOutDate:dd/MM/yyyy}",
                 $"Khách: {Math.Max(container.Confirmed.GuestCount, 1)}",
                 $"Tiền phòng: {baseTotalPrice:N0}đ",
-                extraGuestTotal > 0 ? $"Phụ thu khách thêm: {extraGuestTotal:N0}đ" : "Chưa phát sinh phụ thu khách thêm."
+                extraGuestTotal > 0 
+                    ? $"Phụ thu khách thêm: {extraGuestTotal:N0}đ (vượt sức chứa chuẩn {room?.Capacity} người: +{extraGuests} khách x {extraGuestFeeValue:N0}đ/khách)" 
+                    : "Chưa phát sinh phụ thu khách thêm."
             ],
             finalTotal,
             BuildBranchContactData(room?.Branch));
@@ -1051,7 +1327,9 @@ public class ContextAwareBookingConductor : IBookingConductor
         }
 
         var baseTotalPrice = await _pricingService.CalculateStayPriceAsync(roomId, slot.StartTime, slot.EndTime, true);
-        var extraGuestTotal = slot.Room == null ? 0m : Math.Max(0, Math.Max(container.Confirmed.GuestCount, 1) - slot.Room.Capacity) * slot.Room.ExtraGuestFee;
+        var extraGuests = slot.Room == null ? 0 : Math.Max(0, Math.Max(container.Confirmed.GuestCount, 1) - slot.Room.Capacity);
+        var extraGuestFeeValue = slot.Room?.ExtraGuestFee ?? 0m;
+        var extraGuestTotal = extraGuests * extraGuestFeeValue;
         var finalTotal = baseTotalPrice + extraGuestTotal;
 
         var checkoutUrl = $"/Bookings/CheckoutHourly?roomId={roomId}&slotId={slotId}&guestCount={Math.Max(container.Confirmed.GuestCount, 1)}";
@@ -1066,7 +1344,9 @@ public class ContextAwareBookingConductor : IBookingConductor
                 $"Ngày: {slot.SlotDate:dd/MM/yyyy}",
                 $"Khách: {Math.Max(container.Confirmed.GuestCount, 1)}",
                 $"Tiền slot: {baseTotalPrice:N0}đ",
-                extraGuestTotal > 0 ? $"Phụ thu khách thêm: {extraGuestTotal:N0}đ" : "Chưa phát sinh phụ thu khách thêm."
+                extraGuestTotal > 0 
+                    ? $"Phụ thu khách thêm: {extraGuestTotal:N0}đ (vượt sức chứa chuẩn {slot.Room?.Capacity} người: +{extraGuests} khách x {extraGuestFeeValue:N0}đ/khách)" 
+                    : "Chưa phát sinh phụ thu khách thêm."
             ],
             finalTotal,
             BuildBranchContactData(slot.Room?.Branch));
@@ -1316,6 +1596,38 @@ public class ContextAwareBookingConductor : IBookingConductor
         };
     }
 
+    private async Task<object> BuildBookingModeChoiceBlockAsync(CancellationToken cancellationToken)
+    {
+        var studioConfig = await LoadStudioConfigAsync(cancellationToken);
+        var activeFlows = studioConfig?.ConversationFlows
+            ?.Where(flow => flow.Enabled && (flow.Id == "hourly" || flow.Id == "daily"))
+            ?.OrderBy(flow => flow.Priority)
+            ?.Select(flow => new
+            {
+                id = flow.Id,
+                name = string.IsNullOrEmpty(flow.Name) ? (flow.Id == "hourly" ? "Theo giờ" : "Theo ngày") : flow.Name,
+                description = flow.Description
+            })
+            ?.Cast<object>()
+            ?.ToList();
+
+        return new
+        {
+            type = "bookingModeChoice",
+            data = new
+            {
+                label = "Chọn hình thức đặt phòng",
+                flows = activeFlows != null && activeFlows.Any()
+                    ? activeFlows
+                    : new List<object>
+                    {
+                        new { id = "hourly", name = "Theo giờ", description = "Thu thập chi nhánh, ngày, khung giờ, số khách và phòng phù hợp." },
+                        new { id = "daily", name = "Đặt qua đêm / theo ngày", description = "Thu thập chi nhánh, ngày nhận/trả, số khách và phòng phù hợp." }
+                    }
+            }
+        };
+    }
+
     private async Task<List<object>> BuildRoomCardsAsync(BookingConfirmedState state, CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
@@ -1373,7 +1685,8 @@ public class ContextAwareBookingConductor : IBookingConductor
                 .ToHashSet();
         }
 
-        var filteredRooms = new List<object>();
+        var filteredRooms = new List<(object Payload, double SemanticScore, bool FitsStandardOccupancy, decimal PricePerHour)>();
+        var semanticScores = await TryResolveSemanticScoresAsync(scope.ServiceProvider, state, cancellationToken);
         foreach (var room in rooms)
         {
             var explanation = await _roomExplanationService.BuildAsync(room.Id, state, cancellationToken);
@@ -1395,26 +1708,41 @@ public class ContextAwareBookingConductor : IBookingConductor
                 continue;
             }
 
-            filteredRooms.Add(new
-            {
-                roomId = room.Id,
-                name = room.Name,
-                description = room.Description,
-                pricePerHour = room.PricePerHour,
-                pricePerDay = room.PricePerDay,
-                capacity = room.Capacity,
-                maxGuests = room.MaxGuests,
-                imageUrl = room.ImageUrl,
-                amenities = room.Amenities,
-                fitsStandardOccupancy = explanation.FitsStandardOccupancy,
-                allowsRequestedGuests = explanation.AllowsRequestedGuests,
-                extraGuestCount = explanation.ExtraGuestCount,
-                extraGuestFeeApplied = explanation.ExtraGuestFeeApplied,
-                pricingTierLabel = explanation.PricingTierLabel,
-                pricingExplanation = explanation.Lines,
-                recommendationReason = explanation.RecommendationReason,
-                requestedSlotAvailable = matchesRequestedSlot
-            });
+            var semanticScore = semanticScores.TryGetValue(room.Id, out var score) ? score : 0d;
+            filteredRooms.Add((
+                new
+                {
+                    roomId = room.Id,
+                    name = room.Name,
+                    description = room.Description,
+                    pricePerHour = room.PricePerHour,
+                    pricePerDay = room.PricePerDay,
+                    capacity = room.Capacity,
+                    maxGuests = room.MaxGuests,
+                    imageUrl = room.ImageUrl,
+                    detailsUrl = $"/Rooms/Details/{room.Id}",
+                    amenities = room.Amenities,
+                    fitsStandardOccupancy = explanation.FitsStandardOccupancy,
+                    allowsRequestedGuests = explanation.AllowsRequestedGuests,
+                    extraGuestCount = explanation.ExtraGuestCount,
+                    extraGuestFeeApplied = explanation.ExtraGuestFeeApplied,
+                    pricingTierLabel = explanation.PricingTierLabel,
+                    pricingExplanation = explanation.Lines,
+                    recommendationReason = explanation.RecommendationReason,
+                    requestedSlotAvailable = matchesRequestedSlot
+                },
+                semanticScore,
+                explanation.FitsStandardOccupancy,
+                room.PricePerHour));
+        }
+
+        if (!string.IsNullOrWhiteSpace(state.SemanticPreference) && filteredRooms.Count > 0)
+        {
+            filteredRooms = filteredRooms
+                .OrderByDescending(room => room.SemanticScore)
+                .ThenBy(room => room.FitsStandardOccupancy ? 0 : 1)
+                .ThenBy(room => room.PricePerHour)
+                .ToList();
         }
 
         return new List<object>
@@ -1424,10 +1752,42 @@ public class ContextAwareBookingConductor : IBookingConductor
                 type = "roomCards",
                 data = new
                 {
-                    rooms = filteredRooms
+                    rooms = filteredRooms.Select(room => room.Payload).ToList()
                 }
             }
         };
+    }
+
+    private static async Task<Dictionary<int, double>> TryResolveSemanticScoresAsync(
+        IServiceProvider serviceProvider,
+        BookingConfirmedState state,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(state.SemanticPreference))
+        {
+            return new Dictionary<int, double>();
+        }
+
+        try
+        {
+            var embeddingService = serviceProvider.GetRequiredService<IEmbeddingService>();
+            var vectorSearchService = serviceProvider.GetRequiredService<IVectorSearchService>();
+            var embedding = await embeddingService.GetEmbeddingAsync(state.SemanticPreference, cancellationToken);
+            var hits = await vectorSearchService.SearchRoomsAsync(
+                embedding,
+                state.BranchId,
+                12,
+                cancellationToken);
+
+            return hits
+                .Where(hit => int.TryParse(hit.EntityId, out _))
+                .GroupBy(hit => int.Parse(hit.EntityId))
+                .ToDictionary(group => group.Key, group => group.Max(item => item.Score));
+        }
+        catch
+        {
+            return new Dictionary<int, double>();
+        }
     }
 
     private async Task<List<object>> BuildSlotUiBlocksAsync(BookingSessionContainer container, CancellationToken cancellationToken)
@@ -1640,52 +2000,94 @@ public class ContextAwareBookingConductor : IBookingConductor
         return hourlyPhrases.Any(lowered.Contains);
     }
 
-    private static List<string> GetMissingRequiredFields(BookingConfirmedState state)
+    private List<string> GetMissingRequiredFields(BookingConfirmedState state, AdminAIStudioConfigResponse? studioConfig)
     {
         var missing = new List<string>();
-        if (!state.BranchId.HasValue)
-        {
-            missing.Add("branchId");
-        }
 
         var isDaily = string.Equals(state.BookingMode, "daily", StringComparison.OrdinalIgnoreCase);
+        var isHourly = string.Equals(state.BookingMode, "hourly", StringComparison.OrdinalIgnoreCase);
+
+        List<string> requiredKeys;
         if (isDaily)
         {
-            if (!state.CheckInDate.HasValue)
-            {
-                missing.Add("checkInDate");
-            }
-            if (!state.CheckOutDate.HasValue)
-            {
-                missing.Add("checkOutDate");
-            }
+            var dailyFlow = studioConfig?.ConversationFlows?.FirstOrDefault(f => f.Id == "daily");
+            requiredKeys = dailyFlow != null && dailyFlow.RequiredFieldKeys != null && dailyFlow.RequiredFieldKeys.Any()
+                ? dailyFlow.RequiredFieldKeys
+                : new List<string> { "branchId", "checkInDate", "checkOutDate", "guestCount" };
+        }
+        else if (isHourly)
+        {
+            var hourlyFlow = studioConfig?.ConversationFlows?.FirstOrDefault(f => f.Id == "hourly");
+            requiredKeys = hourlyFlow != null && hourlyFlow.RequiredFieldKeys != null && hourlyFlow.RequiredFieldKeys.Any()
+                ? hourlyFlow.RequiredFieldKeys
+                : new List<string> { "branchId", "hourlyDate", "hourlySlot", "guestCount" };
         }
         else
         {
-            if (!state.HourlyDate.HasValue && !state.CheckInDate.HasValue)
+            requiredKeys = new List<string> { "branchId", "bookingMode", "guestCount" };
+        }
+
+        foreach (var key in requiredKeys)
+        {
+            if (key == "branchId" && !state.BranchId.HasValue)
+            {
+                missing.Add("branchId");
+            }
+            else if (key == "bookingMode" && !IsKnownBookingMode(state.BookingMode))
+            {
+                missing.Add("bookingMode");
+            }
+            else if (key == "checkInDate" && !state.CheckInDate.HasValue)
+            {
+                missing.Add("checkInDate");
+            }
+            else if (key == "checkOutDate" && !state.CheckOutDate.HasValue)
+            {
+                missing.Add("checkOutDate");
+            }
+            else if (key == "hourlyDate" && !state.HourlyDate.HasValue && !state.CheckInDate.HasValue)
             {
                 missing.Add("hourlyDate");
             }
+            else if (key == "guestCount" && state.GuestCount <= 0)
+            {
+                missing.Add("guestCount");
+            }
         }
 
-        if (state.GuestCount <= 0)
+        if (!IsKnownBookingMode(state.BookingMode) && !missing.Contains("bookingMode"))
         {
-            missing.Add("guestCount");
+            missing.Add("bookingMode");
         }
 
         return missing;
     }
 
-    private async Task<List<object>> BuildMissingFieldBlocksAsync(BookingConfirmedState state, CancellationToken cancellationToken)
+    private async Task<List<object>> BuildMissingFieldBlocksAsync(BookingConfirmedState state, AdminAIStudioConfigResponse? studioConfig, CancellationToken cancellationToken)
     {
         var uiBlocks = new List<object>();
-        if (state.MissingRequiredFields.Contains("branchId"))
+        var firstMissing = state.MissingRequiredFields.FirstOrDefault();
+        if (string.IsNullOrEmpty(firstMissing))
+        {
+            return uiBlocks;
+        }
+
+        var fieldDef = studioConfig?.FieldDefinitions?.FirstOrDefault(f => f.Key == firstMissing);
+        var inputType = fieldDef?.InputType;
+
+        if (firstMissing == "branchId" || inputType == "branchSelector" || inputType == "branches")
         {
             uiBlocks.Add(await BuildBranchSelectorBlockAsync(cancellationToken));
             return uiBlocks;
         }
 
-        if (state.MissingRequiredFields.Contains("checkInDate") || state.MissingRequiredFields.Contains("checkOutDate"))
+        if (firstMissing == "bookingMode" || inputType == "bookingModeChoice")
+        {
+            uiBlocks.Add(await BuildBookingModeChoiceBlockAsync(cancellationToken));
+            return uiBlocks;
+        }
+
+        if (firstMissing == "checkInDate" || firstMissing == "checkOutDate" || inputType == "dateRangePicker")
         {
             uiBlocks.Add(new
             {
@@ -1695,13 +2097,14 @@ public class ContextAwareBookingConductor : IBookingConductor
             return uiBlocks;
         }
 
-        if (state.MissingRequiredFields.Contains("hourlyDate"))
+        if (firstMissing == "hourlyDate" || inputType == "singleDatePicker" || inputType == "date")
         {
             uiBlocks.Add(new
             {
                 type = "singleDatePicker",
                 data = new { }
             });
+            return uiBlocks;
         }
 
         return uiBlocks;
@@ -1781,9 +2184,39 @@ public class ContextAwareBookingConductor : IBookingConductor
             || Regex.IsMatch(lowered, @"\b\d{1,2}(?::\d{2}|h)?\s*[-–]\s*\d{1,2}(?::\d{2}|h)?");
     }
 
+    private static bool IsRoomContextGuestCountUpdate(string message, BookingSessionContainer container, int? updatedGuestCount, int previousGuestCount)
+    {
+        if (container.Progress?.ActiveRoomContextId == null || !updatedGuestCount.HasValue || updatedGuestCount.Value == previousGuestCount)
+        {
+            return false;
+        }
+
+        var lowered = message.ToLowerInvariant();
+        return lowered.Contains("thêm")
+            || lowered.Contains("them")
+            || lowered.Contains("tổng")
+            || lowered.Contains("tong")
+            || lowered.Contains("sửa")
+            || lowered.Contains("doi")
+            || lowered.Contains("đổi")
+            || lowered.Contains("cập nhật")
+            || lowered.Contains("cap nhat")
+            || lowered.Contains("còn")
+            || lowered.Contains("con")
+            || lowered.Contains("khách")
+            || lowered.Contains("nguoi")
+            || lowered.Contains("người");
+    }
+
     private async Task TryBindBranchContextFromMessageAsync(BookingSessionContainer container, string message, CancellationToken cancellationToken)
     {
         if (container.Confirmed.BranchId.HasValue)
+        {
+            return;
+        }
+
+        if (WebHomestay.Services.AI.Workflow.SemanticQueryHelper.IsSemanticQuery(message)
+            && !LooksLikeBranchReference(message))
         {
             return;
         }
@@ -1820,6 +2253,29 @@ public class ContextAwareBookingConductor : IBookingConductor
 
         container.Confirmed.BranchId = match.Id;
         container.Confirmed.BranchName = match.Name;
+    }
+
+    private static bool LooksLikeBranchReference(string message)
+    {
+        var normalized = NormalizeForRoomMatch(message);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+
+        return normalized.Contains("chi nhanh", StringComparison.Ordinal)
+            || normalized.Contains("dia chi", StringComparison.Ordinal)
+            || normalized.Contains("quan ", StringComparison.Ordinal)
+            || normalized.Contains("q7", StringComparison.Ordinal)
+            || normalized.Contains("q1", StringComparison.Ordinal)
+            || normalized.Contains("da lat", StringComparison.Ordinal)
+            || normalized.Contains("sai gon", StringComparison.Ordinal)
+            || normalized.Contains("quan 7", StringComparison.Ordinal)
+            || normalized.Contains("quan 1", StringComparison.Ordinal)
+            || normalized.Contains("binh duong", StringComparison.Ordinal)
+            || normalized.Contains("dong nai", StringComparison.Ordinal)
+            || normalized.Contains("bien hoa", StringComparison.Ordinal)
+            || normalized.Contains("dong thap", StringComparison.Ordinal);
     }
 
     private async Task TryBindRoomContextFromMessageAsync(BookingSessionContainer container, string message, CancellationToken cancellationToken)
@@ -2034,5 +2490,44 @@ public class ContextAwareBookingConductor : IBookingConductor
         }
 
         return Regex.Replace(builder.ToString(), @"\s+", " ").Trim();
+    }
+
+    private async Task TriggerHandoffAsync(string sessionId, CancellationToken cancellationToken)
+    {
+        var session = await _context.AdminChatSessions.FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
+        if (session != null)
+        {
+            session.Status = "paused";
+            session.PausedBy = "AI Handoff";
+            session.PausedAt = DateTime.Now;
+            session.PauseReason = "handoff_request";
+            session.LastActivityAt = DateTime.Now;
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        await _adminChatService.AddSystemMessageAsync(sessionId, "Khách yêu cầu chuyển giao hỗ trợ sang nhân viên.");
+
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var hubContext = scope.ServiceProvider.GetService<IHubContext<ChatHub>>();
+            if (hubContext != null)
+            {
+                var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
+                await hubContext.Clients.Group("admin_monitor").SendAsync("sessionUpdate", new
+                {
+                    sessionId,
+                    status = "paused",
+                    pausedBy = "AI Handoff",
+                    pauseReason = "handoff_request",
+                    lastActivityAt = DateTime.Now,
+                    totalUnreadCount
+                }, cancellationToken);
+            }
+        }
+        catch
+        {
+            // Ignore signalr errors in background/tests
+        }
     }
 }

@@ -154,7 +154,7 @@
                     </span>
                     Kho ảnh Đơn hàng
                 </h5>
-                @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.view"))
+                @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.trash"))
                 {
                     <a asp-action="Trash" class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold" style="font-size: 0.75rem;">
                         <i class="fas fa-trash-alt me-1"></i> Thùng rác

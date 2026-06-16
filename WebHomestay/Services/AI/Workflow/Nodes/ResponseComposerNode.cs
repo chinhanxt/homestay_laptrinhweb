@@ -36,7 +36,7 @@ public sealed class ResponseComposerNode : IWorkflowNode
             };
 
             var response = await _modelClient.CompleteAsync(request, cancellationToken);
-            state.FinalAnswer = response.Content;
+            state.FinalAnswer = CleanThoughtBlock(response.Content);
             _logger.LogInformation("Response composed for session {SessionId} using provider {Provider}",
                 state.SessionId, response.Provider);
         }
@@ -45,6 +45,24 @@ public sealed class ResponseComposerNode : IWorkflowNode
             _logger.LogError(ex, "Response composition failed for session {SessionId}", state.SessionId);
             state.FinalAnswer = "Hiện tại hệ thống AI đang có sự cố, vui lòng thử lại sau.";
         }
+    }
+
+    private static string CleanThoughtBlock(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return content;
+        
+        var thoughtStart = content.IndexOf("<thought>", StringComparison.OrdinalIgnoreCase);
+        if (thoughtStart >= 0)
+        {
+            var thoughtEnd = content.IndexOf("</thought>", thoughtStart, StringComparison.OrdinalIgnoreCase);
+            if (thoughtEnd >= 0)
+            {
+                var cleaned = content.Substring(0, thoughtStart) + content.Substring(thoughtEnd + 10);
+                return CleanThoughtBlock(cleaned).Trim();
+            }
+        }
+        
+        return content.Trim();
     }
 
     private static string BuildSystemPrompt(WorkflowState state)
@@ -69,7 +87,19 @@ public sealed class ResponseComposerNode : IWorkflowNode
         builder.AppendLine();
         builder.AppendLine("Luôn trả lời bằng tiếng Việt, thân thiện, tự nhiên.");
         builder.AppendLine("Không tự ý thông báo giá, không xác nhận đặt phòng.");
-        builder.AppendLine("Nếu thiếu thông tin, hãy hỏi lại khách hàng.");
+
+        if (state.RetrievalJson != "[]" && state.RetrievalJson.Contains("RoomId"))
+        {
+            builder.AppendLine("ĐÃ TÌM THẤY PHÒNG PHÙ HỢP: Các phòng này đã được hệ thống tự động tải và hiển thị dưới dạng các thẻ phòng (UI room cards) cho khách hàng trong khung chat.");
+            builder.AppendLine("Nhiệm vụ của bạn:");
+            builder.AppendLine("- Giới thiệu ngắn gọn các phòng được tìm thấy trong [THÔNG TIN CHÍNH SÁCH & ĐỊA ĐIỂM], nhấn mạnh các đặc điểm phù hợp với yêu cầu của khách hàng (lãng mạn, bồn tắm, ban công, yên tĩnh...).");
+            builder.AppendLine("- Hướng dẫn khách hàng chọn và bấm trực tiếp vào thẻ phòng hiển thị bên dưới để xem chi tiết và tiến hành đặt phòng.");
+            builder.AppendLine("- Tuyệt đối KHÔNG bắt buộc khách hàng phải cung cấp ngày nhận/trả phòng hoặc chi nhánh trước khi giới thiệu các căn phòng này. Hãy đề xuất các phòng có sẵn này trước, sau đó hỏi ngày/giờ nếu khách muốn kiểm tra trạng thái phòng trống thực tế hoặc book phòng.");
+        }
+        else
+        {
+            builder.AppendLine("Nếu thiếu thông tin (như ngày đặt phòng, số lượng khách, chi nhánh), hãy lịch sự hỏi lại khách hàng.");
+        }
 
         return builder.ToString();
     }

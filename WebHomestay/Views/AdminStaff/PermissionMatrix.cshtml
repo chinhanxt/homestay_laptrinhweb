@@ -13,13 +13,13 @@
     var allPermKeys = new[] {
         "matrix.view",
         "bookings.view","bookings.detail","bookings.create","bookings.edit","bookings.delete","bookings.trash","bookings.restore",
-        "branches.view","branches.detail","branches.create","branches.edit","branches.delete",
-        "rooms.view","rooms.detail","rooms.create","rooms.edit","rooms.delete",
-        "images.view","images.detail",
+        "branches.view","branches.detail","branches.create","branches.edit","branches.delete","branches.trash","branches.restore",
+        "rooms.view","rooms.detail","rooms.create","rooms.edit","rooms.delete","rooms.trash","rooms.restore",
+        "images.view","images.detail","images.trash","images.restore",
         "statistics.view","statistics.export",
-        "staff.view","staff.create","staff.edit","staff.delete","staff.permissions","staff.logs",
+        "staff.view","staff.create","staff.edit","staff.delete","staff.trash","staff.restore","logs.view",
         "settings.view","settings.update","holidays.manage","slots.manage","branch.settings","payment.settings",
-        "ai.view","ai.detail","ai.create","ai.edit","ai.delete","ai.knowledge","ai.graph","ai.response","ai.trace",
+        "ai.view","ai.create","ai.edit","ai.delete","ai.knowledge","ai.graph","ai.response",
         "chats.view"
     };
     foreach (var k in allPermKeys) allTruePerms[k] = true;
@@ -594,25 +594,24 @@
                 {
                     ("matrix", "Ma trận vận hành", "fa-th", false, false, false, false, Array.Empty<(string,string)>()),
                     ("bookings", "Đơn đặt phòng", "fa-calendar-check", true, true, true, true, new[] { ("trash", "Thùng rác"), ("restore", "Khôi phục") }),
-                    ("branches", "Chi nhánh", "fa-building", true, true, true, true, Array.Empty<(string,string)>()),
-                    ("rooms", "Phòng", "fa-door-open", true, true, true, true, Array.Empty<(string,string)>()),
-                    ("images", "Kho ảnh", "fa-images", true, false, false, false, Array.Empty<(string,string)>()),
+                    ("branches", "Chi nhánh", "fa-building", true, true, true, true, new[] { ("trash", "Thùng rác"), ("restore", "Khôi phục") }),
+                    ("rooms", "Phòng", "fa-door-open", true, true, true, true, new[] { ("trash", "Thùng rác"), ("restore", "Khôi phục") }),
+                    ("images", "Kho ảnh", "fa-images", true, false, false, false, new[] { ("trash", "Thùng rác"), ("restore", "Khôi phục") }),
                     ("statistics", "Thống kê", "fa-chart-bar", false, false, false, false, new[] { ("export", "Xuất Excel") }),
-                    ("staff", "Nhân sự", "fa-users-cog", false, true, true, true, new[] { ("permissions", "Phân quyền"), ("logs", "Nhật ký") }),
+                    ("staff", "Nhân sự", "fa-users-cog", false, true, true, true, new[] { ("trash", "Thùng rác"), ("restore", "Khôi phục"), ("logs.view", "Nhật ký") }),
                     ("settings", "Cấu hình", "fa-sliders-h", false, false, false, false,
                         new[] {
-                            ("update", "Cập nhật"),
-                            ("holidays.manage", "Ngày lễ"),
-                            ("slots.manage", "Khung giờ"),
-                            ("branch.settings", "Chi nhánh"),
-                            ("payment.settings", "Mã QR")
+                            ("settings.update", "Vận hành, tự động & import"),
+                            ("slots.manage", "Thời gian & khung giờ"),
+                            ("holidays.manage", "Ma trận ngày lễ"),
+                            ("branch.settings", "Cấu hình chi nhánh"),
+                            ("payment.settings", "Cấu hình mã QR")
                         }),
-                    ("ai", "Trung tâm Bộ não AI", "fa-brain", true, true, true, true,
+                    ("ai", "Trung tâm Bộ não AI", "fa-brain", false, true, true, true,
                         new[] {
-                            ("knowledge", "Knowledge"),
-                            ("graph", "Graph"),
-                            ("response", "Response"),
-                            ("trace", "Trace")
+                            ("ai.response", "Tổng quan & trả lời"),
+                            ("ai.knowledge", "Tri thức"),
+                            ("ai.graph", "Graph / Map")
                         }),
                     ("chats", "Giám sát Chat", "fa-comment-dots", false, false, false, false, Array.Empty<(string,string)>())
                 };

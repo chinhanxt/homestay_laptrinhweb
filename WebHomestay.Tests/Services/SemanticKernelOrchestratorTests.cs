@@ -36,9 +36,9 @@ namespace WebHomestay.Tests.Services
 
             var aiOptions = Options.Create(new AIModelOptions
             {
-                Provider = "gemma4",
+                Provider = "gemini",
                 ApiKey = "mock-key",
-                Model = "gemma-4-31b-it"
+                Model = "gemini-2.5-flash"
             });
 
             var serviceProviderMock = new Mock<IServiceProvider>();
@@ -155,6 +155,193 @@ namespace WebHomestay.Tests.Services
             Assert.Contains("retrieval", trace.PerformanceLog);
             Assert.Contains("guard", trace.PerformanceLog);
             Assert.Contains("composition", trace.PerformanceLog);
+        }
+
+        [Fact]
+        public async Task ChatAsync_SemanticRoomDescription_DoesNotReturnStudioEntryBlock()
+        {
+            using var context = CreateContext();
+
+            var aiOptions = Options.Create(new AIModelOptions
+            {
+                Provider = "gemini",
+                ApiKey = "mock-key",
+                Model = "gemini-2.5-flash"
+            });
+
+            var serviceProviderMock = new Mock<IServiceProvider>();
+
+            var mockEmbeddingService = new Mock<IEmbeddingService>();
+            mockEmbeddingService.Setup(e => e.GetEmbeddingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new float[1536]);
+
+            var mockVectorSearch = new Mock<IVectorSearchService>();
+            mockVectorSearch.Setup(v => v.SearchKnowledgeAsync(It.IsAny<float[]>(), It.IsAny<VectorSearchFilter>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Array.Empty<VectorSearchResult>());
+            mockVectorSearch.Setup(v => v.SearchRoomsAsync(It.IsAny<float[]>(), It.IsAny<int?>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Array.Empty<VectorSearchResult>());
+
+            var mockAvailability = new Mock<IAvailabilityService>();
+            var mockSlotGen = new Mock<ISlotGenerationService>();
+            var mockExpansion = new Mock<Neo4jGraphExpansionService>(Mock.Of<INeo4jGraphClient>());
+            mockExpansion.Setup(x => x.ExpandAsync(
+                    It.IsAny<IReadOnlyList<string>>(),
+                    It.IsAny<int>(),
+                    It.IsAny<IReadOnlyList<string>?>(),
+                    It.IsAny<int?>(),
+                    It.IsAny<int?>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new GraphExpansionContext());
+
+            var assembler = new RetrievalContextAssembler(context, mockVectorSearch.Object, mockExpansion.Object);
+
+            serviceProviderMock.Setup(sp => sp.GetService(typeof(ApplicationDbContext))).Returns(context);
+            serviceProviderMock.Setup(sp => sp.GetService(typeof(IEmbeddingService))).Returns(mockEmbeddingService.Object);
+            serviceProviderMock.Setup(sp => sp.GetService(typeof(IVectorSearchService))).Returns(mockVectorSearch.Object);
+            serviceProviderMock.Setup(sp => sp.GetService(typeof(RetrievalContextAssembler))).Returns(assembler);
+            serviceProviderMock.Setup(sp => sp.GetService(typeof(IAvailabilityService))).Returns(mockAvailability.Object);
+            serviceProviderMock.Setup(sp => sp.GetService(typeof(ISlotGenerationService))).Returns(mockSlotGen.Object);
+
+            var mockConversationManager = new Mock<IConversationManager>();
+            mockConversationManager.Setup(c => c.GetOrCreateStateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new AIBookingSessionState());
+
+            var mockStudioConfig = new Mock<IAdminAIStudioConfigService>();
+            mockStudioConfig.Setup(s => s.GetAsync()).ReturnsAsync(new AdminAIStudioConfigResponse
+            {
+                AssistantProfile = new AdminAIAssistantProfile
+                {
+                    MissingInfoPrompt = "Bạn muốn đặt theo giờ hay theo ngày?"
+                },
+                Handoff = new AdminAIHandoffConfig { Enabled = false },
+                ConversationFlows = new List<AdminAIConversationFlow>()
+            });
+
+            var mockBookingConductor = new Mock<IBookingConductor>();
+            mockBookingConductor.Setup(b => b.DecideAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AIBrainChatRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ConductorResult
+                {
+                    Action = WebHomestay.Services.ConductorAction.Reply,
+                    Reason = "intent=BrowsingRooms, showCount=0",
+                    State = new BookingSessionContainer
+                    {
+                        Confirmed = new BookingConfirmedState(),
+                        Progress = new BookingProgressState()
+                    },
+                    UiBlocks = new List<object>()
+                });
+
+            var orchestrator = new SemanticKernelOrchestrator(
+                context,
+                aiOptions,
+                serviceProviderMock.Object,
+                Mock.Of<ILogger<SemanticKernelOrchestrator>>(),
+                mockConversationManager.Object,
+                mockStudioConfig.Object,
+                mockBookingConductor.Object,
+                Mock.Of<IPublicBookingRoomExplanationService>());
+
+            var response = await orchestrator.ChatAsync(new AIBrainChatRequest
+            {
+                SessionId = "semantic-no-entry",
+                Message = "cần tìm phòng lãng mạn",
+                Mode = ChatMode.PublicBooking
+            }, CancellationToken.None);
+
+            Assert.DoesNotContain(response.UiBlocks ?? new List<object>(), block => System.Text.Json.JsonSerializer.Serialize(block).Contains("bookingModeChoice"));
+            Assert.NotEqual("entry", response.BookingAction);
+        }
+
+        [Fact]
+        public async Task ChatAsync_LocationQuestion_UsesBranchFallbackWithoutDebugText()
+        {
+            using var context = CreateContext();
+            context.Branches.Add(new Branch
+            {
+                Id = 7,
+                Name = "LumiStay Riverside Quận 7",
+                Address = "123 Nguyen Van Linh, Quan 7, TP.HCM"
+            });
+            context.SaveChanges();
+
+            var aiOptions = Options.Create(new AIModelOptions
+            {
+                Provider = "gemini",
+                ApiKey = "mock-key",
+                Model = "gemini-2.5-flash"
+            });
+
+            var serviceProviderMock = new Mock<IServiceProvider>();
+            var mockEmbeddingService = new Mock<IEmbeddingService>();
+            mockEmbeddingService.Setup(e => e.GetEmbeddingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new float[1536]);
+            var mockVectorSearch = new Mock<IVectorSearchService>();
+            var mockAvailability = new Mock<IAvailabilityService>();
+            var mockSlotGen = new Mock<ISlotGenerationService>();
+            var mockExpansion = new Mock<Neo4jGraphExpansionService>(Mock.Of<INeo4jGraphClient>());
+            mockExpansion.Setup(x => x.ExpandAsync(
+                    It.IsAny<IReadOnlyList<string>>(),
+                    It.IsAny<int>(),
+                    It.IsAny<IReadOnlyList<string>?>(),
+                    It.IsAny<int?>(),
+                    It.IsAny<int?>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new GraphExpansionContext());
+
+            var assembler = new RetrievalContextAssembler(context, mockVectorSearch.Object, mockExpansion.Object);
+
+            serviceProviderMock.Setup(sp => sp.GetService(typeof(ApplicationDbContext))).Returns(context);
+            serviceProviderMock.Setup(sp => sp.GetService(typeof(IEmbeddingService))).Returns(mockEmbeddingService.Object);
+            serviceProviderMock.Setup(sp => sp.GetService(typeof(IVectorSearchService))).Returns(mockVectorSearch.Object);
+            serviceProviderMock.Setup(sp => sp.GetService(typeof(RetrievalContextAssembler))).Returns(assembler);
+            serviceProviderMock.Setup(sp => sp.GetService(typeof(IAvailabilityService))).Returns(mockAvailability.Object);
+            serviceProviderMock.Setup(sp => sp.GetService(typeof(ISlotGenerationService))).Returns(mockSlotGen.Object);
+
+            var mockConversationManager = new Mock<IConversationManager>();
+            mockConversationManager.Setup(c => c.GetOrCreateStateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new AIBookingSessionState());
+
+            var mockStudioConfig = new Mock<IAdminAIStudioConfigService>();
+            mockStudioConfig.Setup(s => s.GetAsync()).ReturnsAsync(new AdminAIStudioConfigResponse
+            {
+                AssistantProfile = new AdminAIAssistantProfile(),
+                Handoff = new AdminAIHandoffConfig { Enabled = false },
+                ConversationFlows = new List<AdminAIConversationFlow>()
+            });
+
+            var mockBookingConductor = new Mock<IBookingConductor>();
+            mockBookingConductor.Setup(b => b.DecideAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AIBrainChatRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ConductorResult
+                {
+                    Action = WebHomestay.Services.ConductorAction.Reply,
+                    Reason = "intent=LocationQuestion, showCount=0",
+                    State = new BookingSessionContainer
+                    {
+                        Confirmed = new BookingConfirmedState(),
+                        Progress = new BookingProgressState()
+                    },
+                    UiBlocks = new List<object>()
+                });
+
+            var orchestrator = new SemanticKernelOrchestrator(
+                context,
+                aiOptions,
+                serviceProviderMock.Object,
+                Mock.Of<ILogger<SemanticKernelOrchestrator>>(),
+                mockConversationManager.Object,
+                mockStudioConfig.Object,
+                mockBookingConductor.Object,
+                Mock.Of<IPublicBookingRoomExplanationService>());
+
+            var response = await orchestrator.ChatAsync(new AIBrainChatRequest
+            {
+                SessionId = "location-direct",
+                Message = "địa chỉ chi nhánh q7",
+                Mode = ChatMode.PublicBooking
+            }, CancellationToken.None);
+
+            Assert.Contains("Quận 7", response.Answer, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("[DEBUG]", response.Answer, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

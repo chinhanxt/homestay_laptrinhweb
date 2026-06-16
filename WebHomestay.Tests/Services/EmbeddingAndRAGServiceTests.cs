@@ -29,7 +29,7 @@ namespace WebHomestay.Tests.Services
             return new ApplicationDbContext(options);
         }
 
-        private static EmbeddingService CreateEmbeddingService(string provider = "gemma4", string apiKey = "mock-key", HttpClient httpClient = null)
+        private static EmbeddingService CreateEmbeddingService(string provider = "gemini", string apiKey = "mock-key", HttpClient httpClient = null)
         {
             var options = Options.Create(new AIModelOptions
             {
@@ -69,7 +69,7 @@ namespace WebHomestay.Tests.Services
         {
             var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest));
             var client = new HttpClient(handler);
-            var service = CreateEmbeddingService("gemma4", "x", client);
+            var service = CreateEmbeddingService("gemini", "x", client);
 
             await Assert.ThrowsAsync<EmbeddingUnavailableException>(
                 () => service.GetEmbeddingAsync("wifi phong"));
@@ -94,7 +94,7 @@ namespace WebHomestay.Tests.Services
                 Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json")
             });
             var client = new HttpClient(handler);
-            var service = CreateEmbeddingService("gemma4", "x", client);
+            var service = CreateEmbeddingService("gemini", "x", client);
 
             var result = await service.GetEmbeddingAsync("wifi phong");
 

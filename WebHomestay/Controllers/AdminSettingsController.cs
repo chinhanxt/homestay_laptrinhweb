@@ -15,17 +15,23 @@ namespace WebHomestay.Controllers
         private readonly ISettingService _settingService;
         private readonly IPaymentQrSettingsService _paymentQrSettingsService;
         private readonly IWebHostEnvironment _environment;
+        private readonly IExcelTemplateService _excelService;
+        private readonly IBulkImportService _importService;
 
         public AdminSettingsController(
             ApplicationDbContext context,
             ISettingService settingService,
             IPaymentQrSettingsService paymentQrSettingsService,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            IExcelTemplateService excelService,
+            IBulkImportService importService)
         {
             _context = context;
             _settingService = settingService;
             _paymentQrSettingsService = paymentQrSettingsService;
             _environment = environment;
+            _excelService = excelService;
+            _importService = importService;
         }
 
         [AdminAuthorize(Permission = "settings.view")]
@@ -60,6 +66,15 @@ namespace WebHomestay.Controllers
         [HttpPost("update")]
         public async Task<IActionResult> Update(string key, string value)
         {
+            if (key == "MaxZipUploadSizeMB")
+            {
+                if (!int.TryParse(value, out var sizeMB) || sizeMB < 5 || sizeMB > 100)
+                {
+                    TempData["ErrorMessage"] = "Kích thước file ZIP tối đa cho phép phải từ 5MB đến 100MB.";
+                    return RedirectToAction(nameof(Index));
+                }
+            }
+
             await _settingService.UpdateSettingAsync(key, value);
             TempData["SuccessMessage"] = "Cập nhật cấu hình hệ thống thành công.";
             return RedirectToAction(nameof(Index));
@@ -119,6 +134,71 @@ namespace WebHomestay.Controllers
             else
             {
                 TempData["ErrorMessage"] = result.Message;
+            }
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        [AdminAuthorize(Permission = "settings.view")]
+        [HttpGet("download-template")]
+        public IActionResult DownloadTemplate(string type)
+        {
+            try
+            {
+                var fileBytes = _excelService.GenerateTemplate(type);
+                string fileName = $"template_{type}.xlsx";
+                return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Lỗi khi tạo file mẫu: {ex.Message}";
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
+        [AdminAuthorize(Permission = "settings.update")]
+        [HttpPost("import-slot-templates")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ImportSlotTemplates(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                TempData["ErrorMessage"] = "Vui lòng chọn file Excel để import.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var result = await _importService.ImportRoomSlotTemplatesAsync(file);
+            if (result.Errors.Any())
+            {
+                TempData["ErrorMessage"] = $"Import hoàn tất. Thành công: {result.SuccessCount}, Thất bại: {result.FailureCount}. Chi tiết lỗi: {string.Join(" | ", result.Errors.Take(5))}";
+            }
+            else
+            {
+                TempData["SuccessMessage"] = $"Đã import thành công {result.SuccessCount} mẫu khung giờ.";
+            }
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        [AdminAuthorize(Permission = "settings.update")]
+        [HttpPost("import-holidays")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ImportHolidays(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                TempData["ErrorMessage"] = "Vui lòng chọn file Excel để import.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var result = await _importService.ImportHolidaysAsync(file);
+            if (result.Errors.Any())
+            {
+                TempData["ErrorMessage"] = $"Import hoàn tất. Thành công: {result.SuccessCount}, Thất bại: {result.FailureCount}. Chi tiết lỗi: {string.Join(" | ", result.Errors.Take(5))}";
+            }
+            else
+            {
+                TempData["SuccessMessage"] = $"Đã import thành công {result.SuccessCount} ngày lễ.";
             }
 
             return RedirectToAction(nameof(Index));

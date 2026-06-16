@@ -73,11 +73,14 @@
                                 </td>
                                 <td class="text-end">
                                     <div class="admin-actions">
-                                        <form asp-action="Restore" asp-route-id="@item.Id" method="post" class="d-inline">
-                                            <button type="submit" class="admin-btn-icon" title="Khôi phục">
-                                                <i class="fas fa-undo"></i>
-                                            </button>
-                                        </form>
+                                        @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.restore"))
+                                        {
+                                            <form asp-action="Restore" asp-route-id="@item.Id" method="post" class="d-inline">
+                                                <button type="submit" class="admin-btn-icon" title="Khôi phục">
+                                                    <i class="fas fa-undo"></i>
+                                                </button>
+                                            </form>
+                                        }
                                         <form asp-action="PermanentDelete" asp-route-id="@item.Id" method="post" class="d-inline" data-premium-confirm="Xóa vĩnh viễn phòng này? Hành động này KHÔNG THỂ hoàn tác." data-premium-title="Xóa vĩnh viễn" data-premium-ok="Xóa vĩnh viễn" data-premium-danger="true">
                                             <button type="submit" class="admin-btn-icon is-danger border-0 bg-transparent">
                                                 <i class="fas fa-times-circle"></i>

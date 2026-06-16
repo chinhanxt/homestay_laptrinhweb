@@ -133,9 +133,15 @@
             </button>
             <section class="ai-chat-panel" aria-label="Nhân viên tư vấn">
                 <div class="ai-chat-header">
-                    <div>
-                        <span class="ai-chat-kicker">chinhan Assistant</span>
-                        <h3>Nhân viên tư vấn</h3>
+                    <div class="ai-chat-profile">
+                        <div class="ai-avatar-container">
+                            <img class="ai-avatar-img" src="/img/ai-avatar.png" alt="AI Avatar" />
+                            <span class="online-pulse"></span>
+                        </div>
+                        <div>
+                            <span class="ai-chat-kicker">CHINHAN</span>
+                            <h3>Nhân viên tư vấn</h3>
+                        </div>
                     </div>
                     <div style="display: flex; gap: 8px;">
                         <button id="ai-chat-clear" class="ai-chat-clear-btn" type="button" title="Làm mới cuộc trò chuyện" aria-label="Làm mới cuộc trò chuyện">
@@ -148,7 +154,7 @@
                 </div>
                 <button class="ai-context-toggle" type="button" aria-expanded="false" aria-controls="ai-chat-context-form">
                     <span class="ai-context-toggle-copy">
-                        <strong>Thông tin tư vấn</strong>
+                        <strong><i class="fas fa-hand-point-right finger-point-anim text-accent me-2"></i>Thông tin tư vấn</strong>
                         <small class="ai-context-toggle-hint">Tên, chi nhánh, ngày đặt, số khách</small>
                     </span>
                     <i class="fas fa-chevron-down ai-context-toggle-icon" aria-hidden="true"></i>
@@ -185,9 +191,7 @@
                     </label>
                 </div>
                 <div class="ai-chat-messages" role="log" aria-live="polite">
-                    <div class="ai-message ai-message-bot">
-                        Chào bạn, mình có thể tư vấn phòng StayEasy Sài Gòn hoặc Đà Lạt. Bạn muốn đi chi nhánh nào, mấy người và thời gian nào?
-                    </div>
+                    <div class="ai-message ai-message-bot">Chào bạn! Mình là trợ lý CHINHAN. Hãy click chọn nút <strong style="color: var(--luxury-accent);">"Thông tin tư vấn" <i class="fas fa-hand-point-up finger-point-up-anim"></i></strong> bên trên để nhập nhanh nhu cầu, hoặc chat trực tiếp với mình ở đây nhé! 👇</div>
                 </div>
                 <div class="ai-chat-status" aria-live="polite"></div>
                 <div class="ai-chat-quick-actions-toggle-bar" id="ai-quick-actions-toggle-bar" style="background: #fff; text-align: right; padding: 6px 14px 4px; border-top: 1px solid var(--luxury-border); font-size: 0.75rem; cursor: pointer; color: var(--luxury-text-muted); display: flex; align-items: center; justify-content: space-between; user-select: none;">

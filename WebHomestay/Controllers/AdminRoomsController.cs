@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
 using WebHomestay.Models;
 using WebHomestay.Filters;
+using WebHomestay.Services;
 using System.IO;
 using System.Text.Json;
 
@@ -15,11 +16,13 @@ namespace WebHomestay.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _hostEnvironment;
+        private readonly IBulkImportService _importService;
 
-        public AdminRoomsController(ApplicationDbContext context, IWebHostEnvironment hostEnvironment)
+        public AdminRoomsController(ApplicationDbContext context, IWebHostEnvironment hostEnvironment, IBulkImportService importService)
         {
             _context = context;
             _hostEnvironment = hostEnvironment;
+            _importService = importService;
         }
 
         [AdminAuthorize(Permission = "rooms.view")]
@@ -262,7 +265,7 @@ namespace WebHomestay.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        [AdminAuthorize(Permission = "rooms.view")]
+        [AdminAuthorize(Permission = "rooms.trash")]
         [HttpGet("trash")]
         public async Task<IActionResult> Trash()
         {
@@ -284,7 +287,7 @@ namespace WebHomestay.Controllers
             return View(rooms);
         }
 
-        [AdminAuthorize(Permission = "rooms.edit")]
+        [AdminAuthorize(Permission = "rooms.restore")]
         [HttpPost("restore/{id}")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Restore(int id)
@@ -318,6 +321,30 @@ namespace WebHomestay.Controllers
         private bool RoomExists(int id)
         {
             return _context.Rooms.Any(e => e.Id == id);
+        }
+
+        [AdminAuthorize(Permission = "rooms.create")]
+        [HttpPost("import-zip")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ImportZip(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                TempData["ErrorMessage"] = "Vui lòng chọn file ZIP hoặc Excel để import.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var result = await _importService.ImportRoomsAsync(file);
+            if (result.Errors.Any())
+            {
+                TempData["ErrorMessage"] = $"Import hoàn tất. Thành công: {result.SuccessCount}, Thất bại: {result.FailureCount}. Chi tiết lỗi: {string.Join(" | ", result.Errors.Take(5))}";
+            }
+            else
+            {
+                TempData["SuccessMessage"] = $"Đã import thành công {result.SuccessCount} phòng.";
+            }
+
+            return RedirectToAction(nameof(Index));
         }
     }
 }

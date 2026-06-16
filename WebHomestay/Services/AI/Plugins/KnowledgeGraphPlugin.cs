@@ -3,11 +3,13 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
 using WebHomestay.Data;
 using WebHomestay.Models;
+using WebHomestay.Services.AI.Retrieval;
 
 namespace WebHomestay.Services.AI.Plugins
 {
@@ -15,18 +17,26 @@ namespace WebHomestay.Services.AI.Plugins
     {
         private readonly ApplicationDbContext _context;
         private readonly IEmbeddingService _embeddingService;
+        private readonly IVectorSearchService _vectorSearchService;
+        private readonly RetrievalContextAssembler _retrievalContextAssembler;
         private readonly AIBookingSessionState? _sessionState;
         private readonly AIBrainChatRequest? _chatRequest;
         private readonly StringBuilder _logs;
+        public string RetrievedKnowledgeJson { get; private set; } = "[]";
+        public string GraphReasoningJson { get; private set; } = "{}";
 
         public KnowledgeGraphPlugin(
             ApplicationDbContext context,
             IEmbeddingService embeddingService,
+            IVectorSearchService vectorSearchService,
+            RetrievalContextAssembler retrievalContextAssembler,
             AIBookingSessionState? sessionState = null,
             AIBrainChatRequest? chatRequest = null)
         {
             _context = context;
             _embeddingService = embeddingService;
+            _vectorSearchService = vectorSearchService;
+            _retrievalContextAssembler = retrievalContextAssembler;
             _sessionState = sessionState;
             _chatRequest = chatRequest;
             _logs = new StringBuilder();
@@ -41,72 +51,84 @@ namespace WebHomestay.Services.AI.Plugins
             
             try
             {
-                // Load all active units
-                var units = await _context.AIKnowledgeUnits
-                    .Where(k => k.IsActive)
-                    .ToListAsync();
+                var queryEmbedding = await _embeddingService.GetEmbeddingAsync(query, CancellationToken.None);
+                var contextPack = await _retrievalContextAssembler.BuildPolicyContextAsync(
+                    queryEmbedding,
+                    new VectorSearchFilter
+                    {
+                        BranchId = _sessionState?.BranchId,
+                        RoomId = _sessionState?.SelectedRoomId ?? _sessionState?.ActiveRoomContextId,
+                        ActiveOnly = true
+                    },
+                    CancellationToken.None);
 
-                var queryEmbedding = await _embeddingService.GetEmbeddingAsync(query);
-
-                var matchedSegments = units
-                    .Where(k => k.Embedding != null)
-                    .Select(k => {
-                        double similarity = CosineSimilarity(k.Embedding, queryEmbedding);
+                var boostedHits = contextPack.Hits
+                    .Select(sr => {
+                        double similarity = sr.Score;
                         
-                        // Boost context if present
                         if (_sessionState != null)
                         {
                             var branchId = _sessionState.BranchId;
                             var roomId = _sessionState.SelectedRoomId ?? _sessionState.ActiveRoomContextId;
 
-                            if (roomId.HasValue && k.Tags.Contains($"room-{roomId.Value}"))
+                            if (roomId.HasValue && sr.Tags.Contains($"room-{roomId.Value}"))
                             {
-                                similarity += 0.25; // Large boost for current room context
+                                similarity += 0.25;
                             }
-                            else if (branchId.HasValue && k.Tags.Contains($"branch-{branchId.Value}"))
+                            else if (branchId.HasValue && sr.Tags.Contains($"branch-{branchId.Value}"))
                             {
-                                similarity += 0.15; // Medium boost for current branch context
+                                similarity += 0.15;
                             }
                         }
 
-                        return new { k.Title, k.Content, Similarity = similarity };
+                        return new VectorSearchResult
+                        {
+                            EntityType = sr.EntityType,
+                            EntityId = sr.EntityId,
+                            Title = sr.Title,
+                            Content = sr.Content,
+                            Tags = sr.Tags,
+                            Score = similarity
+                        };
                     })
-                    .Where(x => x.Similarity > 0.35) // Similarity threshold
-                    .OrderByDescending(x => x.Similarity)
-                    .Take(5)
-                    .Select(x => new { x.Title, x.Content })
+                    .Where(x => x.Score > 0.35)
+                    .OrderByDescending(x => x.Score)
                     .ToList();
 
-                // Fallback to keyword split-matching if no vector match is found (or if all embeddings are null)
-                if (!matchedSegments.Any())
+                if (!boostedHits.Any())
                 {
-                    _logs.AppendLine("[SearchPolicies] No vector matches found. Falling back to keyword search.");
-                    var terms = query.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
-                    matchedSegments = units
-                        .Where(k => terms.Any(t => 
-                            k.Title.Contains(t, StringComparison.OrdinalIgnoreCase) || 
-                            k.Content.Contains(t, StringComparison.OrdinalIgnoreCase) || 
-                            k.Tags.Contains(t, StringComparison.OrdinalIgnoreCase)))
-                        .OrderByDescending(k => k.Priority)
-                        .Take(5)
-                        .Select(k => new { k.Title, k.Content })
-                        .ToList();
-                }
-
-                if (!matchedSegments.Any())
-                {
-                    var failStr = "Không tìm thấy chính sách nào liên quan đến câu hỏi này.";
+                    var failStr = "Không tìm thấy tri thức ngữ nghĩa phù hợp với câu hỏi này trong nguồn dữ liệu hiện tại.";
                     _logs.AppendLine($"[Result SearchPolicies] {failStr}");
+                    RetrievedKnowledgeJson = "[]";
+                    GraphReasoningJson = "{}";
                     return failStr;
                 }
 
-                var successStr = "Tìm thấy các chính sách sau:\n" + JsonSerializer.Serialize(matchedSegments);
+                var payload = new
+                {
+                    Matches = boostedHits.Select(x => new { x.Title, x.Content, Score = Math.Round(x.Score, 4) }).ToList(),
+                    Graph = contextPack.Graph
+                };
+
+                RetrievedKnowledgeJson = JsonSerializer.Serialize(payload.Matches);
+                GraphReasoningJson = JsonSerializer.Serialize(payload.Graph);
+
+                var successStr = "Tìm thấy các chính sách sau:\n" + JsonSerializer.Serialize(new[] { payload });
                 _logs.AppendLine($"[Result SearchPolicies] {successStr}");
                 return successStr;
+            }
+            catch (EmbeddingUnavailableException ex)
+            {
+                _logs.AppendLine($"[SearchPolicies Error] {ex.Message}");
+                RetrievedKnowledgeJson = "[]";
+                GraphReasoningJson = "{}";
+                return "Hệ thống semantic retrieval hiện chưa sẵn sàng vì embedding chưa khả dụng.";
             }
             catch (Exception ex)
             {
                 _logs.AppendLine($"[SearchPolicies Error] {ex.Message}");
+                RetrievedKnowledgeJson = "[]";
+                GraphReasoningJson = "{}";
                 return $"Lỗi tìm kiếm chính sách: {ex.Message}";
             }
         }
@@ -117,10 +139,6 @@ namespace WebHomestay.Services.AI.Plugins
             [Description("Câu hỏi hoặc vấn đề của khách (VD: wifi phòng, bật bình nóng lạnh, mở khóa, hộp số chìa khóa)")] string query)
         {
             _logs.AppendLine($"[SearchRoomOperationManual] query={query}");
-            
-            // This functions similarly to SearchPolicies but specifically operates on guest troubleshooting issues.
-            // Under semantic search, we can use the same context-aware RAG pipeline, which naturally prioritizes 
-            // the guest's active room or branch.
             return await SearchPolicies(query);
         }
 
@@ -132,7 +150,7 @@ namespace WebHomestay.Services.AI.Plugins
             _logs.AppendLine($"[SearchLocationGraph] query={query}");
 
             var nodes = await _context.AIGraphNodes
-                .Where(n => n.IsActive)
+                .Where(n => n.IsActive && !n.IsDeleted)
                 .ToListAsync();
 
             var matchedNodes = nodes
@@ -150,7 +168,7 @@ namespace WebHomestay.Services.AI.Plugins
 
             var nodeIds = matchedNodes.Select(n => n.Id).ToList();
             var edges = await _context.AIGraphEdges
-                .Where(e => nodeIds.Contains(e.FromNodeId) || nodeIds.Contains(e.ToNodeId))
+                .Where(e => !e.IsDeleted && (nodeIds.Contains(e.FromNodeId) || nodeIds.Contains(e.ToNodeId)))
                 .Include(e => e.FromNode)
                 .Include(e => e.ToNode)
                 .Select(e => new { From = e.FromNode.Label, To = e.ToNode.Label, e.RelationshipType, e.Evidence })
@@ -169,20 +187,5 @@ namespace WebHomestay.Services.AI.Plugins
         }
 
         public string GetLogs() => _logs.ToString();
-
-        private static double CosineSimilarity(float[]? v1, float[]? v2)
-        {
-            if (v1 == null || v2 == null || v1.Length != v2.Length) return 0.0;
-            double dot = 0.0;
-            double n1 = 0.0;
-            double n2 = 0.0;
-            for (int i = 0; i < v1.Length; i++)
-            {
-                dot += v1[i] * v2[i];
-                n1 += v1[i] * v1[i];
-                n2 += v2[i] * v2[i];
-            }
-            return (n1 == 0.0 || n2 == 0.0) ? 0.0 : dot / (Math.Sqrt(n1) * Math.Sqrt(n2));
-        }
     }
 }

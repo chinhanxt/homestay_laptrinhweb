@@ -7,16 +7,19 @@ namespace WebHomestay.Tests;
 public class FakeServiceScopeFactory : IServiceScopeFactory
 {
     private readonly ApplicationDbContext _context;
+    private readonly Action<ServiceCollection>? _configureServices;
 
-    public FakeServiceScopeFactory(ApplicationDbContext context)
+    public FakeServiceScopeFactory(ApplicationDbContext context, Action<ServiceCollection>? configureServices = null)
     {
         _context = context;
+        _configureServices = configureServices;
     }
 
     public IServiceScope CreateScope()
     {
         var services = new ServiceCollection();
         services.AddSingleton(_context);
+        _configureServices?.Invoke(services);
         var provider = services.BuildServiceProvider();
         return new FakeScope(provider);
     }

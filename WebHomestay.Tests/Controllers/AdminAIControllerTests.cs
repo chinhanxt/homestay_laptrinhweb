@@ -4,7 +4,9 @@ using Moq;
 using WebHomestay.Controllers;
 using WebHomestay.Data;
 using WebHomestay.Models.AI;
+using WebHomestay.Services;
 using WebHomestay.Services.AI;
+using WebHomestay.Services.AI.Compatibility;
 using Xunit;
 
 namespace WebHomestay.Tests.Controllers;
@@ -25,7 +27,9 @@ public class AdminAIControllerTests
         IAdminAIRuntimeSimulatorService? runtimeSimulatorService = null,
         IAdminAIReseedService? reseedService = null,
         IEmbeddingService? embeddingService = null,
-        IOperationalInsightService? operationalInsightService = null)
+        IOperationalInsightService? operationalInsightService = null,
+        IAIRuntimeSelector? runtimeSelector = null,
+        IBulkImportService? importService = null)
     {
         context ??= CreateContext();
         studioConfigService ??= Mock.Of<IAdminAIStudioConfigService>();
@@ -33,8 +37,10 @@ public class AdminAIControllerTests
         reseedService ??= Mock.Of<IAdminAIReseedService>();
         embeddingService ??= Mock.Of<IEmbeddingService>();
         operationalInsightService ??= Mock.Of<IOperationalInsightService>();
+        runtimeSelector ??= Mock.Of<IAIRuntimeSelector>();
+        importService ??= Mock.Of<IBulkImportService>();
 
-        return new AdminAIController(context, studioConfigService, runtimeSimulatorService, reseedService, embeddingService, operationalInsightService);
+        return new AdminAIController(context, studioConfigService, runtimeSimulatorService, reseedService, embeddingService, operationalInsightService, runtimeSelector, importService);
     }
 
     [Fact]

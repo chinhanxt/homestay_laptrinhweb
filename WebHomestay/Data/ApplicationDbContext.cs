@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using WebHomestay.Models;
 
@@ -39,6 +41,10 @@ namespace WebHomestay.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            if (Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory")
+            {
+                modelBuilder.HasPostgresExtension("vector");
+            }
 
             // Configure table names to lowercase to match PostgreSQL convention
             modelBuilder.Entity<User>().ToTable("users");
@@ -108,7 +114,20 @@ namespace WebHomestay.Data
                 entity.Property(e => e.Capacity).HasColumnName("capacity");
                 entity.Property(e => e.MaxGuests).HasColumnName("max_guests");
                 entity.Property(e => e.Status).HasColumnName("status");
-                entity.Property(e => e.Embedding).HasColumnName("embedding");
+                entity.Property(e => e.Embedding)
+                    .HasColumnName("embedding");
+                if (Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+                {
+                    entity.Property(e => e.Embedding).HasConversion(
+                        new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<Pgvector.Vector?, string>(
+                            v => v != null ? string.Join(",", v.ToArray()) : string.Empty,
+                            v => !string.IsNullOrEmpty(v) ? new Pgvector.Vector(v.Split(',', StringSplitOptions.None).Select(float.Parse).ToArray()) : null!
+                        ));
+                }
+                else
+                {
+                    entity.Property(e => e.Embedding).HasColumnType("vector(1536)");
+                }
                 entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
                 entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
             });
@@ -263,7 +282,20 @@ namespace WebHomestay.Data
                 entity.Property(e => e.Priority).HasColumnName("priority");
                 entity.Property(e => e.IsActive).HasColumnName("is_active");
                 entity.Property(e => e.LastUpdated).HasColumnName("last_updated");
-                entity.Property(e => e.Embedding).HasColumnName("embedding");
+                entity.Property(e => e.Embedding)
+                    .HasColumnName("embedding");
+                if (Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+                {
+                    entity.Property(e => e.Embedding).HasConversion(
+                        new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<Pgvector.Vector?, string>(
+                            v => v != null ? string.Join(",", v.ToArray()) : string.Empty,
+                            v => !string.IsNullOrEmpty(v) ? new Pgvector.Vector(v.Split(',', StringSplitOptions.None).Select(float.Parse).ToArray()) : null!
+                        ));
+                }
+                else
+                {
+                    entity.Property(e => e.Embedding).HasColumnType("vector(1536)");
+                }
                 entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
                 entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
                 entity.HasOne(e => e.Scope).WithMany(e => e.KnowledgeUnits).HasForeignKey(e => e.ScopeId).OnDelete(DeleteBehavior.Cascade);

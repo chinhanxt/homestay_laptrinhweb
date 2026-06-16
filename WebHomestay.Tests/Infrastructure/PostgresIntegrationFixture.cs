@@ -14,6 +14,11 @@ public sealed class PostgresIntegrationFixture : IAsyncLifetime
         Environment.GetEnvironmentVariable("WEBHOMESTAY_TEST_POSTGRES")
         ?? DefaultConnectionString;
 
+    static PostgresIntegrationFixture()
+    {
+        AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+    }
+
     public bool IsAvailable { get; private set; } = true;
     public string? UnavailableReason { get; private set; }
 
@@ -75,13 +80,12 @@ public sealed class PostgresIntegrationFixture : IAsyncLifetime
         await createCommand.ExecuteNonQueryAsync();
     }
 
-    public bool EnsureAvailable()
+    public void EnsureAvailable()
     {
         if (!IsAvailable)
         {
-            return false;
+            throw new InvalidOperationException(
+                UnavailableReason ?? "PostgreSQL integration fixture is unavailable.");
         }
-
-        return true;
     }
 }

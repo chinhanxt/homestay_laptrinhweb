@@ -11,6 +11,7 @@ public class AdminAIStudioConfig
     public List<AdminAIUiBlockDefinition> UiBlockDefinitions { get; set; } = new();
     public AdminAIRuntimePolicies RuntimePolicies { get; set; } = new();
     public AdminAIHandoffConfig Handoff { get; set; } = new();
+    public List<BookingFormFieldConfig> BookingFormFields { get; set; } = new();
 
     // Temporary compatibility shim while controller/UI/tests are migrated in later tasks.
     [JsonIgnore]
@@ -80,6 +81,11 @@ public class AdminAIRuntimePolicies
     public AdminAIStudioDisplayRules ShowBookingCtaRules { get; set; } = new();
     public string FallbackReplyRule { get; set; } = string.Empty;
     public string SessionPersistenceRule { get; set; } = string.Empty;
+    public string TriggerWords { get; set; } = "đặt,chốt,lấy,book,giữ phòng,giữ chỗ";
+    public string ExitKeywords { get; set; } = "thôi,bỏ,khác,xóa,hủy,không,để sau";
+    public string ProactiveMode { get; set; } = "balanced";
+    public string DependencyRule { get; set; } = "branch->room->slot";
+    public string GuestOverflowRule { get; set; } = "capacity_warn_max_filter";
 }
 
 public class AdminAIHandoffConfig
@@ -123,4 +129,15 @@ public class AdminAIStudioDisplayRules
     public int MaxItems { get; set; }
     public int CooldownTurns { get; set; }
     public string DisplayRule { get; set; } = string.Empty;
+}
+
+public class BookingFormFieldConfig
+{
+    public string Id { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+    public bool Enabled { get; set; } = true;
+    public bool Required { get; set; } = true;
+    public string HelpText { get; set; } = string.Empty;
+    public int Order { get; set; }
 }

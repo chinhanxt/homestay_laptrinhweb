@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let bookingState = JSON.parse(localStorage.getItem('ai_booking_state') || '{}');
     let latestBookingSummary = null;
     let zaloContactsLoaded = false;
+    let contextTouched = { mode: false };
 
     function getSessionId() {
         let sid = localStorage.getItem('ai_chat_session_id');
@@ -239,9 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionId = getSessionId();
                 bookingState = {};
                 messages.innerHTML = `
-                    <div class="ai-message ai-message-bot">
-                        Chào bạn, mình có thể tư vấn phòng StayEasy Sài Gòn hoặc Đà Lạt. Bạn muốn đi chi nhánh nào, mấy người và thời gian nào?
-                    </div>
+                    <div class="ai-message ai-message-bot">Chào bạn! Mình là trợ lý CHINHAN. Hãy click chọn nút <strong style="color: var(--luxury-accent);">"Thông tin tư vấn" <i class="fas fa-hand-point-up finger-point-up-anim"></i></strong> bên trên để nhập nhanh nhu cầu, hoặc chat trực tiếp với mình ở đây nhé! 👇</div>
                 `;
                 rejoinChatHub(sessionId);
                 if (nameInput) nameInput.value = '';
@@ -254,7 +253,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     if (cancelAction) cancelAction.addEventListener('click', () => renderCancellationPrompt());
-    if (modeSelect) modeSelect.addEventListener('change', updateContextDateTimeControls);
+    if (modeSelect) {
+        modeSelect.addEventListener('change', () => {
+            contextTouched.mode = true;
+            updateContextDateTimeControls();
+        });
+    }
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -441,6 +445,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (block.type === 'branchSelector') renderBranchSelector(block.data || {});
             if (block.type === 'singleDatePicker') renderSingleDatePicker(block.data || {});
             if (block.type === 'dateRangePicker') renderDateRangePicker(block.data || {});
+            if (block.type === 'handoffContact') renderHandoffContact(block.data || {});
+            if (block.type === 'roomDecisionCta') renderRoomDecisionCta(block.data || {});
+            if (block.type === 'bookingCta') renderBookingCta(block.data || {});
+            if (block.type === 'branchContactCapture') renderBranchContactCapture(block.data || {});
         });
     }
 
@@ -455,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderBookingModeChoice(data) {
         const wrapper = appendBlock('ai-booking-mode-choice');
         const title = document.createElement('h5');
-        title.style.margin = '0 0 10px 0';
+        title.style.margin = '0 0 12px 0';
         title.style.fontSize = '0.95rem';
         title.style.fontWeight = 'bold';
         title.textContent = data.label || 'Chọn hình thức đặt phòng';
@@ -464,25 +472,49 @@ document.addEventListener('DOMContentLoaded', () => {
         const flows = Array.isArray(data.flows) ? data.flows : [];
         flows.forEach(flow => {
             const button = document.createElement('button');
-            button.className = 'ai-action-btn ai-action-primary w-100 mb-2';
+            button.className = 'ai-choice-card d-flex align-items-center gap-3 w-100 mb-2';
             button.type = 'button';
             button.dataset.aiAction = 'select-booking-mode';
             button.dataset.bookingMode = flow.id;
+
+            const iconDiv = document.createElement('div');
+            iconDiv.className = 'ai-choice-icon';
+            const icon = document.createElement('i');
             
-            const nameSpan = document.createElement('span');
-            nameSpan.textContent = flow.name || flow.id;
-            nameSpan.style.fontWeight = 'bold';
-            button.appendChild(nameSpan);
+            const flowIdLower = String(flow.id || '').toLowerCase();
+            const flowNameLower = String(flow.name || '').toLowerCase();
+            if (flowIdLower.includes('hourly') || flowNameLower.includes('giờ')) {
+                icon.className = 'far fa-clock';
+            } else {
+                icon.className = 'far fa-calendar-alt';
+            }
+            iconDiv.appendChild(icon);
+            button.appendChild(iconDiv);
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'flex-grow-1';
+
+            const name = document.createElement('strong');
+            name.textContent = flow.name || flow.id;
+            name.style.fontWeight = '700';
+            name.style.color = 'var(--luxury-primary)';
+            name.style.fontSize = '0.9rem';
+            name.style.lineHeight = '1.35';
+            name.style.display = 'block';
+            contentDiv.appendChild(name);
 
             if (flow.description) {
-                const desc = document.createElement('small');
-                desc.className = 'd-block mt-1';
-                desc.style.fontSize = '0.75rem';
-                desc.style.opacity = '0.85';
+                const desc = document.createElement('span');
+                desc.style.marginTop = '2px';
+                desc.style.color = 'var(--luxury-text-muted)';
+                desc.style.fontSize = '0.78rem';
+                desc.style.lineHeight = '1.35';
                 desc.style.fontWeight = 'normal';
+                desc.style.display = 'block';
                 desc.textContent = flow.description;
-                button.appendChild(desc);
+                contentDiv.appendChild(desc);
             }
+            button.appendChild(contentDiv);
             wrapper.appendChild(button);
         });
         scrollMessages();
@@ -491,7 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderBranchSelector(data) {
         const wrapper = appendBlock('ai-branch-selector');
         const title = document.createElement('h5');
-        title.style.margin = '0 0 10px 0';
+        title.style.margin = '0 0 12px 0';
         title.style.fontSize = '0.95rem';
         title.style.fontWeight = 'bold';
         title.textContent = data.label || 'Chọn chi nhánh';
@@ -500,11 +532,41 @@ document.addEventListener('DOMContentLoaded', () => {
         const branches = Array.isArray(data.branches) ? data.branches : [];
         branches.forEach(branch => {
             const button = document.createElement('button');
-            button.className = 'ai-action-btn ai-action-primary w-100 mb-2';
+            button.className = 'ai-choice-card d-flex align-items-center gap-3 w-100 mb-2';
             button.type = 'button';
             button.dataset.aiAction = 'select-branch';
             button.dataset.branchId = String(branch.id);
-            button.textContent = branch.name;
+
+            const iconDiv = document.createElement('div');
+            iconDiv.className = 'ai-choice-icon';
+            const icon = document.createElement('i');
+            icon.className = 'fas fa-map-marker-alt';
+            iconDiv.appendChild(icon);
+            button.appendChild(iconDiv);
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'flex-grow-1';
+
+            const name = document.createElement('strong');
+            name.textContent = branch.name;
+            name.style.fontWeight = '700';
+            name.style.color = 'var(--luxury-primary)';
+            name.style.fontSize = '0.9rem';
+            name.style.lineHeight = '1.35';
+            name.style.display = 'block';
+            contentDiv.appendChild(name);
+
+            const subtitle = document.createElement('span');
+            subtitle.style.marginTop = '2px';
+            subtitle.style.color = 'var(--luxury-text-muted)';
+            subtitle.style.fontSize = '0.78rem';
+            subtitle.style.lineHeight = '1.35';
+            subtitle.style.fontWeight = 'normal';
+            subtitle.style.display = 'block';
+            subtitle.textContent = 'Nhấp để chọn chi nhánh này';
+            contentDiv.appendChild(subtitle);
+
+            button.appendChild(contentDiv);
             wrapper.appendChild(button);
         });
         scrollMessages();
@@ -514,25 +576,37 @@ document.addEventListener('DOMContentLoaded', () => {
         const wrapper = appendBlock('ai-single-date-picker');
         
         const container = document.createElement('div');
-        container.className = 'ai-booking-form';
+        container.className = 'ai-booking-form-card';
         
         const label = document.createElement('label');
+        label.className = 'ai-input-label d-block mb-2';
+        
         const caption = document.createElement('span');
         caption.textContent = data.label || 'Chọn ngày đặt phòng';
         label.appendChild(caption);
+        container.appendChild(label);
+
+        const inputWrapper = document.createElement('div');
+        inputWrapper.className = 'ai-date-input-wrapper mb-3';
+
+        const icon = document.createElement('i');
+        icon.className = 'far fa-calendar-alt ai-input-icon';
+        inputWrapper.appendChild(icon);
 
         const dateInput = document.createElement('input');
         dateInput.type = 'date';
         dateInput.name = 'checkInDate';
+        dateInput.className = 'ai-date-picker-input';
         
         const todayStr = new Date().toISOString().split('T')[0];
         dateInput.min = todayStr;
         dateInput.value = todayStr;
-        label.appendChild(dateInput);
-        container.appendChild(label);
+        
+        inputWrapper.appendChild(dateInput);
+        container.appendChild(inputWrapper);
 
         const button = document.createElement('button');
-        button.className = 'ai-booking-submit';
+        button.className = 'ai-booking-submit w-100';
         button.type = 'button';
         button.dataset.aiAction = 'confirm-dates';
         button.textContent = 'Xác nhận ngày';
@@ -546,38 +620,67 @@ document.addEventListener('DOMContentLoaded', () => {
         const wrapper = appendBlock('ai-date-range-picker');
         
         const container = document.createElement('div');
-        container.className = 'ai-booking-form';
+        container.className = 'ai-booking-form-card';
+        
+        const grid = document.createElement('div');
+        grid.className = 'row g-2 mb-3';
+
+        const ciCol = document.createElement('div');
+        ciCol.className = 'col-6';
         
         const ciLabel = document.createElement('label');
-        const ciCaption = document.createElement('span');
-        ciCaption.textContent = 'Ngày nhận phòng';
-        ciLabel.appendChild(ciCaption);
+        ciLabel.className = 'ai-input-label d-block mb-1';
+        ciLabel.textContent = 'Ngày nhận phòng';
+        ciCol.appendChild(ciLabel);
+
+        const ciWrapper = document.createElement('div');
+        ciWrapper.className = 'ai-date-input-wrapper';
+        
+        const ciIcon = document.createElement('i');
+        ciIcon.className = 'far fa-calendar-plus ai-input-icon';
+        ciWrapper.appendChild(ciIcon);
 
         const ciInput = document.createElement('input');
         ciInput.type = 'date';
         ciInput.name = 'checkInDate';
+        ciInput.className = 'ai-date-picker-input';
         const todayStr = new Date().toISOString().split('T')[0];
         ciInput.min = todayStr;
         ciInput.value = todayStr;
-        ciLabel.appendChild(ciInput);
-        container.appendChild(ciLabel);
+        ciWrapper.appendChild(ciInput);
+        ciCol.appendChild(ciWrapper);
+        grid.appendChild(ciCol);
+
+        const coCol = document.createElement('div');
+        coCol.className = 'col-6';
 
         const coLabel = document.createElement('label');
-        const coCaption = document.createElement('span');
-        coCaption.textContent = 'Ngày trả phòng';
-        coLabel.appendChild(coCaption);
+        coLabel.className = 'ai-input-label d-block mb-1';
+        coLabel.textContent = 'Ngày trả phòng';
+        coCol.appendChild(coLabel);
+
+        const coWrapper = document.createElement('div');
+        coWrapper.className = 'ai-date-input-wrapper';
+        
+        const coIcon = document.createElement('i');
+        coIcon.className = 'far fa-calendar-minus ai-input-icon';
+        coWrapper.appendChild(coIcon);
 
         const coInput = document.createElement('input');
         coInput.type = 'date';
         coInput.name = 'checkOutDate';
+        coInput.className = 'ai-date-picker-input';
         
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         const tomorrowStr = tomorrow.toISOString().split('T')[0];
         coInput.min = tomorrowStr;
         coInput.value = tomorrowStr;
-        coLabel.appendChild(coInput);
-        container.appendChild(coLabel);
+        coWrapper.appendChild(coInput);
+        coCol.appendChild(coWrapper);
+        grid.appendChild(coCol);
+
+        container.appendChild(grid);
 
         ciInput.addEventListener('change', () => {
             if (ciInput.value) {
@@ -591,7 +694,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const button = document.createElement('button');
-        button.className = 'ai-booking-submit';
+        button.className = 'ai-booking-submit w-100';
         button.type = 'button';
         button.dataset.aiAction = 'confirm-dates';
         button.textContent = 'Xác nhận ngày';
@@ -609,23 +712,56 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'ai-room-card';
 
+            if (room.imageUrl) {
+                const imgWrapper = document.createElement('div');
+                imgWrapper.className = 'ai-room-img-wrapper';
+                const img = document.createElement('img');
+                img.src = room.imageUrl;
+                img.alt = room.name || 'Phòng';
+                imgWrapper.appendChild(img);
+                card.appendChild(imgWrapper);
+            }
+
             const title = document.createElement('h4');
             title.textContent = room.name || 'Phòng';
             card.appendChild(title);
 
+            const badgeContainer = document.createElement('div');
+            badgeContainer.className = 'mb-2 d-flex flex-wrap gap-1 align-items-center';
+
+            if (room.requestedSlotAvailable !== false) {
+                const availBadge = document.createElement('span');
+                availBadge.className = 'ai-availability-badge';
+                availBadge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Còn trống';
+                badgeContainer.appendChild(availBadge);
+            }
+
+            if (room.fitsStandardOccupancy) {
+                const stdBadge = document.createElement('span');
+                stdBadge.className = 'ai-occupancy-badge ai-occupancy-badge-standard';
+                stdBadge.innerHTML = '<i class="fas fa-user-friends me-1"></i>Chuẩn khách';
+                badgeContainer.appendChild(stdBadge);
+            } else {
+                const extBadge = document.createElement('span');
+                extBadge.className = 'ai-occupancy-badge ai-occupancy-badge-extra';
+                extBadge.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Có phụ thu';
+                badgeContainer.appendChild(extBadge);
+            }
+            card.appendChild(badgeContainer);
+
             const description = document.createElement('div');
-            description.className = 'ai-room-meta';
+            description.className = 'ai-room-meta mb-1';
             description.textContent = room.description || '';
             card.appendChild(description);
 
             const prices = document.createElement('div');
-            prices.className = 'ai-room-meta';
+            prices.className = 'ai-room-meta mb-1';
             prices.textContent = `Giờ: ${formatMoney(room.pricePerHour)}/h · Ngày: ${formatMoney(room.pricePerDay)}/ngày`;
             card.appendChild(prices);
 
             const capacity = document.createElement('div');
-            capacity.className = 'ai-room-meta';
-            capacity.textContent = `Chuẩn ${toSafeNumber(room.capacity)} khách · Tối đa ${toSafeNumber(room.maxGuests)} khách${room.extraGuestFee > 0 ? ` · Phụ thu ${formatMoney(room.extraGuestFee)}` : ''}`;
+            capacity.className = 'ai-room-meta mb-3';
+            capacity.textContent = `Chuẩn ${toSafeNumber(room.capacity)} khách · Tối đa ${toSafeNumber(room.maxGuests)} khách${room.extraGuestFee > 0 ? ` · Phụ thu ${formatMoney(room.extraGuestFee)}/khách` : ''}`;
             card.appendChild(capacity);
 
             const actions = document.createElement('div');
@@ -759,6 +895,171 @@ document.addEventListener('DOMContentLoaded', () => {
             item.appendChild(actions);
             wrapper.appendChild(item);
         });
+        scrollMessages();
+    }
+
+    function renderHandoffContact(data) {
+        const wrapper = appendBlock('ai-handoff-contact-block');
+        
+        const container = document.createElement('div');
+        container.className = 'ai-handoff-contact';
+
+        const title = document.createElement('h5');
+        title.className = 'ai-block-title';
+        title.textContent = data.branchName || 'CHINHAN';
+        container.appendChild(title);
+
+        const instruction = document.createElement('p');
+        instruction.className = 'ai-payment-message mb-3';
+        instruction.textContent = data.contactInstruction || 'Bạn vui lòng liên hệ chi nhánh qua thông tin dưới đây để được hỗ trợ.';
+        container.appendChild(instruction);
+
+        const address = document.createElement('div');
+        address.className = 'ai-room-meta mb-1';
+        address.innerHTML = `<i class="fas fa-map-marker-alt me-1 text-accent"></i> ${data.address || 'Hệ thống StayEasy Homestay'}`;
+        container.appendChild(address);
+
+        const hotline = document.createElement('div');
+        hotline.className = 'ai-room-meta mb-1';
+        hotline.innerHTML = `<i class="fas fa-phone-alt me-1 text-accent"></i> Hotline: <a href="tel:${data.hotline || ''}">${data.hotline || 'Chưa cấu hình'}</a>`;
+        container.appendChild(hotline);
+
+        const email = document.createElement('div');
+        email.className = 'ai-room-meta mb-3';
+        email.innerHTML = `<i class="fas fa-envelope me-1 text-accent"></i> Email: ${data.email || 'Chưa cấu hình'}`;
+        container.appendChild(email);
+
+        const actions = document.createElement('div');
+        actions.className = 'ai-handoff-actions';
+
+        if (data.hotline) {
+            const callBtn = document.createElement('a');
+            callBtn.className = 'ai-handoff-btn ai-handoff-btn-call';
+            callBtn.href = `tel:${data.hotline}`;
+            callBtn.innerHTML = '<i class="fas fa-phone me-1"></i> Gọi Hotline';
+            actions.appendChild(callBtn);
+        }
+
+        if (data.hotline) {
+            const zaloBtn = document.createElement('a');
+            zaloBtn.className = 'ai-handoff-btn ai-handoff-btn-zalo';
+            zaloBtn.href = buildZaloLink(data.hotline);
+            zaloBtn.target = '_blank';
+            zaloBtn.rel = 'noopener';
+            zaloBtn.innerHTML = '<i class="fas fa-comment me-1"></i> Chat Zalo';
+            actions.appendChild(zaloBtn);
+        }
+
+        if (data.mapUrl) {
+            const mapBtn = document.createElement('a');
+            mapBtn.className = 'ai-handoff-btn ai-handoff-btn-map';
+            mapBtn.href = data.mapUrl;
+            mapBtn.target = '_blank';
+            mapBtn.rel = 'noopener';
+            mapBtn.innerHTML = '<i class="fas fa-map me-1"></i> Xem Bản đồ';
+            actions.appendChild(mapBtn);
+        }
+
+        container.appendChild(actions);
+        wrapper.appendChild(container);
+        scrollMessages();
+    }
+
+    function renderRoomDecisionCta(data) {
+        const wrapper = appendBlock('ai-room-decision-cta');
+        
+        const container = document.createElement('div');
+        container.className = 'ai-room-decision-card';
+        
+        if (data.message) {
+            const msg = document.createElement('p');
+            msg.className = 'ai-room-meta mb-3';
+            msg.textContent = data.message;
+            container.appendChild(msg);
+        }
+
+        const formGroup = document.createElement('div');
+        formGroup.className = 'ai-guest-update-group mb-3 d-flex align-items-center justify-content-between gap-2';
+        
+        const labelText = document.createElement('span');
+        labelText.className = 'ai-room-meta fw-bold';
+        labelText.textContent = 'Số lượng khách:';
+        formGroup.appendChild(labelText);
+
+        const inputGroup = document.createElement('div');
+        inputGroup.className = 'd-flex align-items-center gap-2';
+
+        const guestInput = document.createElement('input');
+        guestInput.type = 'number';
+        guestInput.className = 'ai-guest-input form-control';
+        guestInput.style.width = '60px';
+        guestInput.min = '1';
+        if (data.maxGuests) guestInput.max = String(data.maxGuests);
+        guestInput.value = String(data.guestCount || 1);
+        inputGroup.appendChild(guestInput);
+
+        const updateBtn = document.createElement('button');
+        updateBtn.className = 'ai-chip-btn';
+        updateBtn.type = 'button';
+        updateBtn.textContent = 'Xác nhận thay đổi';
+        
+        updateBtn.addEventListener('click', async () => {
+            const guestCount = parseInt(guestInput.value, 10) || 1;
+            bookingState.guestCount = guestCount;
+            if (guestsInput) guestsInput.value = String(guestCount);
+            
+            updateBtn.disabled = true;
+            setBusy(true);
+            try {
+                const payload = buildActionPayload('select-room', updateBtn);
+                payload.state.guestCount = guestCount;
+                
+                const response = await fetch('/ai/booking-action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const responseData = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(responseData.message || 'AI booking action failed.');
+                handleActionResponse(responseData);
+            } catch {
+                appendMessage('Xin lỗi, không cập nhật được số khách. Bạn thử lại nhé.', 'bot');
+                updateBtn.disabled = false;
+            } finally {
+                setBusy(false);
+            }
+        });
+        
+        inputGroup.appendChild(updateBtn);
+        formGroup.appendChild(inputGroup);
+        container.appendChild(formGroup);
+
+        const actions = document.createElement('div');
+        actions.className = 'ai-room-actions';
+
+        const detailsUrl = toSafeRelativeUrl(data.detailsUrl);
+        if (detailsUrl) {
+            const detailsLink = document.createElement('a');
+            detailsLink.className = 'ai-chip-btn';
+            detailsLink.href = detailsUrl;
+            detailsLink.target = '_blank';
+            detailsLink.rel = 'noopener';
+            detailsLink.textContent = data.detailsLabel || 'Xem chi tiết phòng này';
+            actions.appendChild(detailsLink);
+        }
+
+        if (data.showCommitButton) {
+            const commitBtn = document.createElement('button');
+            commitBtn.className = 'ai-chip-btn ai-chip-btn-primary';
+            commitBtn.type = 'button';
+            commitBtn.dataset.aiAction = 'commit-room';
+            commitBtn.dataset.roomId = String(data.roomId);
+            commitBtn.textContent = data.commitLabel || 'Xác nhận phòng này';
+            actions.appendChild(commitBtn);
+        }
+
+        container.appendChild(actions);
+        wrapper.appendChild(container);
         scrollMessages();
     }
 
@@ -1082,7 +1383,7 @@ document.addEventListener('DOMContentLoaded', () => {
             branches.forEach(branch => {
                 const option = document.createElement('option');
                 option.value = String(branch.id || '');
-                option.textContent = branch.address ? `${branch.name} - ${branch.address}` : branch.name;
+                option.textContent = branch.name;
                 select.appendChild(option);
             });
             wrapper.appendChild(select);
@@ -1210,15 +1511,152 @@ document.addEventListener('DOMContentLoaded', () => {
         scrollMessages();
     }
 
+    function renderBookingCta(data) {
+        const wrapper = appendBlock('ai-booking-cta-block');
+
+        const message = document.createElement('p');
+        message.className = 'ai-payment-message mb-3 text-center';
+        message.style.fontSize = '0.92rem';
+        message.style.fontWeight = '500';
+        message.style.color = 'var(--luxury-primary)';
+        message.textContent = data.message || 'Hoàn tất thông tin ở trang đặt phòng chính thức.';
+        wrapper.appendChild(message);
+
+        const checkoutLink = document.createElement('a');
+        checkoutLink.className = 'ai-action-btn ai-action-primary w-100 d-block text-center py-2';
+        checkoutLink.style.textDecoration = 'none';
+        checkoutLink.style.fontSize = '0.9rem';
+        checkoutLink.href = toSafeRelativeUrl(data.target);
+        checkoutLink.innerHTML = '<i class="fas fa-check-double me-2"></i>Đi tới trang đặt phòng';
+        wrapper.appendChild(checkoutLink);
+
+        if (data.secondaryMessage) {
+            const secMessage = document.createElement('p');
+            secMessage.className = 'ai-payment-message mt-3 mb-0 text-center';
+            secMessage.style.fontSize = '0.8rem';
+            secMessage.style.fontStyle = 'italic';
+            secMessage.textContent = data.secondaryMessage;
+            wrapper.appendChild(secMessage);
+        }
+        scrollMessages();
+    }
+
+    function renderBranchContactCapture(data) {
+        const wrapper = appendBlock('ai-branch-contact-capture');
+
+        if (data.branchName) {
+            const title = document.createElement('h5');
+            title.className = 'ai-block-title mb-2';
+            title.textContent = data.branchName;
+            wrapper.appendChild(title);
+        }
+
+        if (data.message) {
+            const msg = document.createElement('p');
+            msg.className = 'ai-payment-message mb-3';
+            msg.textContent = data.message;
+            wrapper.appendChild(msg);
+        }
+
+        if (data.address) {
+            const addr = document.createElement('div');
+            addr.className = 'ai-room-meta mb-1';
+            addr.innerHTML = `<i class="fas fa-map-marker-alt me-1 text-accent"></i> ${data.address}`;
+            wrapper.appendChild(addr);
+        }
+
+        if (data.hotline) {
+            const phoneVal = String(data.hotline).trim();
+            const phoneDiv = document.createElement('div');
+            phoneDiv.className = 'ai-room-meta mb-1';
+            phoneDiv.innerHTML = `<i class="fas fa-phone-alt me-1 text-accent"></i> Hotline: <a href="tel:${phoneVal}">${phoneVal}</a>`;
+            wrapper.appendChild(phoneDiv);
+        }
+
+        const formElement = document.createElement('form');
+        formElement.className = 'ai-contact-capture-form mt-3';
+        
+        const phoneInput = document.createElement('input');
+        phoneInput.type = 'tel';
+        phoneInput.placeholder = 'Số điện thoại của bạn';
+        phoneInput.required = true;
+        phoneInput.name = 'phone';
+        phoneInput.maxLength = 20;
+        formElement.appendChild(phoneInput);
+
+        const submitBtn = document.createElement('button');
+        submitBtn.type = 'submit';
+        submitBtn.className = 'ai-booking-submit';
+        submitBtn.style.padding = '9px 16px';
+        submitBtn.style.borderRadius = '8px';
+        submitBtn.style.fontSize = '0.85rem';
+        submitBtn.textContent = 'Gửi liên hệ';
+        formElement.appendChild(submitBtn);
+
+        wrapper.appendChild(formElement);
+
+        formElement.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const phone = phoneInput.value.trim();
+            if (!phone) return;
+
+            submitBtn.disabled = true;
+            phoneInput.disabled = true;
+            setBusy(true);
+
+            try {
+                const payload = {
+                    sessionId: sessionId,
+                    action: 'submit-contact-phone',
+                    state: {
+                        ...bookingState,
+                        customerPhone: phone
+                    },
+                    formSubmission: {
+                        phoneNumber: phone,
+                        values: { phone: phone }
+                    }
+                };
+
+                const response = await fetch('/ai/booking-action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const responseData = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(responseData.message || 'Gửi liên hệ thất bại.');
+
+                formElement.classList.add('is-submitted');
+                submitBtn.textContent = 'Đã gửi';
+                appendMessage(`Cảm ơn bạn! Số điện thoại ${phone} đã được gửi đến nhân viên chi nhánh ${data.branchName || ''} hỗ trợ.`, 'bot');
+                
+                updateBookingState(responseData.state || payload.state);
+            } catch (err) {
+                appendMessage('Xin lỗi, không gửi được thông tin liên hệ. Bạn vui lòng thử lại nhé.', 'bot');
+                submitBtn.disabled = false;
+                phoneInput.disabled = false;
+            } finally {
+                setBusy(false);
+            }
+        });
+
+        scrollMessages();
+    }
+
     function renderDateSelector(data) {
         const wrapper = appendBlock('ai-date-selector');
+        
+        const container = document.createElement('div');
+        container.className = 'p-3';
+
         const mode = getBookingMode();
 
         const modeGroup = document.createElement('div');
-        modeGroup.className = 'ai-date-mode-group';
+        modeGroup.className = 'ai-date-mode-group mb-3';
 
         const hourlyLabel = document.createElement('label');
-        hourlyLabel.className = 'ai-date-mode-option';
+        hourlyLabel.className = 'ai-date-mode-option flex-grow-1 justify-content-center';
         const hourlyRadio = document.createElement('input');
         hourlyRadio.type = 'radio';
         hourlyRadio.name = 'ds-booking-mode';
@@ -1228,7 +1666,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hourlyLabel.appendChild(document.createTextNode(' Theo giờ'));
 
         const dailyLabel = document.createElement('label');
-        dailyLabel.className = 'ai-date-mode-option';
+        dailyLabel.className = 'ai-date-mode-option flex-grow-1 justify-content-center';
         const dailyRadio = document.createElement('input');
         dailyRadio.type = 'radio';
         dailyRadio.name = 'ds-booking-mode';
@@ -1239,54 +1677,117 @@ document.addEventListener('DOMContentLoaded', () => {
 
         modeGroup.appendChild(hourlyLabel);
         modeGroup.appendChild(dailyLabel);
-        wrapper.appendChild(modeGroup);
+        container.appendChild(modeGroup);
 
         const dateGroup = document.createElement('div');
-        dateGroup.className = 'ai-date-inputs';
+        dateGroup.className = 'row g-2 mb-3';
 
+        const checkInCol = document.createElement('div');
+        checkInCol.className = 'col-12';
+        
         const checkInLabel = document.createElement('label');
-        checkInLabel.className = 'ai-date-field';
+        checkInLabel.className = 'ai-input-label d-block mb-1';
         const checkInCaption = document.createElement('span');
         checkInCaption.textContent = mode === 'daily' ? 'Ngày nhận' : 'Ngày đặt';
         checkInLabel.appendChild(checkInCaption);
+        checkInCol.appendChild(checkInLabel);
+
+        const checkInWrapper = document.createElement('div');
+        checkInWrapper.className = 'ai-date-input-wrapper';
+        
+        const checkInIcon = document.createElement('i');
+        checkInIcon.className = 'far fa-calendar-alt ai-input-icon';
+        checkInWrapper.appendChild(checkInIcon);
+
         const checkInEl = document.createElement('input');
         checkInEl.type = 'date';
-        checkInEl.className = 'ai-ds-checkin';
+        checkInEl.className = 'ai-date-picker-input ai-ds-checkin';
         checkInEl.required = true;
-        checkInLabel.appendChild(checkInEl);
-        dateGroup.appendChild(checkInLabel);
+        
+        const todayStr = new Date().toISOString().split('T')[0];
+        checkInEl.min = todayStr;
+        checkInEl.value = todayStr;
 
+        checkInWrapper.appendChild(checkInEl);
+        checkInCol.appendChild(checkInWrapper);
+        dateGroup.appendChild(checkInCol);
+
+        const checkOutCol = document.createElement('div');
+        checkOutCol.className = 'col-12';
+        checkOutCol.style.display = mode === 'daily' ? 'block' : 'none';
+        
         const checkOutLabel = document.createElement('label');
-        checkOutLabel.className = 'ai-date-field';
-        checkOutLabel.hidden = mode !== 'daily';
+        checkOutLabel.className = 'ai-input-label d-block mb-1';
         const checkOutCaption = document.createElement('span');
         checkOutCaption.textContent = 'Ngày trả';
         checkOutLabel.appendChild(checkOutCaption);
+        checkOutCol.appendChild(checkOutLabel);
+
+        const checkOutWrapper = document.createElement('div');
+        checkOutWrapper.className = 'ai-date-input-wrapper';
+        
+        const checkOutIcon = document.createElement('i');
+        checkOutIcon.className = 'far fa-calendar-check ai-input-icon';
+        checkOutWrapper.appendChild(checkOutIcon);
+
         const checkOutEl = document.createElement('input');
         checkOutEl.type = 'date';
-        checkOutEl.className = 'ai-ds-checkout';
-        checkOutLabel.appendChild(checkOutEl);
-        dateGroup.appendChild(checkOutLabel);
+        checkOutEl.className = 'ai-date-picker-input ai-ds-checkout';
+        
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        checkOutEl.min = tomorrowStr;
+        checkOutEl.value = tomorrowStr;
 
-        wrapper.appendChild(dateGroup);
+        checkOutWrapper.appendChild(checkOutEl);
+        checkOutCol.appendChild(checkOutWrapper);
+        dateGroup.appendChild(checkOutCol);
+
+        container.appendChild(dateGroup);
+
+        checkInEl.addEventListener('change', () => {
+            if (checkInEl.value) {
+                const nextDay = new Date(checkInEl.value);
+                nextDay.setDate(nextDay.getDate() + 1);
+                checkOutEl.min = nextDay.toISOString().split('T')[0];
+                if (checkOutEl.value <= checkInEl.value) {
+                    checkOutEl.value = checkOutEl.min;
+                }
+            }
+        });
+
+        const updateLayout = (isDaily) => {
+            if (isDaily) {
+                checkOutCol.style.display = 'block';
+                checkInCol.className = 'col-6';
+                checkOutCol.className = 'col-6';
+                checkInCaption.textContent = 'Ngày nhận';
+            } else {
+                checkOutCol.style.display = 'none';
+                checkInCol.className = 'col-12';
+                checkInCaption.textContent = 'Ngày đặt';
+            }
+        };
+
+        updateLayout(mode === 'daily');
 
         hourlyRadio.addEventListener('change', () => {
-            checkOutLabel.hidden = true;
-            checkInCaption.textContent = 'Ngày đặt';
+            updateLayout(false);
         });
         dailyRadio.addEventListener('change', () => {
-            checkOutLabel.hidden = false;
-            checkInCaption.textContent = 'Ngày nhận';
+            updateLayout(true);
         });
 
         const confirmBtn = document.createElement('button');
-        confirmBtn.className = 'ai-chip-btn';
+        confirmBtn.className = 'ai-booking-submit w-100';
         confirmBtn.type = 'button';
         confirmBtn.dataset.aiAction = 'confirm-dates';
         confirmBtn.dataset.dsMode = 'dateSelector';
         confirmBtn.textContent = 'Xác nhận ngày';
-        wrapper.appendChild(confirmBtn);
+        container.appendChild(confirmBtn);
 
+        wrapper.appendChild(container);
         scrollMessages();
     }
 
@@ -1294,7 +1795,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const state = { ...bookingState };
         state.customerName = state.customerName || getCustomerName();
         state.branchId = state.branchId || getBranchId();
-        state.bookingMode = state.bookingMode && state.bookingMode !== 'unknown' ? state.bookingMode : getBookingMode();
+        state.bookingMode = state.bookingMode && state.bookingMode !== 'unknown'
+            ? state.bookingMode
+            : (contextTouched.mode ? getBookingMode() : 'unknown');
         state.guestCount = state.guestCount || getGuestCount();
 
         if (source && source.dataset) {
@@ -1339,7 +1842,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.bookingMode === 'daily') {
                 state.checkInDate = state.checkInDate || getDateOnly(checkInInput);
                 state.checkOutDate = state.checkOutDate || getDateOnly(checkOutInput);
-            } else {
+            } else if (state.bookingMode === 'hourly') {
                 state.hourlyDate = state.hourlyDate || getDateOnly(checkInInput);
             }
         }
@@ -1401,7 +1904,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('ai_booking_state', JSON.stringify(bookingState));
         if (state.customerName && nameInput) nameInput.value = state.customerName;
         if (state.branchId && branchSelect) branchSelect.value = String(state.branchId);
-        if (state.bookingMode && modeSelect && (state.bookingMode === 'hourly' || state.bookingMode === 'daily')) modeSelect.value = state.bookingMode;
+        if (state.bookingMode && modeSelect && (state.bookingMode === 'hourly' || state.bookingMode === 'daily' || state.bookingMode === 'unknown')) modeSelect.value = state.bookingMode;
         if (state.guestCount && guestsInput) guestsInput.value = state.guestCount;
 
         // Also populate dates if present
@@ -1426,7 +1929,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getBookingMode() {
-        return modeSelect && modeSelect.value === 'daily' ? 'daily' : 'hourly';
+        if (!modeSelect) return 'unknown';
+        if (modeSelect.value === 'daily') return 'daily';
+        if (modeSelect.value === 'hourly') return 'hourly';
+        return 'unknown';
     }
 
     function getGuestCount() {
@@ -1445,19 +1951,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getCheckOutDateTime() {
-        if (getBookingMode() === 'hourly') return null;
+        if (getBookingMode() !== 'daily') return null;
         const value = getDateOnly(checkOutInput);
         return value ? `${value}T00:00:00` : null;
     }
 
     function updateContextDateTimeControls() {
         if (!checkInInput || !checkOutInput) return;
-        const hourly = getBookingMode() === 'hourly';
+        const mode = getBookingMode();
+        const hourly = mode === 'hourly';
+        const daily = mode === 'daily';
         checkInInput.type = 'date';
         checkOutInput.type = 'date';
-        checkInInput.previousElementSibling.textContent = hourly ? 'Ngày đặt' : 'Ngày nhận';
+        checkInInput.previousElementSibling.textContent = daily ? 'Ngày nhận' : 'Ngày đặt';
         checkOutInput.previousElementSibling.textContent = 'Ngày trả';
-        if (checkOutField) checkOutField.hidden = hourly;
+        if (checkOutField) checkOutField.hidden = !daily;
         timeFields.forEach(field => { field.hidden = true; });
         if (checkInInput.value && checkInInput.value.length > 10) checkInInput.value = checkInInput.value.slice(0, 10);
         if (checkOutInput.value && checkOutInput.value.length > 10) checkOutInput.value = checkOutInput.value.slice(0, 10);

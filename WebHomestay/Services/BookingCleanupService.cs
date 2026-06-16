@@ -227,11 +227,40 @@ namespace WebHomestay.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error in BookingCleanupService");
+                    if (stoppingToken.IsCancellationRequested)
+                    {
+                        break;
+                    }
+
+                    TryLogError(ex, "Error in BookingCleanupService");
                 }
 
                 // Run every 1 minute
-                await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+            }
+        }
+
+        private void TryLogError(Exception ex, string message)
+        {
+            try
+            {
+                _logger.LogError(ex, message);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Host is already shutting down and logger providers are disposed.
+            }
+            catch (AggregateException aggregateException)
+                when (aggregateException.InnerExceptions.All(inner => inner is ObjectDisposedException))
+            {
+                // EventLog/logger provider disposal during shutdown can surface as AggregateException.
             }
         }
     }

@@ -236,6 +236,8 @@ public class AdminChatService : IAdminChatService
 
     public async Task<List<AdminChatSession>> GetSessionsAsync(bool includeDeleted, int timeoutMinutes = 30)
     {
+        await BackfillLegacySessionsAsync();
+
         var query = _db.AdminChatSessions.AsQueryable();
 
         query = includeDeleted
@@ -244,17 +246,24 @@ public class AdminChatService : IAdminChatService
 
         return await query
             .OrderByDescending(s => s.LastActivityAt)
-            .Take(200)
             .ToListAsync();
     }
 
-    public Task<List<AdminChatSession>> GetActiveSessionsAsync(int timeoutMinutes = 30)
+    public async Task<List<AdminChatSession>> GetActiveSessionsAsync(int timeoutMinutes = 30)
     {
-        return GetSessionsAsync(false, timeoutMinutes);
+        await BackfillLegacySessionsAsync();
+
+        var cutoff = DateTime.Now.AddMinutes(-timeoutMinutes);
+        return await _db.AdminChatSessions
+            .Where(s => !s.IsDeleted && s.LastActivityAt >= cutoff)
+            .OrderByDescending(s => s.LastActivityAt)
+            .ToListAsync();
     }
 
     public async Task<List<AdminChatMessage>> GetSessionMessagesAsync(string sessionId)
     {
+        await BackfillLegacyMessagesFromTracesAsync(sessionId);
+
         return await _db.AdminChatMessages
             .Where(m => m.SessionId == sessionId)
             .OrderBy(m => m.CreatedAt)
@@ -327,5 +336,168 @@ public class AdminChatService : IAdminChatService
 
         if (messages.Count > 0 || session != null)
             await _db.SaveChangesAsync();
+    }
+
+    private async Task BackfillLegacySessionsAsync()
+    {
+        var existingSessionIds = await _db.AdminChatSessions
+            .Select(s => s.SessionId)
+            .ToListAsync();
+
+        var existingSessionSet = existingSessionIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.Ordinal);
+
+        var messageSummaries = await _db.AdminChatMessages
+            .Where(m => !string.IsNullOrWhiteSpace(m.SessionId))
+            .GroupBy(m => m.SessionId)
+            .Select(g => new
+            {
+                SessionId = g.Key,
+                CreatedAt = g.Min(m => m.CreatedAt),
+                LastActivityAt = g.Max(m => m.CreatedAt),
+                CustomerName = g
+                    .Where(m => m.Role == "user" && m.CreatedBy != null && m.CreatedBy != "")
+                    .OrderByDescending(m => m.CreatedAt)
+                    .Select(m => m.CreatedBy)
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
+
+        var traceSummaries = await _db.AIConversationTraces
+            .Where(t => !string.IsNullOrWhiteSpace(t.SessionId))
+            .GroupBy(t => t.SessionId)
+            .Select(g => new
+            {
+                SessionId = g.Key,
+                CreatedAt = g.Min(t => t.CreatedAt),
+                LastActivityAt = g.Max(t => t.CreatedAt)
+            })
+            .ToListAsync();
+
+        var newSessions = new List<AdminChatSession>();
+
+        foreach (var summary in messageSummaries)
+        {
+            if (existingSessionSet.Contains(summary.SessionId))
+            {
+                continue;
+            }
+
+            newSessions.Add(new AdminChatSession
+            {
+                SessionId = summary.SessionId,
+                CustomerName = summary.CustomerName,
+                Status = "auto",
+                CreatedAt = summary.CreatedAt,
+                LastActivityAt = summary.LastActivityAt
+            });
+            existingSessionSet.Add(summary.SessionId);
+        }
+
+        foreach (var summary in traceSummaries)
+        {
+            if (existingSessionSet.Contains(summary.SessionId))
+            {
+                continue;
+            }
+
+            newSessions.Add(new AdminChatSession
+            {
+                SessionId = summary.SessionId,
+                Status = "auto",
+                CreatedAt = summary.CreatedAt,
+                LastActivityAt = summary.LastActivityAt
+            });
+            existingSessionSet.Add(summary.SessionId);
+        }
+
+        if (newSessions.Count > 0)
+        {
+            _db.AdminChatSessions.AddRange(newSessions);
+        }
+
+        var messageSessionSet = messageSummaries
+            .Select(x => x.SessionId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var traceSummary in traceSummaries)
+        {
+            if (!messageSessionSet.Contains(traceSummary.SessionId))
+            {
+                await BackfillLegacyMessagesFromTracesAsync(traceSummary.SessionId, saveChanges: false);
+            }
+        }
+
+        if (newSessions.Count > 0 || _db.ChangeTracker.HasChanges())
+        {
+            await _db.SaveChangesAsync();
+        }
+    }
+
+    private async Task BackfillLegacyMessagesFromTracesAsync(string sessionId, bool saveChanges = true)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            return;
+        }
+
+        var hasMessages = await _db.AdminChatMessages.AnyAsync(m => m.SessionId == sessionId);
+        if (hasMessages)
+        {
+            return;
+        }
+
+        var traces = await _db.AIConversationTraces
+            .Where(t => t.SessionId == sessionId)
+            .OrderBy(t => t.CreatedAt)
+            .ToListAsync();
+
+        if (traces.Count == 0)
+        {
+            return;
+        }
+
+        var legacyMessages = new List<AdminChatMessage>();
+        foreach (var trace in traces)
+        {
+            if (!string.IsNullOrWhiteSpace(trace.CustomerMessage))
+            {
+                legacyMessages.Add(new AdminChatMessage
+                {
+                    SessionId = sessionId,
+                    Role = "user",
+                    Content = trace.CustomerMessage,
+                    CreatedAt = trace.CreatedAt,
+                    IsRead = true
+                });
+            }
+
+            if (!string.IsNullOrWhiteSpace(trace.FinalAnswer))
+            {
+                legacyMessages.Add(new AdminChatMessage
+                {
+                    SessionId = sessionId,
+                    Role = "ai",
+                    Content = trace.FinalAnswer,
+                    CreatedBy = "AI",
+                    CreatedAt = trace.CreatedAt.AddMilliseconds(1),
+                    IsRead = true
+                });
+            }
+        }
+
+        if (legacyMessages.Count == 0)
+        {
+            return;
+        }
+
+        _db.AdminChatMessages.AddRange(legacyMessages);
+
+        if (saveChanges)
+        {
+            await _db.SaveChangesAsync();
+        }
     }
 }
