@@ -1,9 +1,16 @@
-\echo 'Demo verification start'
-
-DROP TABLE IF EXISTS demo_verification_summary;
+DO $$
+BEGIN
+    IF to_regclass('pg_temp.demo_verification_summary') IS NOT NULL THEN
+        EXECUTE 'DROP TABLE pg_temp.demo_verification_summary';
+    END IF;
+END $$;
 
 CREATE TEMP TABLE demo_verification_summary (
     demo_booking_count bigint NOT NULL,
+    week_demo_booking_count bigint NOT NULL,
+    demo_booking_with_assets_count bigint NOT NULL,
+    demo_history_booking_count bigint NOT NULL,
+    demo_history_month_count bigint NOT NULL,
     pending_demo_cancellation_count bigint NOT NULL,
     branch_qr_count bigint NOT NULL,
     lumistay_branch_qr_count bigint NOT NULL,
@@ -17,6 +24,10 @@ CREATE TEMP TABLE demo_verification_summary (
 DO $$
 DECLARE
     demo_booking_count bigint := 0;
+    week_demo_booking_count bigint := 0;
+    demo_booking_with_assets_count bigint := 0;
+    demo_history_booking_count bigint := 0;
+    demo_history_month_count bigint := 0;
     pending_demo_cancellation_count bigint := 0;
     branch_qr_count bigint := 0;
     lumistay_branch_qr_count bigint := 0;
@@ -35,6 +46,10 @@ DECLARE
     has_bookings_id boolean := false;
     has_bookings_customer_note boolean := false;
     has_bookings_admin_note boolean := false;
+    has_bookings_start_time boolean := false;
+    has_bookings_id_card_front_path boolean := false;
+    has_bookings_id_card_back_path boolean := false;
+    has_bookings_payment_proof_url boolean := false;
     has_cancellations_status boolean := false;
     has_cancellations_customer_name boolean := false;
     has_cancellations_policy_message boolean := false;
@@ -89,10 +104,42 @@ BEGIN
                    WHERE table_schema = 'public'
                      AND table_name = 'bookings'
                      AND column_name = 'admin_note'
+               ),
+               EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'bookings'
+                     AND column_name = 'start_time'
+               ),
+               EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'bookings'
+                     AND column_name = 'id_card_front_path'
+               ),
+               EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'bookings'
+                     AND column_name = 'id_card_back_path'
+               ),
+               EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'bookings'
+                     AND column_name = 'payment_proof_url'
                )
         INTO has_bookings_id,
              has_bookings_customer_note,
-             has_bookings_admin_note;
+             has_bookings_admin_note,
+             has_bookings_start_time,
+             has_bookings_id_card_front_path,
+             has_bookings_id_card_back_path,
+             has_bookings_payment_proof_url;
     END IF;
 
     IF has_cancellations_table THEN
@@ -315,6 +362,41 @@ BEGIN
             'FROM public.bookings b ' ||
             'WHERE ' || demo_bookings_where
         INTO demo_booking_count;
+
+        IF has_bookings_start_time THEN
+            EXECUTE
+                'SELECT COUNT(*) ' ||
+                'FROM public.bookings b ' ||
+                'WHERE COALESCE(b.customer_note, '''') = ''[DEMO-SEED:MATRIX-2026-06]'' ' ||
+                'AND b.start_time >= TIMESTAMP ''2026-06-15 00:00:00'' ' ||
+                'AND b.start_time < TIMESTAMP ''2026-06-23 00:00:00'''
+            INTO week_demo_booking_count;
+
+            EXECUTE
+                'SELECT COUNT(DISTINCT DATE_TRUNC(''month'', b.start_time)) ' ||
+                'FROM public.bookings b ' ||
+                'WHERE COALESCE(b.customer_note, '''') = ''[DEMO-SEED:HISTORY-2026-Q2]'''
+            INTO demo_history_month_count;
+        END IF;
+
+        IF has_bookings_id_card_front_path
+           AND has_bookings_id_card_back_path
+           AND has_bookings_payment_proof_url THEN
+            EXECUTE
+                'SELECT COUNT(*) ' ||
+                'FROM public.bookings b ' ||
+                'WHERE COALESCE(b.customer_note, '''') = ''[DEMO-SEED:MATRIX-2026-06]'' ' ||
+                'AND COALESCE(b.id_card_front_path, '''') <> '''' ' ||
+                'AND COALESCE(b.id_card_back_path, '''') <> '''' ' ||
+                'AND COALESCE(b.payment_proof_url, '''') <> '''''
+            INTO demo_booking_with_assets_count;
+        END IF;
+
+        EXECUTE
+            'SELECT COUNT(*) ' ||
+            'FROM public.bookings b ' ||
+            'WHERE COALESCE(b.customer_note, '''') = ''[DEMO-SEED:HISTORY-2026-Q2]'''
+        INTO demo_history_booking_count;
     END IF;
 
     IF has_cancellations_table THEN
@@ -474,32 +556,35 @@ BEGIN
         INTO lumistay_active_combo_assignment_count;
     END IF;
 
-    INSERT INTO pg_temp.demo_verification_summary (
-        demo_booking_count,
-        pending_demo_cancellation_count,
-        branch_qr_count,
-        lumistay_branch_qr_count,
-        lumistay_branch_count,
-        lumistay_room_count,
-        lumistay_available_room_count,
-        combo_template_count,
-        lumistay_active_combo_assignment_count
-    )
-    VALUES (
-        demo_booking_count,
-        pending_demo_cancellation_count,
-        branch_qr_count,
-        lumistay_branch_qr_count,
-        lumistay_branch_count,
-        lumistay_room_count,
-        lumistay_available_room_count,
-        combo_template_count,
-        lumistay_active_combo_assignment_count
-    );
+    EXECUTE
+        'INSERT INTO demo_verification_summary (' ||
+        'demo_booking_count, week_demo_booking_count, demo_booking_with_assets_count, ' ||
+        'demo_history_booking_count, demo_history_month_count, pending_demo_cancellation_count, ' ||
+        'branch_qr_count, lumistay_branch_qr_count, lumistay_branch_count, lumistay_room_count, ' ||
+        'lumistay_available_room_count, combo_template_count, lumistay_active_combo_assignment_count' ||
+        ') VALUES (' ||
+        demo_booking_count || ', ' ||
+        week_demo_booking_count || ', ' ||
+        demo_booking_with_assets_count || ', ' ||
+        demo_history_booking_count || ', ' ||
+        demo_history_month_count || ', ' ||
+        pending_demo_cancellation_count || ', ' ||
+        branch_qr_count || ', ' ||
+        lumistay_branch_qr_count || ', ' ||
+        lumistay_branch_count || ', ' ||
+        lumistay_room_count || ', ' ||
+        lumistay_available_room_count || ', ' ||
+        combo_template_count || ', ' ||
+        lumistay_active_combo_assignment_count ||
+        ')';
 END $$;
 
 SELECT
     demo_booking_count,
+    week_demo_booking_count,
+    demo_booking_with_assets_count,
+    demo_history_booking_count,
+    demo_history_month_count,
     pending_demo_cancellation_count,
     branch_qr_count,
     lumistay_branch_qr_count,
@@ -508,5 +593,4 @@ SELECT
     lumistay_available_room_count,
     combo_template_count,
     lumistay_active_combo_assignment_count
-FROM pg_temp.demo_verification_summary;
-\echo 'Demo verification complete'
+FROM demo_verification_summary;
