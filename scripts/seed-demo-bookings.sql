@@ -114,7 +114,17 @@ WITH RECURSIVE target_templates AS (
         r.price_weekend_per_day,
         r.capacity,
         r.max_guests,
-        ROW_NUMBER() OVER (PARTITION BY i.room_id, i.slot_date ORDER BY i.start_time) AS slot_order
+        CASE ((i.room_id + EXTRACT(DOY FROM i.slot_date)::int) % 3)
+            WHEN 0 THEN 'combo_12h'
+            WHEN 1 THEN 'combo_8h'
+            ELSE 'combo_6h'
+        END AS preferred_primary_code,
+        CASE t.code
+            WHEN 'combo_6h' THEN 1
+            WHEN 'combo_8h' THEN 2
+            WHEN 'combo_12h' THEN 3
+            ELSE 9
+        END AS template_priority
     FROM room_slot_inventories i
     JOIN rooms r ON r.id = i.room_id
     JOIN branches b ON b.id = r.branch_id
@@ -125,15 +135,43 @@ WITH RECURSIVE target_templates AS (
       AND i.booking_id IS NULL
       AND COALESCE(r.is_deleted, false) = false
       AND COALESCE(b.is_deleted, false) = false
-), selected_slots AS (
-    SELECT
+), first_slots AS (
+    SELECT DISTINCT ON (cs.room_id, cs.slot_date)
         cs.*,
-        CASE
-            WHEN cs.slot_order <= 2 THEN true
-            WHEN cs.slot_order = 3 AND ((cs.room_id + EXTRACT(DOY FROM cs.slot_date)::int) % 2 = 0) THEN true
-            ELSE false
-        END AS should_seed
+        1 AS slot_order
     FROM candidate_slots cs
+    WHERE cs.code = cs.preferred_primary_code
+    ORDER BY
+        cs.room_id,
+        cs.slot_date,
+        cs.start_time,
+        cs.end_time,
+        cs.template_priority,
+        cs.id
+), second_slots AS (
+    SELECT DISTINCT ON (cs.room_id, cs.slot_date)
+        cs.*,
+        2 AS slot_order
+    FROM candidate_slots cs
+    JOIN first_slots fs
+      ON fs.room_id = cs.room_id
+     AND fs.slot_date = cs.slot_date
+    WHERE cs.start_time >= fs.end_time
+    ORDER BY
+        cs.room_id,
+        cs.slot_date,
+        cs.end_time,
+        cs.start_time,
+        cs.template_priority,
+        cs.id
+), selected_slots AS (
+    SELECT *
+    FROM first_slots
+
+    UNION ALL
+
+    SELECT *
+    FROM second_slots
 ), inserted_bookings AS (
     INSERT INTO bookings (
         room_id,
@@ -203,21 +241,45 @@ WITH RECURSIVE target_templates AS (
             WHEN ss.slot_date < DATE '2026-06-18' THEN 'CheckedOut'
             WHEN ss.slot_date = DATE '2026-06-18' AND ss.slot_order = 1 THEN 'CheckedIn'
             WHEN ss.slot_date = DATE '2026-06-18' AND ss.slot_order = 2 THEN 'Confirmed'
-            WHEN ss.slot_date > DATE '2026-06-18' AND ss.slot_order = 1 THEN 'Confirmed'
-            WHEN ss.slot_date > DATE '2026-06-18' AND ss.slot_order = 2 THEN 'AwaitingApproval'
-            ELSE 'PendingPayment'
+            WHEN ss.slot_date > DATE '2026-06-18' AND ss.slot_order = 1 THEN
+                CASE ((ss.room_id + EXTRACT(DOY FROM ss.slot_date)::int) % 3)
+                    WHEN 0 THEN 'Confirmed'
+                    WHEN 1 THEN 'AwaitingApproval'
+                    ELSE 'PendingPayment'
+                END
+            ELSE
+                CASE ((ss.room_id + EXTRACT(DOY FROM ss.slot_date)::int) % 2)
+                    WHEN 0 THEN 'Confirmed'
+                    ELSE 'AwaitingApproval'
+                END
         END,
         CASE
             WHEN ss.slot_date < DATE '2026-06-18' THEN 'Paid'
             WHEN ss.slot_date = DATE '2026-06-18' AND ss.slot_order IN (1, 2) THEN 'Paid'
-            WHEN ss.slot_date > DATE '2026-06-18' AND ss.slot_order IN (1, 2) THEN 'Paid'
-            ELSE 'Unpaid'
+            WHEN ss.slot_date > DATE '2026-06-18' THEN
+                CASE
+                    WHEN
+                        CASE
+                            WHEN ss.slot_order = 1 THEN ((ss.room_id + EXTRACT(DOY FROM ss.slot_date)::int) % 3) <> 2
+                            ELSE true
+                        END
+                    THEN 'Paid'
+                    ELSE 'Unpaid'
+                END
         END,
         CASE
             WHEN ss.slot_date < DATE '2026-06-18' THEN '/uploads/payments/demo-payment-bill.jpg'
             WHEN ss.slot_date = DATE '2026-06-18' AND ss.slot_order IN (1, 2) THEN '/uploads/payments/demo-payment-bill.jpg'
-            WHEN ss.slot_date > DATE '2026-06-18' AND ss.slot_order IN (1, 2) THEN '/uploads/payments/demo-payment-bill.jpg'
-            ELSE NULL
+            WHEN ss.slot_date > DATE '2026-06-18' THEN
+                CASE
+                    WHEN
+                        CASE
+                            WHEN ss.slot_order = 1 THEN ((ss.room_id + EXTRACT(DOY FROM ss.slot_date)::int) % 3) <> 2
+                            ELSE true
+                        END
+                    THEN '/uploads/payments/demo-payment-bill.jpg'
+                    ELSE NULL
+                END
         END,
         CASE
             WHEN ss.slot_date >= DATE '2026-06-18' THEN NOW()
@@ -229,7 +291,6 @@ WITH RECURSIVE target_templates AS (
         ss.id,
         ss.slot_label
     FROM selected_slots ss
-    WHERE ss.should_seed = true
     RETURNING id, room_slot_inventory_id, status
 )
 UPDATE room_slot_inventories i

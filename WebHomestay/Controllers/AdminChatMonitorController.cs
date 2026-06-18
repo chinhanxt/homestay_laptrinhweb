@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -722,12 +723,18 @@ public class AdminChatMonitorController : Controller
         try
         {
             var path = await _bookingCancellationService.GetProtectedFilePathAsync(id, kind);
-            if (!System.IO.File.Exists(path)) return NotFound();
+            if (!System.IO.File.Exists(path))
+            {
+                Response.StatusCode = StatusCodes.Status404NotFound;
+                return Content(BuildMissingCancellationFileHtml(kind, "Tep da duoc tham chieu nhung hien khong con trong he thong."), "text/html; charset=utf-8");
+            }
+
             return PhysicalFile(path, GetImageContentType(Path.GetExtension(path)));
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { message = ex.Message });
+            Response.StatusCode = StatusCodes.Status404NotFound;
+            return Content(BuildMissingCancellationFileHtml(kind, ex.Message), "text/html; charset=utf-8");
         }
     }
 
@@ -767,6 +774,132 @@ public class AdminChatMonitorController : Controller
             ".gif" => "image/gif",
             ".webp" => "image/webp",
             _ => "image/png"
+        };
+    }
+
+    private static string BuildMissingCancellationFileHtml(string kind, string detail)
+    {
+        var title = GetCancellationFileLabel(kind);
+        var safeTitle = WebUtility.HtmlEncode(title);
+        var safeDetail = WebUtility.HtmlEncode(detail);
+
+        return $$"""
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Không có {{safeTitle}}</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f6f2ea;
+            --card: #fffdf9;
+            --border: #eadfce;
+            --text: #1f2a44;
+            --muted: #6f7a90;
+            --accent: #c79a57;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(199, 154, 87, 0.16), transparent 32%),
+                linear-gradient(180deg, #fffefb 0%, var(--bg) 100%);
+            color: var(--text);
+        }
+
+        .card {
+            width: min(560px, 100%);
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 32px 28px;
+            box-shadow: 0 18px 50px rgba(31, 42, 68, 0.08);
+        }
+
+        .eyebrow {
+            margin: 0 0 10px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        h1 {
+            margin: 0 0 12px;
+            font-size: clamp(28px, 5vw, 36px);
+            line-height: 1.15;
+        }
+
+        p {
+            margin: 0;
+            font-size: 16px;
+            line-height: 1.65;
+            color: var(--muted);
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 24px;
+        }
+
+        .button {
+            appearance: none;
+            border: 0;
+            border-radius: 999px;
+            padding: 12px 18px;
+            font-size: 14px;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .button-primary {
+            background: var(--text);
+            color: #fff;
+        }
+
+        .button-secondary {
+            background: #f4ede2;
+            color: var(--text);
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <p class="eyebrow">Duyet yeu cau huy</p>
+        <h1>Khong co {{safeTitle}}</h1>
+        <p>{{safeDetail}}</p>
+        <p style="margin-top: 10px;">Ban co the quay lai man hinh duyet yeu cau huy de tiep tuc xu ly, hoac bo sung tep cho yeu cau nay neu can.</p>
+        <div class="actions">
+            <button class="button button-primary" type="button" onclick="if (window.history.length > 1) { history.back(); } else { location.href = '/chinhan/hethong/chat-monitor'; }">Quay lai</button>
+            <a class="button button-secondary" href="/chinhan/hethong/chat-monitor">Mo chat monitor</a>
+        </div>
+    </main>
+</body>
+</html>
+""";
+    }
+
+    private static string GetCancellationFileLabel(string kind)
+    {
+        return kind?.ToLowerInvariant() switch
+        {
+            "confirmation" => "anh xac nhan",
+            "refundqr" => "anh QR hoan tien",
+            "refundbill" => "bill hoan tien",
+            _ => "tep dinh kem"
         };
     }
 
