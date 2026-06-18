@@ -1,11 +1,11 @@
 \echo 'Demo verification start'
 
-DROP TABLE IF EXISTS pg_temp.demo_verification_results;
+DROP TABLE IF EXISTS pg_temp.demo_verification_summary;
 
-CREATE TEMP TABLE demo_verification_results (
-    metric text PRIMARY KEY,
-    count_value bigint NOT NULL,
-    status text NOT NULL
+CREATE TEMP TABLE demo_verification_summary (
+    demo_booking_count bigint NOT NULL,
+    pending_demo_cancellation_count bigint NOT NULL,
+    branch_qr_count bigint NOT NULL
 ) ON COMMIT DROP;
 
 DO $$
@@ -13,25 +13,134 @@ DECLARE
     demo_booking_count bigint := 0;
     pending_demo_cancellation_count bigint := 0;
     branch_qr_count bigint := 0;
-    bookings_status text := 'missing table or columns';
-    cancellations_status text := 'missing table or columns';
-    qr_status text := 'missing table or columns';
+    has_bookings_table boolean := to_regclass('public.bookings') IS NOT NULL;
+    has_cancellations_table boolean := to_regclass('public.booking_cancellation_requests') IS NOT NULL;
+    has_system_settings_table boolean := to_regclass('public.system_settings') IS NOT NULL;
+    has_bookings_id boolean := false;
+    has_bookings_customer_note boolean := false;
+    has_bookings_admin_note boolean := false;
+    has_cancellations_status boolean := false;
+    has_cancellations_customer_name boolean := false;
+    has_cancellations_policy_message boolean := false;
+    has_cancellations_submitted_code boolean := false;
+    has_cancellations_booking_id boolean := false;
+    has_system_settings_key boolean := false;
+    has_system_settings_value boolean := false;
+    can_query_demo_bookings boolean := false;
+    can_query_linked_demo_bookings boolean := false;
+    can_query_demo_cancellations boolean := false;
+    can_query_branch_qr boolean := false;
 BEGIN
-    IF to_regclass('public.bookings') IS NOT NULL
-       AND EXISTS (
-           SELECT 1
-           FROM information_schema.columns
-           WHERE table_schema = 'public'
-             AND table_name = 'bookings'
-             AND column_name = 'customer_note'
-       )
-       AND EXISTS (
-           SELECT 1
-           FROM information_schema.columns
-           WHERE table_schema = 'public'
-             AND table_name = 'bookings'
-             AND column_name = 'admin_note'
-       ) THEN
+    IF has_bookings_table THEN
+        SELECT EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'bookings'
+                     AND column_name = 'id'
+               ),
+               EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'bookings'
+                     AND column_name = 'customer_note'
+               ),
+               EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'bookings'
+                     AND column_name = 'admin_note'
+               )
+        INTO has_bookings_id,
+             has_bookings_customer_note,
+             has_bookings_admin_note;
+    END IF;
+
+    IF has_cancellations_table THEN
+        SELECT EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'booking_cancellation_requests'
+                     AND column_name = 'status'
+               ),
+               EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'booking_cancellation_requests'
+                     AND column_name = 'customer_name'
+               ),
+               EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'booking_cancellation_requests'
+                     AND column_name = 'policy_message_snapshot'
+               ),
+               EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'booking_cancellation_requests'
+                     AND column_name = 'submitted_booking_code'
+               ),
+               EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'booking_cancellation_requests'
+                     AND column_name = 'booking_id'
+               )
+        INTO has_cancellations_status,
+             has_cancellations_customer_name,
+             has_cancellations_policy_message,
+             has_cancellations_submitted_code,
+             has_cancellations_booking_id;
+    END IF;
+
+    IF has_system_settings_table THEN
+        SELECT EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'system_settings'
+                     AND column_name = 'setting_key'
+               ),
+               EXISTS (
+                   SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'system_settings'
+                     AND column_name = 'setting_value'
+               )
+        INTO has_system_settings_key,
+             has_system_settings_value;
+    END IF;
+
+    can_query_demo_bookings := has_bookings_table
+        AND has_bookings_customer_note
+        AND has_bookings_admin_note;
+
+    can_query_linked_demo_bookings := has_bookings_table
+        AND has_bookings_id
+        AND has_bookings_customer_note
+        AND has_bookings_admin_note;
+
+    can_query_demo_cancellations := has_cancellations_table
+        AND has_cancellations_status
+        AND has_cancellations_customer_name
+        AND has_cancellations_policy_message
+        AND has_cancellations_submitted_code
+        AND has_cancellations_booking_id;
+
+    can_query_branch_qr := has_system_settings_table
+        AND has_system_settings_key
+        AND has_system_settings_value;
+
+    IF can_query_demo_bookings THEN
         EXECUTE $sql$
             SELECT COUNT(*)
             FROM public.bookings b
@@ -39,61 +148,10 @@ BEGIN
                OR COALESCE(b.admin_note, '') LIKE '[DEMO-SEED:%'
         $sql$
         INTO demo_booking_count;
-
-        bookings_status := 'ok';
     END IF;
 
-    IF to_regclass('public.booking_cancellation_requests') IS NOT NULL
-       AND EXISTS (
-           SELECT 1
-           FROM information_schema.columns
-           WHERE table_schema = 'public'
-             AND table_name = 'booking_cancellation_requests'
-             AND column_name = 'status'
-       )
-       AND EXISTS (
-           SELECT 1
-           FROM information_schema.columns
-           WHERE table_schema = 'public'
-             AND table_name = 'booking_cancellation_requests'
-             AND column_name = 'customer_name'
-       )
-       AND EXISTS (
-           SELECT 1
-           FROM information_schema.columns
-           WHERE table_schema = 'public'
-             AND table_name = 'booking_cancellation_requests'
-             AND column_name = 'policy_message_snapshot'
-       )
-       AND EXISTS (
-           SELECT 1
-           FROM information_schema.columns
-           WHERE table_schema = 'public'
-             AND table_name = 'booking_cancellation_requests'
-             AND column_name = 'submitted_booking_code'
-       )
-       AND EXISTS (
-           SELECT 1
-           FROM information_schema.columns
-           WHERE table_schema = 'public'
-             AND table_name = 'booking_cancellation_requests'
-             AND column_name = 'booking_id'
-       ) THEN
-        IF to_regclass('public.bookings') IS NOT NULL
-           AND EXISTS (
-               SELECT 1
-               FROM information_schema.columns
-               WHERE table_schema = 'public'
-                 AND table_name = 'bookings'
-                 AND column_name = 'customer_note'
-           )
-           AND EXISTS (
-               SELECT 1
-               FROM information_schema.columns
-               WHERE table_schema = 'public'
-                 AND table_name = 'bookings'
-                 AND column_name = 'admin_note'
-           ) THEN
+    IF can_query_demo_cancellations THEN
+        IF can_query_linked_demo_bookings THEN
             EXECUTE $sql$
                 SELECT COUNT(*)
                 FROM public.booking_cancellation_requests c
@@ -127,25 +185,9 @@ BEGIN
             $sql$
             INTO pending_demo_cancellation_count;
         END IF;
-
-        cancellations_status := 'ok';
     END IF;
 
-    IF to_regclass('public.system_settings') IS NOT NULL
-       AND EXISTS (
-           SELECT 1
-           FROM information_schema.columns
-           WHERE table_schema = 'public'
-             AND table_name = 'system_settings'
-             AND column_name = 'setting_key'
-       )
-       AND EXISTS (
-           SELECT 1
-           FROM information_schema.columns
-           WHERE table_schema = 'public'
-             AND table_name = 'system_settings'
-             AND column_name = 'setting_value'
-       ) THEN
+    IF can_query_branch_qr THEN
         EXECUTE $sql$
             SELECT COUNT(*)
             FROM public.system_settings s
@@ -153,23 +195,24 @@ BEGIN
               AND BTRIM(COALESCE(s.setting_value, '')) <> ''
         $sql$
         INTO branch_qr_count;
-
-        qr_status := 'ok';
     END IF;
 
-    INSERT INTO demo_verification_results (metric, count_value, status)
-    VALUES
-        ('demo_booking_count', demo_booking_count, bookings_status),
-        ('pending_demo_cancellation_count', pending_demo_cancellation_count, cancellations_status),
-        ('branch_qr_count', branch_qr_count, qr_status);
+    INSERT INTO demo_verification_summary (
+        demo_booking_count,
+        pending_demo_cancellation_count,
+        branch_qr_count
+    )
+    VALUES (
+        demo_booking_count,
+        pending_demo_cancellation_count,
+        branch_qr_count
+    );
 END $$;
 
-TABLE demo_verification_results;
-
 SELECT
-    COALESCE(MAX(count_value) FILTER (WHERE metric = 'demo_booking_count'), 0) AS demo_booking_count,
-    COALESCE(MAX(count_value) FILTER (WHERE metric = 'pending_demo_cancellation_count'), 0) AS pending_demo_cancellation_count,
-    COALESCE(MAX(count_value) FILTER (WHERE metric = 'branch_qr_count'), 0) AS branch_qr_count
-FROM demo_verification_results;
+    demo_booking_count,
+    pending_demo_cancellation_count,
+    branch_qr_count
+FROM demo_verification_summary;
 
 \echo 'Demo verification complete'
