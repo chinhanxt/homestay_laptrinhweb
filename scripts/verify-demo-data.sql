@@ -142,6 +142,7 @@ BEGIN
 
     can_query_linked_demo_bookings := has_bookings_table
         AND has_bookings_id
+        AND has_cancellations_booking_id
         AND demo_bookings_where <> '';
 
     can_query_branch_qr := has_system_settings_table
@@ -189,23 +190,18 @@ BEGIN
 
         has_any_cancellation_marker := cancellation_marker_where <> '';
         can_query_demo_cancellations := has_cancellations_table
+            AND has_cancellations_status
             AND has_any_cancellation_marker;
 
-        IF cancellation_marker_where <> '' THEN
+        IF can_query_demo_cancellations THEN
             cancellation_sql :=
                 'SELECT COUNT(*) ' ||
                 'FROM public.booking_cancellation_requests c ' ||
-                'WHERE ' ||
-                CASE
-                    WHEN has_cancellations_status THEN 'COALESCE(c.status, '''') = ''Pending'' AND '
-                    ELSE ''
-                END ||
+                'WHERE COALESCE(c.status, '''') = ''Pending'' AND ' ||
                 '(' || cancellation_marker_where || ')';
 
-            IF can_query_demo_cancellations THEN
-                EXECUTE cancellation_sql
-                INTO pending_demo_cancellation_count;
-            END IF;
+            EXECUTE cancellation_sql
+            INTO pending_demo_cancellation_count;
         END IF;
     END IF;
 
