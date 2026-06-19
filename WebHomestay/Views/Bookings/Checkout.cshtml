@@ -135,10 +135,10 @@
                     <div class="space-y-3">
                         <div class="d-flex justify-content-between py-2 border-bottom border-light">
                             <span class="small text-muted">Loại hình:</span>
-                            <span class="small fw-bold text-uppercase">@(Model.BookingMode == WebHomestay.Models.BookingMode.Hourly ? "Theo giờ" : "Theo ngày")</span>
+                            <span class="small fw-bold text-uppercase">@(Model.BookingMode == WebHomestay.Models.Enums.BookingMode.Hourly ? "Theo giờ" : "Theo ngày")</span>
                         </div>
 
-                        @if (Model.BookingMode == WebHomestay.Models.BookingMode.Hourly)
+                        @if (Model.BookingMode == WebHomestay.Models.Enums.BookingMode.Hourly)
                         {
                             <div class="d-flex justify-content-between py-2 border-bottom border-light">
                                 <span class="small text-muted">Khung giờ:</span>

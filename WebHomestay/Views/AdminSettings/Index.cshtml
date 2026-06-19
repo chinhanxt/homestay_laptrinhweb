@@ -1,12 +1,12 @@
-@model IEnumerable<WebHomestay.Models.SystemSetting>
+@model IEnumerable<WebHomestay.Models.Entities.Core.SystemSetting>
 @{
     Layout = "_Layout";
     ViewData["Title"] = "Trung tâm Điều hành Hệ thống";
-    var branches = ViewBag.Branches as List<WebHomestay.Models.Branch> ?? new List<WebHomestay.Models.Branch>();
-    var holidays = ViewBag.Holidays as List<WebHomestay.Models.Holiday> ?? new List<WebHomestay.Models.Holiday>();
-    var trashedHolidays = ViewBag.TrashedHolidays as List<WebHomestay.Models.Holiday> ?? new List<WebHomestay.Models.Holiday>();
-    var templates = ViewBag.Templates as List<WebHomestay.Models.RoomSlotTemplate> ?? new List<WebHomestay.Models.RoomSlotTemplate>();
-    var trashedTemplates = ViewBag.TrashedTemplates as List<WebHomestay.Models.RoomSlotTemplate> ?? new List<WebHomestay.Models.RoomSlotTemplate>();
+    var branches = ViewBag.Branches as List<WebHomestay.Models.Entities.Core.Branch> ?? new List<WebHomestay.Models.Entities.Core.Branch>();
+    var holidays = ViewBag.Holidays as List<WebHomestay.Models.Entities.Core.Holiday> ?? new List<WebHomestay.Models.Entities.Core.Holiday>();
+    var trashedHolidays = ViewBag.TrashedHolidays as List<WebHomestay.Models.Entities.Core.Holiday> ?? new List<WebHomestay.Models.Entities.Core.Holiday>();
+    var templates = ViewBag.Templates as List<WebHomestay.Models.Entities.Slots.RoomSlotTemplate> ?? new List<WebHomestay.Models.Entities.Slots.RoomSlotTemplate>();
+    var trashedTemplates = ViewBag.TrashedTemplates as List<WebHomestay.Models.Entities.Slots.RoomSlotTemplate> ?? new List<WebHomestay.Models.Entities.Slots.RoomSlotTemplate>();
     var paymentQrSettings = ViewBag.PaymentQrSettings as Dictionary<int, WebHomestay.Models.ViewModels.PaymentQrSettingsViewModel> ?? new Dictionary<int, WebHomestay.Models.ViewModels.PaymentQrSettingsViewModel>();
 
     var checkoutMode = Model.FirstOrDefault(s => s.SettingKey == "CheckoutMode")?.SettingValue ?? "Auto";
@@ -403,7 +403,7 @@
                                 <i class="fas fa-plus me-2"></i> Thêm mẫu mới
                             </button>
                             <button type="button" class="btn-premium-outline btn-sm rounded-pill px-3 mb-2" data-bs-toggle="modal" data-bs-target="#importSlotsModal">
-                                <i class="fas fa-file-import me-2"></i> Import Excel
+                                <i class="fas fa-file-import me-2"></i> Import Excel/Word
                             </button>
                         }
                         @if (trashedTemplates.Any())
@@ -539,7 +539,7 @@
                     </div>
                     <div class="d-flex gap-2 align-items-center">
                         <button type="button" class="btn-premium btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#importHolidaysModal">
-                            <i class="fas fa-file-import me-2"></i> Import Excel
+                            <i class="fas fa-file-import me-2"></i> Import Excel/Word
                         </button>
                         @if (trashedHolidays.Any())
                         {
@@ -1068,7 +1068,7 @@
                     <!-- Zip size limit slider -->
                     <div class="bento-item full-width">
                         <div class="bento-inner">
-                            <h5 class="bento-title"><i class="fas fa-file-archive me-2 text-warning"></i>Cấu hình Giới hạn Kích thước ZIP/Excel Upload</h5>
+                            <h5 class="bento-title"><i class="fas fa-file-archive me-2 text-warning"></i>Cấu hình Giới hạn Kích thước File Upload</h5>
                             <p class="text-muted small mb-4">Thiết lập dung lượng file tối đa cho phép tải lên khi thực hiện Import dữ liệu hàng loạt (từ 5MB đến 100MB).</p>
                             
                             <form asp-action="Update" method="post">
@@ -2327,10 +2327,10 @@
             <form asp-action="ImportSlotTemplates" method="post" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <div class="modal-body py-4">
-                    <p class="text-muted small">Vui lòng chọn file Excel (.xlsx), Word (.docx) hoặc file nén ZIP cấu hình khung giờ đúng định dạng mẫu.</p>
+                    <p class="text-muted small">Vui lòng chọn file Excel (.xlsx) hoặc Word (.docx) cấu hình khung giờ đúng định dạng mẫu.</p>
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">Chọn file (.xlsx, .docx hoặc .zip)</label>
-                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx,.docx,.zip" required />
+                        <label class="form-label small fw-bold text-muted">Chọn file (.xlsx, .docx)</label>
+                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx,.xls,.docx,.doc" required />
                     </div>
                 </div>
                 <div class="modal-footer border-0">
@@ -2353,10 +2353,10 @@
             <form asp-action="ImportHolidays" method="post" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <div class="modal-body py-4">
-                    <p class="text-muted small">Vui lòng chọn file Excel (.xlsx), Word (.docx) hoặc file nén ZIP danh sách ngày lễ đúng định dạng mẫu.</p>
+                    <p class="text-muted small">Vui lòng chọn file Excel (.xlsx) hoặc Word (.docx) danh sách ngày lễ đúng định dạng mẫu.</p>
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">Chọn file (.xlsx, .docx hoặc .zip)</label>
-                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx,.docx,.zip" required />
+                        <label class="form-label small fw-bold text-muted">Chọn file (.xlsx, .docx)</label>
+                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx,.xls,.docx,.doc" required />
                     </div>
                 </div>
                 <div class="modal-footer border-0">
@@ -3033,5 +3033,4 @@
         });
     </script>
 }
-
 

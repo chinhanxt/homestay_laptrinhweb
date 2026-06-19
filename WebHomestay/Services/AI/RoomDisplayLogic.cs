@@ -5,7 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
-using WebHomestay.Models.AI;
+using WebHomestay.Models.Configuration;
+using WebHomestay.Models.DTOs.AI;
+using WebHomestay.Models.Entities.AI;
 
 namespace WebHomestay.Services.AI;
 

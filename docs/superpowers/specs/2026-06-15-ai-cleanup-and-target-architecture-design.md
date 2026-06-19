@@ -73,7 +73,7 @@ The following are considered drift or garbage and should be removed or explicitl
 - silent fallback from embedding failure to fake semantic vectors
 - wording that claims `GraphRAG`, `pgvector search`, `Neo4j-style intelligence`, or `LangGraph` when those capabilities are not actually implemented
 - any retrieval path that presents itself as vector search while still doing application-side O(n) scanning
-- architecture descriptions in `ai.md` that describe tools or frameworks not present in the real runtime path
+- architecture descriptions in `docs/note/ai-runtime-notes.md` that describe tools or frameworks not present in the real runtime path
 
 ### 5.2 Keep But Reposition
 
@@ -151,7 +151,7 @@ These rules apply to docs, code comments, admin UI text, and architecture descri
 The migration should happen in controlled phases.
 
 ### Phase A: Truth Cleanup
-- rewrite `ai.md` to separate current state, removed garbage, target architecture, and migration phases
+- rewrite `docs/note/ai-runtime-notes.md` to separate current state, removed garbage, target architecture, and migration phases
 - remove misleading wording from AI admin UI and related comments
 - mark unsupported capabilities as planned, not implemented
 - define explicit production policy for embedding failure
@@ -188,7 +188,7 @@ The following are not goals of the first cleanup step:
 Each migration phase should be verified differently.
 
 Truth cleanup verification:
-- review `ai.md`, UI text, and comments for capability accuracy
+- review `docs/note/ai-runtime-notes.md`, UI text, and comments for capability accuracy
 
 Real RAG verification:
 - tests that embedding failure is explicit and safe
@@ -207,7 +207,7 @@ Workflow verification:
 ## 11. Expected Deliverables
 
 The redesign effort should produce:
-- a cleaned and truthful `ai.md`
+- a cleaned and truthful `docs/note/ai-runtime-notes.md`
 - corrected AI-related wording in UI and comments
 - a technical implementation plan for real pgvector-backed RAG
 - a follow-up implementation plan for graph-aware retrieval

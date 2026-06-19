@@ -1,5 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
+using WebHomestay.Services.Slots;
+using WebHomestay.Services.Room;
+using WebHomestay.Services.Chat;
+using WebHomestay.Services.Settings;
+using WebHomestay.Services.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,19 +50,19 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Register Custom Services
 builder.Services.AddScoped<WebHomestay.Services.IAvailabilityService, WebHomestay.Services.AvailabilityService>();
 builder.Services.AddScoped<WebHomestay.Services.IExcelTemplateService, WebHomestay.Services.ExcelTemplateService>();
-builder.Services.AddScoped<WebHomestay.Services.IBulkImportService, WebHomestay.Services.BulkImportService>();
-builder.Services.AddScoped<WebHomestay.Services.ISlotGenerationService, WebHomestay.Services.SlotGenerationService>();
-builder.Services.AddScoped<WebHomestay.Services.IRoomBookingViewService, WebHomestay.Services.RoomBookingViewService>();
+builder.Services.AddScoped<WebHomestay.Services.Infrastructure.IBulkImportService, WebHomestay.Services.Infrastructure.BulkImportService>();
+builder.Services.AddScoped<WebHomestay.Services.Slots.ISlotGenerationService, WebHomestay.Services.Slots.SlotGenerationService>();
+builder.Services.AddScoped<WebHomestay.Services.IRoomBookingViewService, WebHomestay.Services.Room.RoomBookingViewService>();
 builder.Services.AddScoped<WebHomestay.Services.IBookingCreationService, WebHomestay.Services.BookingCreationService>();
 builder.Services.AddScoped<WebHomestay.Services.IBookingCancellationService, WebHomestay.Services.BookingCancellationService>();
-builder.Services.AddScoped<WebHomestay.Services.ISlotManagementService, WebHomestay.Services.SlotManagementService>();
-builder.Services.AddScoped<WebHomestay.Services.IMailService, WebHomestay.Services.MailService>();
+builder.Services.AddScoped<WebHomestay.Services.ISlotManagementService, WebHomestay.Services.Slots.SlotManagementService>();
+builder.Services.AddScoped<WebHomestay.Services.IMailService, WebHomestay.Services.Infrastructure.MailService>();
 builder.Services.AddScoped<WebHomestay.Services.IBranchLeadTimeService, WebHomestay.Services.BranchLeadTimeService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<WebHomestay.Services.ISettingService, WebHomestay.Services.SettingService>();
-builder.Services.AddScoped<WebHomestay.Services.IStatisticsService, WebHomestay.Services.StatisticsService>();
-builder.Services.AddScoped<WebHomestay.Services.IImageMaskingService, WebHomestay.Services.ImageMaskingService>();
-builder.Services.AddScoped<WebHomestay.Services.IPaymentQrSettingsService, WebHomestay.Services.PaymentQrSettingsService>();
+builder.Services.AddScoped<WebHomestay.Services.IStatisticsService, WebHomestay.Services.Infrastructure.StatisticsService>();
+builder.Services.AddScoped<WebHomestay.Services.IImageMaskingService, WebHomestay.Services.Infrastructure.ImageMaskingService>();
+builder.Services.AddScoped<WebHomestay.Services.Settings.IPaymentQrSettingsService, WebHomestay.Services.Settings.PaymentQrSettingsService>();
 builder.Services.AddScoped<WebHomestay.Services.AI.IAdminAIStudioConfigService, WebHomestay.Services.AI.AdminAIStudioConfigService>();
 builder.Services.AddScoped<WebHomestay.Services.AI.IAdminAIRuntimeSimulatorService, WebHomestay.Services.AI.AdminAIRuntimeSimulatorService>();
 builder.Services.AddScoped<WebHomestay.Services.AI.IAdminAIReseedService, WebHomestay.Services.AI.AdminAIReseedService>();
@@ -91,8 +96,8 @@ builder.Services.AddScoped<WebHomestay.Services.IAIBrainOrchestrator, WebHomesta
 builder.Services.AddScoped<WebHomestay.Services.IBookingConductor, WebHomestay.Services.ContextAwareBookingConductor>();
 builder.Services.AddScoped<WebHomestay.Services.PricingService>();
 builder.Services.AddScoped<WebHomestay.Services.IPermissionResolveService, WebHomestay.Services.PermissionResolveService>();
-builder.Services.AddScoped<WebHomestay.Services.IAdminChatService, WebHomestay.Services.AdminChatService>();
-builder.Services.AddScoped<WebHomestay.Services.IAdminChatQuickSendService, WebHomestay.Services.AdminChatQuickSendService>();
+builder.Services.AddScoped<WebHomestay.Services.IAdminChatService, WebHomestay.Services.Chat.AdminChatService>();
+builder.Services.AddScoped<WebHomestay.Services.IAdminChatQuickSendService, WebHomestay.Services.Chat.AdminChatQuickSendService>();
 builder.Services.AddHostedService<WebHomestay.Services.BookingCleanupService>();
 
 // Register new Vector DB and Insight Services
@@ -130,7 +135,7 @@ using (var scope = app.Services.CreateScope())
     // Seed default settings
     if (!context.SystemSettings.Any(s => s.SettingKey == "BookingLeadTimeHours"))
     {
-        context.SystemSettings.Add(new WebHomestay.Models.SystemSetting
+        context.SystemSettings.Add(new WebHomestay.Models.Entities.Core.SystemSetting
         {
             SettingKey = "BookingLeadTimeHours",
             SettingValue = "2",
@@ -142,7 +147,7 @@ using (var scope = app.Services.CreateScope())
 
     if (!context.SystemSettings.Any(s => s.SettingKey == "MaxZipUploadSizeMB"))
     {
-        context.SystemSettings.Add(new WebHomestay.Models.SystemSetting
+        context.SystemSettings.Add(new WebHomestay.Models.Entities.Core.SystemSetting
         {
             SettingKey = "MaxZipUploadSizeMB",
             SettingValue = "30",
@@ -155,7 +160,7 @@ using (var scope = app.Services.CreateScope())
     // Seed ChatMonitor settings
     if (!context.SystemSettings.Any(s => s.SettingKey == "ChatMonitorAutoReplyEnabled"))
     {
-        context.SystemSettings.Add(new WebHomestay.Models.SystemSetting
+        context.SystemSettings.Add(new WebHomestay.Models.Entities.Core.SystemSetting
         {
             SettingKey = "ChatMonitorAutoReplyEnabled",
             SettingValue = "true",
@@ -167,7 +172,7 @@ using (var scope = app.Services.CreateScope())
 
     if (!context.SystemSettings.Any(s => s.SettingKey == "ChatMonitorAutoReplyMessage"))
     {
-        context.SystemSettings.Add(new WebHomestay.Models.SystemSetting
+        context.SystemSettings.Add(new WebHomestay.Models.Entities.Core.SystemSetting
         {
             SettingKey = "ChatMonitorAutoReplyMessage",
             SettingValue = "Hiện admin đang bận, vui lòng chờ một chút. Chúng tôi sẽ trả lời bạn sớm nhất.",
@@ -179,7 +184,7 @@ using (var scope = app.Services.CreateScope())
 
     if (!context.SystemSettings.Any(s => s.SettingKey == "ChatMonitorActiveWindowMinutes"))
     {
-        context.SystemSettings.Add(new WebHomestay.Models.SystemSetting
+        context.SystemSettings.Add(new WebHomestay.Models.Entities.Core.SystemSetting
         {
             SettingKey = "ChatMonitorActiveWindowMinutes",
             SettingValue = "30",
@@ -191,15 +196,15 @@ using (var scope = app.Services.CreateScope())
 
     var cancellationDefaults = new[]
     {
-        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationHandlingMode", SettingValue = "Manual", Description = "Chế độ xử lý hủy đơn", GroupName = "Cancellation" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationNoticeHours", SettingValue = "24", Description = "Số giờ tối thiểu trước check-in để hủy thuận lợi", GroupName = "Cancellation" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationRefundPercentBeforeNotice", SettingValue = "50", Description = "Phần trăm hoàn tiền trước ngưỡng hủy", GroupName = "Cancellation" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationRefundPercentAfterNotice", SettingValue = "0", Description = "Phần trăm hoàn tiền sau ngưỡng hủy", GroupName = "Cancellation" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationPolicyMessage", SettingValue = "Yêu cầu hủy trước thời hạn quy định có thể được hoàn theo chính sách. Sau thời hạn quy định, yêu cầu vẫn được tiếp nhận nhưng có thể bị giảm hoặc không hoàn tiền.", Description = "Thông báo chính sách hủy đơn", GroupName = "Cancellation" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationApprovalEmailSubject", SettingValue = WebHomestay.Services.BookingCancellationService.DefaultApprovalSubject, Description = "Tiêu đề email chấp nhận hủy đơn", GroupName = "Cancellation" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationApprovalEmailBody", SettingValue = WebHomestay.Services.BookingCancellationService.DefaultApprovalBody, Description = "Nội dung email chấp nhận hủy đơn", GroupName = "Cancellation" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationRejectionEmailSubject", SettingValue = WebHomestay.Services.BookingCancellationService.DefaultRejectionSubject, Description = "Tiêu đề email từ chối hủy đơn", GroupName = "Cancellation" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "CancellationRejectionEmailBody", SettingValue = WebHomestay.Services.BookingCancellationService.DefaultRejectionBody, Description = "Nội dung email từ chối hủy đơn", GroupName = "Cancellation" }
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "CancellationHandlingMode", SettingValue = "Manual", Description = "Chế độ xử lý hủy đơn", GroupName = "Cancellation" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "CancellationNoticeHours", SettingValue = "24", Description = "Số giờ tối thiểu trước check-in để hủy thuận lợi", GroupName = "Cancellation" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "CancellationRefundPercentBeforeNotice", SettingValue = "50", Description = "Phần trăm hoàn tiền trước ngưỡng hủy", GroupName = "Cancellation" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "CancellationRefundPercentAfterNotice", SettingValue = "0", Description = "Phần trăm hoàn tiền sau ngưỡng hủy", GroupName = "Cancellation" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "CancellationPolicyMessage", SettingValue = "Yêu cầu hủy trước thời hạn quy định có thể được hoàn theo chính sách. Sau thời hạn quy định, yêu cầu vẫn được tiếp nhận nhưng có thể bị giảm hoặc không hoàn tiền.", Description = "Thông báo chính sách hủy đơn", GroupName = "Cancellation" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "CancellationApprovalEmailSubject", SettingValue = WebHomestay.Services.BookingCancellationService.DefaultApprovalSubject, Description = "Tiêu đề email chấp nhận hủy đơn", GroupName = "Cancellation" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "CancellationApprovalEmailBody", SettingValue = WebHomestay.Services.BookingCancellationService.DefaultApprovalBody, Description = "Nội dung email chấp nhận hủy đơn", GroupName = "Cancellation" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "CancellationRejectionEmailSubject", SettingValue = WebHomestay.Services.BookingCancellationService.DefaultRejectionSubject, Description = "Tiêu đề email từ chối hủy đơn", GroupName = "Cancellation" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "CancellationRejectionEmailBody", SettingValue = WebHomestay.Services.BookingCancellationService.DefaultRejectionBody, Description = "Nội dung email từ chối hủy đơn", GroupName = "Cancellation" }
     };
 
     foreach (var setting in cancellationDefaults)
@@ -212,17 +217,17 @@ using (var scope = app.Services.CreateScope())
 
     var aiDefaults = new[]
     {
-        new WebHomestay.Models.SystemSetting { SettingKey = "AIFinalSynthesizerStyle", SettingValue = "Giọng thân thiện, rõ ràng, tư vấn như lễ tân chuyên nghiệp. Trả lời ngắn gọn nhưng đủ ý. Nếu thiếu thông tin thì hỏi lại bằng các câu hỏi cụ thể.", Description = "Phong cách trả lời", GroupName = "AI" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "AIFinalBasePrompt", SettingValue = "Bạn là Final Response Synthesizer của AI Brain Center cho homestay self check-in/self check-out. Nhiệm vụ duy nhất: viết câu trả lời cuối cùng cho khách dựa trên dữ liệu các agent cung cấp.", Description = "System prompt chính", GroupName = "AI" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "AIFinalLanguageRule", SettingValue = "Luôn trả lời bằng tiếng Việt, thân thiện, tự nhiên như nhân viên tư vấn homestay.", Description = "Quy tắc ngôn ngữ", GroupName = "AI" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "AIPublicBookingTriggerWords", SettingValue = "đặt,chốt,lấy,book,giữ phòng", Description = "Từ khoá kích hoạt", GroupName = "AI" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "AIPublicBookingProactiveMode", SettingValue = "balanced", Description = "Chế độ chủ động", GroupName = "AI" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "AIPublicBookingAutoShowRooms", SettingValue = "true", Description = "Tự động gợi ý phòng", GroupName = "AI" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "AIPublicBookingMaxRoomShows", SettingValue = "2", Description = "Số lần tối đa show phòng", GroupName = "AI" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "AIPublicBookingRoomCooldown", SettingValue = "3", Description = "Số message cooldown sau khi show phòng", GroupName = "AI" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "AIPublicBookingPrompt", SettingValue = "Luôn hiểu câu khách tự nhiên trước, sau đó hỏi đúng field cha còn thiếu. Giải thích sức chứa chuẩn, tối đa, phụ thu và giá cuối tuần/ngày lễ theo dữ liệu thật.", Description = "Prompt public booking", GroupName = "AI" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "AIPublicBookingDependencyRule", SettingValue = "branch->room->slot", Description = "Quy tắc cha con public booking", GroupName = "AI" },
-        new WebHomestay.Models.SystemSetting { SettingKey = "AIPublicBookingGuestOverflowRule", SettingValue = "capacity_warn_max_filter", Description = "Vượt chuẩn thì cảnh báo, vượt tối đa thì loại", GroupName = "AI" }
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "AIFinalSynthesizerStyle", SettingValue = "Giọng thân thiện, rõ ràng, tư vấn như lễ tân chuyên nghiệp. Trả lời ngắn gọn nhưng đủ ý. Nếu thiếu thông tin thì hỏi lại bằng các câu hỏi cụ thể.", Description = "Phong cách trả lời", GroupName = "AI" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "AIFinalBasePrompt", SettingValue = "Bạn là Final Response Synthesizer của AI Brain Center cho homestay self check-in/self check-out. Nhiệm vụ duy nhất: viết câu trả lời cuối cùng cho khách dựa trên dữ liệu các agent cung cấp.", Description = "System prompt chính", GroupName = "AI" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "AIFinalLanguageRule", SettingValue = "Luôn trả lời bằng tiếng Việt, thân thiện, tự nhiên như nhân viên tư vấn homestay.", Description = "Quy tắc ngôn ngữ", GroupName = "AI" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "AIPublicBookingTriggerWords", SettingValue = "đặt,chốt,lấy,book,giữ phòng", Description = "Từ khoá kích hoạt", GroupName = "AI" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "AIPublicBookingProactiveMode", SettingValue = "balanced", Description = "Chế độ chủ động", GroupName = "AI" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "AIPublicBookingAutoShowRooms", SettingValue = "true", Description = "Tự động gợi ý phòng", GroupName = "AI" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "AIPublicBookingMaxRoomShows", SettingValue = "2", Description = "Số lần tối đa show phòng", GroupName = "AI" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "AIPublicBookingRoomCooldown", SettingValue = "3", Description = "Số message cooldown sau khi show phòng", GroupName = "AI" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "AIPublicBookingPrompt", SettingValue = "Luôn hiểu câu khách tự nhiên trước, sau đó hỏi đúng field cha còn thiếu. Giải thích sức chứa chuẩn, tối đa, phụ thu và giá cuối tuần/ngày lễ theo dữ liệu thật.", Description = "Prompt public booking", GroupName = "AI" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "AIPublicBookingDependencyRule", SettingValue = "branch->room->slot", Description = "Quy tắc cha con public booking", GroupName = "AI" },
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "AIPublicBookingGuestOverflowRule", SettingValue = "capacity_warn_max_filter", Description = "Vượt chuẩn thì cảnh báo, vượt tối đa thì loại", GroupName = "AI" }
     };
 
     foreach (var setting in aiDefaults)
@@ -235,7 +240,7 @@ using (var scope = app.Services.CreateScope())
     
     var bookingDefaults = new[]
     {
-        new WebHomestay.Models.SystemSetting { SettingKey = "BookingTrashRetentionDays", SettingValue = "7", Description = "Số ngày giữ đơn hàng trong thùng rác trước khi tự động xóa vĩnh viễn", GroupName = "Booking" }
+        new WebHomestay.Models.Entities.Core.SystemSetting { SettingKey = "BookingTrashRetentionDays", SettingValue = "7", Description = "Số ngày giữ đơn hàng trong thùng rác trước khi tự động xóa vĩnh viễn", GroupName = "Booking" }
     };
 
     foreach (var setting in bookingDefaults)

@@ -1,4 +1,4 @@
-@model IEnumerable<WebHomestay.Models.AdminUser>
+@model IEnumerable<WebHomestay.Models.Entities.Core.AdminUser>
 @inject ISettingService SettingService
 
 @{
@@ -53,7 +53,7 @@
                                 </td>
                                 <td><span class="text-muted">@item.Username</span></td>
                                 <td>
-                                    <span class="badge-premium @(item.Role == WebHomestay.Models.AdminRole.SuperAdmin ? "badge-danger-soft" : (item.Role == WebHomestay.Models.AdminRole.Manager ? "badge-warning-soft" : "badge-info-soft"))">
+                                    <span class="badge-premium @(item.Role == WebHomestay.Models.Entities.Core.AdminRole.SuperAdmin ? "badge-danger-soft" : (item.Role == WebHomestay.Models.Entities.Core.AdminRole.Manager ? "badge-warning-soft" : "badge-info-soft"))">
                                         @roleDisplay[item.Role.ToString()]
                                     </span>
                                 </td>

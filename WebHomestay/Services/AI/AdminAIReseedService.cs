@@ -1,7 +1,17 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
-using WebHomestay.Models;
+using WebHomestay.Models.Entities.Core;
+using WebHomestay.Models.Entities.Slots;
+using WebHomestay.Models.Entities.Chat;
+using WebHomestay.Models.Entities.AI;
+using WebHomestay.Models.Enums;
+using WebHomestay.Models.DTOs.Booking;
+using WebHomestay.Models.DTOs.AI;
+using WebHomestay.Models.Configuration;
+using WebHomestay.Models.ViewModels;
+using BranchEntity = WebHomestay.Models.Entities.Core.Branch;
+using RoomEntity = WebHomestay.Models.Entities.Core.Room;
 
 namespace WebHomestay.Services.AI;
 
@@ -229,12 +239,12 @@ public class AdminAIReseedService : IAdminAIReseedService
         };
     }
 
-    private static string BuildRoomSummary(Branch branch, Room room)
+    private static string BuildRoomSummary(BranchEntity branch, RoomEntity room)
     {
         return $"Phòng {room.Name} thuộc chi nhánh {branch.Name}, sức chứa {room.Capacity}, tối đa {room.MaxGuests} khách, giá giờ {room.PricePerHour:N0}, giá ngày {room.PricePerDay:N0}, phụ thu khách thêm {room.ExtraGuestFee:N0}, trạng thái {room.Status}.";
     }
 
-    private static string BuildBranchRoomSummary(Branch branch)
+    private static string BuildBranchRoomSummary(BranchEntity branch)
     {
         if (branch.Rooms.Count == 0)
         {
@@ -250,7 +260,7 @@ public class AdminAIReseedService : IAdminAIReseedService
         return $"Chi nhánh {branch.Name} có {branch.Rooms.Count} phòng: {roomNames}. Giá giờ dao động {minHourly:N0} - {maxHourly:N0}, giá ngày dao động {minDaily:N0} - {maxDaily:N0}.";
     }
 
-    private static string GetPriceBandKey(Room room)
+    private static string GetPriceBandKey(RoomEntity room)
     {
         var hourlyBand = room.PricePerHour switch
         {

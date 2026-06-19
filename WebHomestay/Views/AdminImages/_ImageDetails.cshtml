@@ -1,7 +1,7 @@
-@model WebHomestay.Models.Booking
+@model WebHomestay.Models.Entities.Core.Booking
 @{
-    var role = Context.Session.GetString("AdminRole");
-    bool isSuperAdmin = role == "SuperAdmin";
+    bool canViewOriginalImages = WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.original");
+    var maskedImageVersion = Model.CreatedAt.Ticks;
 }
 
 <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
@@ -33,7 +33,7 @@
             <a href="/chinhan/hethong/bookings/details/@Model.Id" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-2 fw-bold d-flex align-items-center">
                 <i class="fas fa-external-link-alt me-2"></i>Chi tiết đơn
             </a>
-            @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.detail"))
+            @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.delete"))
             {
                 <form asp-action="SoftDelete" method="post" class="d-inline"
                       data-premium-confirm="Xóa ảnh của đơn hàng #@Model.Id vào thùng rác?"
@@ -83,7 +83,11 @@
                 <div class="p-2 bg-info bg-opacity-10 rounded-3 me-3 text-info">
                     <i class="fas fa-id-card"></i>
                 </div>
-                <h5 class="fw-bold text-dark mb-0">Hồ sơ định danh (CCCD gốc)</h5>
+                <h5 class="fw-bold text-dark mb-0">Hồ sơ định danh (CCCD)</h5>
+                @if (!canViewOriginalImages)
+                {
+                    <span class="badge bg-warning-soft text-warning small ms-3"><i class="fas fa-shield-alt me-1"></i>Bản đã che thông tin</span>
+                }
             </div>
 
             <div class="row g-4">
@@ -96,7 +100,14 @@
                         @if (!string.IsNullOrEmpty(Model.IdCardFrontPath))
                         {
                             <div class="position-relative overflow-hidden rounded-3 shadow-sm border bg-light">
-                                <img src="/SecureImage/GetOriginal?fileName=@Model.IdCardFrontPath" class="id-card-img" style="cursor: zoom-in;" onclick="window.open(this.src)" />
+                                @if (canViewOriginalImages)
+                                {
+                                    <img src="/SecureImage/GetOriginal?fileName=@Model.IdCardFrontPath" class="id-card-img" style="cursor: zoom-in;" onclick="window.open(this.src)" />
+                                }
+                                else
+                                {
+                                    <img src="@(string.IsNullOrEmpty(Model.IdCardFrontMaskedPath) ? string.Empty : $"{Model.IdCardFrontMaskedPath}?v={maskedImageVersion}")" class="id-card-img" />
+                                }
                             </div>
                         }
                         else
@@ -115,7 +126,14 @@
                         @if (!string.IsNullOrEmpty(Model.IdCardBackPath))
                         {
                             <div class="position-relative overflow-hidden rounded-3 shadow-sm border bg-light">
-                                <img src="/SecureImage/GetOriginal?fileName=@Model.IdCardBackPath" class="id-card-img" style="cursor: zoom-in;" onclick="window.open(this.src)" />
+                                @if (canViewOriginalImages)
+                                {
+                                    <img src="/SecureImage/GetOriginal?fileName=@Model.IdCardBackPath" class="id-card-img" style="cursor: zoom-in;" onclick="window.open(this.src)" />
+                                }
+                                else
+                                {
+                                    <img src="@(string.IsNullOrEmpty(Model.IdCardBackMaskedPath) ? string.Empty : $"{Model.IdCardBackMaskedPath}?v={maskedImageVersion}")" class="id-card-img" />
+                                }
                             </div>
                         }
                         else

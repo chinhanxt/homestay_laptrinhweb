@@ -13,7 +13,7 @@
 ## File Map
 
 ### Existing files to modify
-- `ai.md`
+- `docs/note/ai-runtime-notes.md`
 - `WebHomestay/Views/AdminAI/Index.cshtml`
 - `WebHomestay/wwwroot/js/admin-ai-brain-center.js`
 - `WebHomestay/Services/AI/EmbeddingService.cs`
@@ -43,14 +43,14 @@
 - `PgVectorSearchService` owns database-side vector ranking.
 - `KnowledgeGraphPlugin` and `SemanticSearchPlugin` stop doing their own in-memory cosine math and delegate retrieval.
 - `RetrievalContextAssembler` is the first step toward graph-aware context assembly without rewriting the full orchestrator.
-- `ai.md` and admin AI UI text become truthful about current runtime capabilities.
+- `docs/note/ai-runtime-notes.md` and admin AI UI text become truthful about current runtime capabilities.
 
 ---
 
 ### Task 1: Truth Cleanup In Docs And Admin UI
 
 **Files:**
-- Modify: `ai.md`
+- Modify: `docs/note/ai-runtime-notes.md`
 - Modify: `WebHomestay/Views/AdminAI/Index.cshtml`
 - Modify: `WebHomestay/wwwroot/js/admin-ai-brain-center.js`
 - Test: manual review in browser and grep search
@@ -73,16 +73,16 @@ FAIL if any current-facing text claims:
 Run:
 
 ```powershell
-rg -n "LangGraph|GraphRAG|pgvector|Neo4j|HNSW|Vector RAG|embedding 1536|vector db" ai.md WebHomestay/Views/AdminAI/Index.cshtml WebHomestay/wwwroot/js/admin-ai-brain-center.js
+rg -n "LangGraph|GraphRAG|pgvector|Neo4j|HNSW|Vector RAG|embedding 1536|vector db" docs/note/ai-runtime-notes.md WebHomestay/Views/AdminAI/Index.cshtml WebHomestay/wwwroot/js/admin-ai-brain-center.js
 ```
 
 Expected:
 
 ```text
-Matches found in ai.md and AdminAI UI text that overstate runtime capability.
+Matches found in docs/note/ai-runtime-notes.md and AdminAI UI text that overstate runtime capability.
 ```
 
-- [ ] **Step 3: Rewrite `ai.md` to separate current state, garbage, target, and roadmap**
+- [ ] **Step 3: Rewrite `docs/note/ai-runtime-notes.md` to separate current state, garbage, target, and roadmap**
 
 Replace the file contents with a truthful structure like this:
 
@@ -155,7 +155,7 @@ syncStatusMessage.textContent = ok
 Run:
 
 ```powershell
-rg -n "LangGraph|GraphRAG|Neo4j|HNSW Index|Vector RAG" ai.md WebHomestay/Views/AdminAI/Index.cshtml WebHomestay/wwwroot/js/admin-ai-brain-center.js
+rg -n "LangGraph|GraphRAG|Neo4j|HNSW Index|Vector RAG" docs/note/ai-runtime-notes.md WebHomestay/Views/AdminAI/Index.cshtml WebHomestay/wwwroot/js/admin-ai-brain-center.js
 ```
 
 Expected:
@@ -181,7 +181,7 @@ Build succeeded.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add ai.md WebHomestay/Views/AdminAI/Index.cshtml WebHomestay/wwwroot/js/admin-ai-brain-center.js
+git add docs/note/ai-runtime-notes.md WebHomestay/Views/AdminAI/Index.cshtml WebHomestay/wwwroot/js/admin-ai-brain-center.js
 git commit -m "docs: make AI capability claims truthful"
 ```
 
@@ -931,7 +931,7 @@ Build succeeded.
 Check:
 
 ```text
-1. `ai.md` no longer claims unsupported frameworks at runtime.
+1. `docs/note/ai-runtime-notes.md` no longer claims unsupported frameworks at runtime.
 2. Admin AI page no longer overstates vector/graph capability.
 3. Reindex flow still works.
 4. Retrieval failures are explicit instead of silently becoming fake semantic matches.

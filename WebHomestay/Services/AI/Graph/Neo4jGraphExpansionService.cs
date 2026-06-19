@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Neo4j.Driver;
 using WebHomestay.Data;
-using WebHomestay.Models;
+using WebHomestay.Models.Entities.AI;
 
 namespace WebHomestay.Services.AI.Graph
 {

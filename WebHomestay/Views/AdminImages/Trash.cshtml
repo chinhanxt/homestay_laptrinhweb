@@ -1,10 +1,10 @@
-@model IEnumerable<WebHomestay.Models.Booking>
+@model IEnumerable<WebHomestay.Models.Entities.Core.Booking>
 @inject ISettingService SettingService
 
 @{
     ViewData["Title"] = "Thùng rác Ảnh";
     var retentionDays = await SettingService.GetIntAsync("BookingTrashRetentionDays", 7);
-    var branchOptions = ViewBag.BranchOptions as List<WebHomestay.Models.Branch> ?? new();
+    var branchOptions = ViewBag.BranchOptions as List<WebHomestay.Models.Entities.Core.Branch> ?? new();
     var selectedBranchId = ViewBag.SelectedBranchId as int?;
 }
 

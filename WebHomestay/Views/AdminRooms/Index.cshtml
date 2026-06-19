@@ -1,4 +1,4 @@
-@model IEnumerable<WebHomestay.Models.Room>
+@model IEnumerable<WebHomestay.Models.Entities.Core.Room>
 
 @{
     ViewData["Title"] = "Quản lý Phòng";
@@ -22,7 +22,7 @@
                     </a>
                     <button type="button" class="btn-premium-outline" data-bs-toggle="modal" data-bs-target="#importRoomsModal">
                         <i class="fas fa-file-import"></i>
-                        <span>Import Excel/ZIP</span>
+                        <span>Import Excel/ZIP (Kèm ảnh)</span>
                     </button>
                 }
                 @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.trash"))
@@ -39,7 +39,7 @@
                     <label class="filter-label">Chi nhánh</label>
                     <select class="form-select form-select-sm room-filter" id="filterBranch">
                         <option value="">Tất cả</option>
-                        @foreach (var branch in ViewBag.Branches as List<WebHomestay.Models.Branch> ?? new())
+                        @foreach (var branch in ViewBag.Branches as List<WebHomestay.Models.Entities.Core.Branch> ?? new())
                         {
                             <option value="@branch.Id">@branch.Name</option>
                         }
@@ -122,9 +122,12 @@
                                  </td>
                                 <td class="text-end">
                                      <div class="admin-actions">
-                                        <a asp-controller="AdminSlots" asp-action="RoomSchedules" asp-route-roomId="@item.Id" class="admin-btn-icon" title="Quản lý lịch trình">
-                                            <i class="fas fa-clock"></i>
-                                        </a>
+                                        @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.schedules"))
+                                        {
+                                            <a asp-controller="AdminSlots" asp-action="RoomSchedules" asp-route-roomId="@item.Id" class="admin-btn-icon" title="Cấu hình giờ">
+                                                <i class="fas fa-clock"></i>
+                                            </a>
+                                        }
                                         @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "rooms.edit"))
                                         {
                                             <a asp-action="Edit" asp-route-id="@item.Id" class="admin-btn-icon" title="Chỉnh sửa">
@@ -172,10 +175,10 @@
             <form asp-action="ImportZip" method="post" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <div class="modal-body py-4">
-                    <p class="text-muted small">Chọn file Excel (.xlsx), Word (.docx) hoặc file nén ZIP để nhập hàng loạt thông tin phòng ngủ kèm hình ảnh.</p>
+                    <p class="text-muted small">Chọn file nén ZIP (.zip) chứa ảnh và file Excel hoặc chọn file Excel (.xlsx) để nhập hàng loạt thông tin phòng ngủ.</p>
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">Chọn file (.xlsx, .docx hoặc .zip)</label>
-                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx,.docx,.zip" required />
+                        <label class="form-label small fw-bold text-muted">Chọn file (.zip, .xlsx)</label>
+                        <input type="file" name="file" class="form-control premium-input" accept=".zip,.xlsx" required />
                     </div>
                 </div>
                 <div class="modal-footer border-0">
@@ -286,4 +289,3 @@
         });
     </script>
 }
-

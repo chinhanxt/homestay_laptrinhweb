@@ -4,8 +4,11 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
 using WebHomestay.Data;
-using WebHomestay.Models;
-using WebHomestay.Models.AI;
+using WebHomestay.Models.Entities.Core;
+using WebHomestay.Models.Configuration;
+using WebHomestay.Models.DTOs.AI;
+using WebHomestay.Models.Entities.AI;
+using WebHomestay.Services.Slots;
 
 namespace WebHomestay.Services.AI.Plugins
 {

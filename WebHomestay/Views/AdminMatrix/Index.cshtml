@@ -1,5 +1,5 @@
 @using System.Text.Json
-@model IEnumerable<WebHomestay.Models.Branch>
+@model IEnumerable<WebHomestay.Models.Entities.Core.Branch>
 
 @{
     ViewData["Title"] = "Ma trận vận hành phòng";
@@ -8,8 +8,8 @@
     DateTime endDate = ViewBag.EndDate is DateTime end ? end.Date : startDate.AddDays(10);
     var branches = Model?.Where(branch => branch.Rooms != null && branch.Rooms.Any())
         .OrderBy(branch => branch.Name)
-        .ToList() ?? new List<WebHomestay.Models.Branch>();
-    var bookings = (ViewBag.Bookings as List<WebHomestay.Models.Booking> ?? new List<WebHomestay.Models.Booking>())
+        .ToList() ?? new List<WebHomestay.Models.Entities.Core.Branch>();
+    var bookings = (ViewBag.Bookings as List<WebHomestay.Models.Entities.Core.Booking> ?? new List<WebHomestay.Models.Entities.Core.Booking>())
         .OrderBy(booking => booking.StartTime)
         .ToList();
 
@@ -49,10 +49,10 @@
         _ => "tone-neutral"
     };
 
-    var bookingsByRoomDate = new Dictionary<string, List<WebHomestay.Models.Booking>>();
+    var bookingsByRoomDate = new Dictionary<string, List<WebHomestay.Models.Entities.Core.Booking>>();
     foreach (var booking in bookings)
     {
-        if (booking.BookingMode == WebHomestay.Models.BookingMode.Daily)
+        if (booking.BookingMode == WebHomestay.Models.Enums.BookingMode.Daily)
         {
             var visibleStart = booking.StartTime.Date < startDate ? startDate : booking.StartTime.Date;
             var visibleEndInclusive = booking.EndTime.Date >= endDate ? endDate.AddDays(-1) : booking.EndTime.Date;
@@ -62,7 +62,7 @@
                 var key = cellKey(booking.RoomId, date);
                 if (!bookingsByRoomDate.TryGetValue(key, out var bucket))
                 {
-                    bucket = new List<WebHomestay.Models.Booking>();
+                    bucket = new List<WebHomestay.Models.Entities.Core.Booking>();
                     bookingsByRoomDate[key] = bucket;
                 }
 
@@ -77,7 +77,7 @@
                 var key = cellKey(booking.RoomId, slotDate);
                 if (!bookingsByRoomDate.TryGetValue(key, out var bucket))
                 {
-                    bucket = new List<WebHomestay.Models.Booking>();
+                    bucket = new List<WebHomestay.Models.Entities.Core.Booking>();
                     bookingsByRoomDate[key] = bucket;
                 }
 
@@ -94,7 +94,7 @@
     {
         var roomBookings = roomBookingLookup.TryGetValue(room.Id, out var value)
             ? value
-            : new List<WebHomestay.Models.Booking>();
+            : new List<WebHomestay.Models.Entities.Core.Booking>();
 
         return new
         {
@@ -257,7 +257,7 @@
                                 {
                                     var roomBookings = roomBookingLookup.TryGetValue(room.Id, out var value)
                                         ? value
-                                        : new List<WebHomestay.Models.Booking>();
+                                        : new List<WebHomestay.Models.Entities.Core.Booking>();
                                     var hasAnyBooking = roomBookings.Any();
                                     var hasAttention = roomBookings.Any(booking =>
                                         booking.Status is "AwaitingApproval" or "AwaitingPayment" or "PendingPayment");
@@ -302,7 +302,7 @@
                                         @foreach (var day in days)
                                         {
                                             bookingsByRoomDate.TryGetValue(cellKey(room.Id, day), out var dayBookings);
-                                            dayBookings ??= new List<WebHomestay.Models.Booking>();
+                                            dayBookings ??= new List<WebHomestay.Models.Entities.Core.Booking>();
 
                                             <td class="matrix-cell-col">
                                                 <button type="button"
@@ -317,7 +317,7 @@
                                                         foreach (var booking in dayBookings.Take(3))
                                                         {
                                                             var toneClass = bookingTone(booking.Status);
-                                                            var isDaily = booking.BookingMode == WebHomestay.Models.BookingMode.Daily;
+                                                            var isDaily = booking.BookingMode == WebHomestay.Models.Enums.BookingMode.Daily;
                                                             var isStartSegment = isDaily && day.Date == booking.StartTime.Date;
                                                             var isEndSegment = isDaily && day.Date == booking.EndTime.Date;
 

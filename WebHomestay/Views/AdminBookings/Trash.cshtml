@@ -1,4 +1,4 @@
-@model IEnumerable<WebHomestay.Models.Booking>
+@model IEnumerable<WebHomestay.Models.Entities.Core.Booking>
 @inject ISettingService SettingService
 
 @{
@@ -49,7 +49,7 @@
                                 <td>
                                     <div class="fw-bold">@item.Room?.Name</div>
                                     <div class="small text-muted">
-                                        @if (item.BookingMode == WebHomestay.Models.BookingMode.Hourly)
+                                        @if (item.BookingMode == WebHomestay.Models.Enums.BookingMode.Hourly)
                                         {
                                             var label = item.RoomSlotInventory?.Template?.Name ?? item.SlotLabel;
                                             <span>@label (@item.StartTime.ToString("HH:mm")-@item.EndTime.ToString("HH:mm"))</span>

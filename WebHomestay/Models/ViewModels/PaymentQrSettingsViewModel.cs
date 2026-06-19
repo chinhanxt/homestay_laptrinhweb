@@ -1,3 +1,5 @@
+using WebHomestay.Models.Entities.Core;
+using WebHomestay.Models.Enums;
 namespace WebHomestay.Models.ViewModels
 {
     public class PaymentQrSettingsViewModel

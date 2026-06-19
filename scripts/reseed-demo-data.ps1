@@ -61,6 +61,60 @@ function Ensure-Asset {
     Copy-Item $Source $Destination -Force
 }
 
+function New-DemoMaskedIdCardAsset {
+    param(
+        [string]$Source,
+        [string]$Destination,
+        [ValidateSet("Front", "Back")]
+        [string]$Side
+    )
+
+    Add-Type -AssemblyName System.Drawing
+
+    New-Item -ItemType Directory -Force -Path (Split-Path $Destination) | Out-Null
+
+    $bitmap = [System.Drawing.Bitmap]::new($Source)
+    try {
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        try {
+            $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+            $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+
+            $maskBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(235, 0, 0, 0))
+            $labelBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(230, 255, 255, 255))
+            $bannerBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(220, 189, 147, 75))
+            $font = [System.Drawing.Font]::new("Arial", [math]::Max(14, [int]($bitmap.Width * 0.035)), [System.Drawing.FontStyle]::Bold)
+            $labelFont = [System.Drawing.Font]::new("Arial", [math]::Max(11, [int]($bitmap.Width * 0.022)), [System.Drawing.FontStyle]::Bold)
+
+            if ($Side -eq "Front") {
+                $graphics.FillRectangle($maskBrush, [int]($bitmap.Width * 0.37), [int]($bitmap.Height * 0.22), [int]($bitmap.Width * 0.42), [int]($bitmap.Height * 0.11))
+                $graphics.FillRectangle($maskBrush, [int]($bitmap.Width * 0.34), [int]($bitmap.Height * 0.56), [int]($bitmap.Width * 0.58), [int]($bitmap.Height * 0.26))
+            }
+            else {
+                $graphics.FillRectangle($maskBrush, [int]($bitmap.Width * 0.70), [int]($bitmap.Height * 0.05), [int]($bitmap.Width * 0.20), [int]($bitmap.Height * 0.22))
+                $graphics.FillRectangle($maskBrush, 0, [int]($bitmap.Height * 0.74), $bitmap.Width, [int]($bitmap.Height * 0.22))
+            }
+
+            $graphics.FillRectangle($bannerBrush, [int]($bitmap.Width * 0.03), [int]($bitmap.Height * 0.04), [int]($bitmap.Width * 0.30), [int]($bitmap.Height * 0.10))
+            $graphics.DrawString("MASKED DEMO", $font, $labelBrush, [float]($bitmap.Width * 0.05), [float]($bitmap.Height * 0.055))
+            $graphics.DrawString("BẢN CHE THÔNG TIN", $labelFont, $labelBrush, [float]($bitmap.Width * 0.05), [float]($bitmap.Height * 0.145))
+        }
+        finally {
+            if ($graphics) { $graphics.Dispose() }
+            if ($maskBrush) { $maskBrush.Dispose() }
+            if ($labelBrush) { $labelBrush.Dispose() }
+            if ($bannerBrush) { $bannerBrush.Dispose() }
+            if ($font) { $font.Dispose() }
+            if ($labelFont) { $labelFont.Dispose() }
+        }
+
+        $bitmap.Save($Destination, [System.Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally {
+        $bitmap.Dispose()
+    }
+}
+
 $repoRoot = Get-RepoRoot
 $connectionMap = Convert-ConnectionStringToMap (Get-AppConnectionString -RepoRoot $repoRoot)
 $connectionString = Build-ConnectionString -ConnectionMap $connectionMap -DatabaseName $DatabaseName
@@ -72,8 +126,8 @@ dotnet ef database update --project (Join-Path $repoRoot "WebHomestay\WebHomesta
 
 Ensure-Asset -Source (Join-Path $repoRoot "ảnh\cccd.png") -Destination (Join-Path $repoRoot "WebHomestay\App_Data\SecureUploads\IDCards\demo-cccd-front.png")
 Ensure-Asset -Source (Join-Path $repoRoot "ảnh\cccd.png") -Destination (Join-Path $repoRoot "WebHomestay\App_Data\SecureUploads\IDCards\demo-cccd-back.png")
-Ensure-Asset -Source (Join-Path $repoRoot "ảnh\cccd.png") -Destination (Join-Path $repoRoot "WebHomestay\wwwroot\uploads\masked\idcards\demo-masked-front.png")
-Ensure-Asset -Source (Join-Path $repoRoot "ảnh\cccd.png") -Destination (Join-Path $repoRoot "WebHomestay\wwwroot\uploads\masked\idcards\demo-masked-back.png")
+New-DemoMaskedIdCardAsset -Source (Join-Path $repoRoot "ảnh\cccd.png") -Destination (Join-Path $repoRoot "WebHomestay\wwwroot\uploads\masked\idcards\demo-masked-front.png") -Side Front
+New-DemoMaskedIdCardAsset -Source (Join-Path $repoRoot "ảnh\cccd.png") -Destination (Join-Path $repoRoot "WebHomestay\wwwroot\uploads\masked\idcards\demo-masked-back.png") -Side Back
 Ensure-Asset -Source (Join-Path $repoRoot "ảnh\chuyenkhoan.jpg") -Destination (Join-Path $repoRoot "WebHomestay\wwwroot\uploads\payments\demo-payment-bill.jpg")
 Ensure-Asset -Source (Join-Path $repoRoot "ảnh\ma qr.png") -Destination (Join-Path $repoRoot "WebHomestay\wwwroot\uploads\payment-qr\demo-q1.png")
 Ensure-Asset -Source (Join-Path $repoRoot "ảnh\ma qr.png") -Destination (Join-Path $repoRoot "WebHomestay\wwwroot\uploads\payment-qr\demo-q7.png")

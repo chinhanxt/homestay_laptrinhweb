@@ -1,0 +1,58 @@
+using WebHomestay.Services;
+using WebHomestay.Services.Slots;
+using WebHomestay.Services.Room;
+using WebHomestay.Services.Chat;
+using WebHomestay.Services.Settings;
+using WebHomestay.Services.Infrastructure;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using MimeKit;
+using Microsoft.Extensions.Options;
+
+namespace WebHomestay.Services.Infrastructure
+{
+    public class MailService : IMailService
+    {
+        private readonly IConfiguration _config;
+
+        public MailService(IConfiguration config)
+        {
+            _config = config;
+        }
+
+        public Task SendEmailAsync(string toEmail, string subject, string body)
+        {
+            return SendEmailAsync(toEmail, subject, body, Array.Empty<EmailAttachment>());
+        }
+
+        public async Task SendEmailAsync(string toEmail, string subject, string body, IReadOnlyCollection<EmailAttachment> attachments)
+        {
+            var email = new MimeMessage();
+            email.From.Add(new MailboxAddress(_config["MailSettings:DisplayName"], _config["MailSettings:Mail"]));
+            email.To.Add(MailboxAddress.Parse(toEmail));
+            email.Subject = subject;
+
+            var builder = new BodyBuilder { HtmlBody = body };
+            foreach (var attachment in attachments)
+            {
+                if (File.Exists(attachment.FilePath))
+                {
+                    builder.Attachments.Add(attachment.FileName, await File.ReadAllBytesAsync(attachment.FilePath), ContentType.Parse(attachment.ContentType));
+                }
+            }
+            email.Body = builder.ToMessageBody();
+
+            using var smtp = new SmtpClient();
+            try
+            {
+                await smtp.ConnectAsync(_config["MailSettings:Host"], int.Parse(_config["MailSettings:Port"] ?? "587"), SecureSocketOptions.StartTls);
+                await smtp.AuthenticateAsync(_config["MailSettings:Mail"], _config["MailSettings:Password"]);
+                await smtp.SendAsync(email);
+            }
+            finally
+            {
+                await smtp.DisconnectAsync(true);
+            }
+        }
+    }
+}

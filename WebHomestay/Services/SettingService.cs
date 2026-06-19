@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
-using WebHomestay.Models;
+using WebHomestay.Models.Entities.Core;
 
 namespace WebHomestay.Services
 {

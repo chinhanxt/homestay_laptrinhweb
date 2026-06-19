@@ -1,7 +1,12 @@
 using System;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
-using WebHomestay.Models;
+using WebHomestay.Models.Entities.Core;
+using WebHomestay.Models.Entities.Slots;
+using WebHomestay.Models.Entities.Chat;
+using WebHomestay.Models.Entities.AI;
+using WebHomestay.Models.Configuration;
+using WebHomestay.Models.DTOs.Booking;
 
 namespace WebHomestay.Data
 {
@@ -158,6 +163,8 @@ namespace WebHomestay.Data
                 entity.Property(e => e.GuestCount).HasColumnName("guest_count");
                 entity.Property(e => e.IdCardFrontPath).HasColumnName("id_card_front_path");
                 entity.Property(e => e.IdCardBackPath).HasColumnName("id_card_back_path");
+                entity.Property(e => e.IdCardFrontMaskedPath).HasColumnName("IdCardFrontMaskedPath");
+                entity.Property(e => e.IdCardBackMaskedPath).HasColumnName("IdCardBackMaskedPath");
                 entity.Property(e => e.CustomerNote).HasColumnName("customer_note");
                 entity.Property(e => e.AdminNote).HasColumnName("admin_note");
                 entity.Property(e => e.StartTime).HasColumnName("start_time");

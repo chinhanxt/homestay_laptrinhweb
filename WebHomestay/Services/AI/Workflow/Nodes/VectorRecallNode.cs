@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
-using WebHomestay.Models;
+using WebHomestay.Services;
 using WebHomestay.Services.AI.Retrieval;
 
 namespace WebHomestay.Services.AI.Workflow.Nodes;

@@ -112,7 +112,7 @@ public class PublicBookingRoomExplanationService : IPublicBookingRoomExplanation
         return dayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
     }
 
-    private static decimal ResolveDisplayPrice(Models.Room room, string bookingMode, string pricingTier)
+    private static decimal ResolveDisplayPrice(WebHomestay.Models.Entities.Core.Room room, string bookingMode, string pricingTier)
     {
         var isDaily = string.Equals(bookingMode, "daily", StringComparison.OrdinalIgnoreCase);
         return (pricingTier, isDaily) switch

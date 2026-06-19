@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
 using WebHomestay.Data;
-using WebHomestay.Models;
+using WebHomestay.Services;
 using WebHomestay.Services.AI.Retrieval;
 
 namespace WebHomestay.Services.AI.Plugins

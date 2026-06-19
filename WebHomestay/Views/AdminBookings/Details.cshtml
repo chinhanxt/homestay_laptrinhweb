@@ -1,7 +1,9 @@
-@model WebHomestay.Models.Booking
+@model WebHomestay.Models.Entities.Core.Booking
 
 @{
     ViewData["Title"] = "Chi tiết Đơn hàng #" + Model.Id;
+    bool canViewOriginalImages = WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.original");
+    var maskedImageVersion = Model.CreatedAt.Ticks;
 }
 
 <link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
@@ -79,7 +81,7 @@
                 <div class="admin-card p-4">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h5 class="fw-bold text-primary mb-0"><i class="fas fa-id-card me-2"></i>Hồ sơ định danh (CCCD)</h5>
-                        @if (Context.Session.GetString("AdminRole") != "SuperAdmin")
+                        @if (!canViewOriginalImages)
                         {
                             <span class="badge bg-warning-soft text-warning small"><i class="fas fa-shield-alt me-1"></i>Bản đã che thông tin</span>
                         }
@@ -90,13 +92,13 @@
                             <div class="rounded overflow-hidden border shadow-sm bg-light d-flex align-items-center justify-content-center" style="min-height: 200px;">
                                 @if (!string.IsNullOrEmpty(Model.IdCardFrontPath))
                                 {
-                                    if (Context.Session.GetString("AdminRole") == "SuperAdmin")
+                                    if (canViewOriginalImages)
                                     {
                                         <img src="/SecureImage/GetOriginal?fileName=@Model.IdCardFrontPath" class="w-100" style="cursor: zoom-in;" onclick="window.open(this.src)" />
                                     }
                                     else
                                     {
-                                        <img src="@Model.IdCardFrontMaskedPath" class="w-100" />
+                                        <img src="@(string.IsNullOrEmpty(Model.IdCardFrontMaskedPath) ? string.Empty : $"{Model.IdCardFrontMaskedPath}?v={maskedImageVersion}")" class="w-100" />
                                     }
                                 }
                                 else
@@ -110,13 +112,13 @@
                             <div class="rounded overflow-hidden border shadow-sm bg-light d-flex align-items-center justify-content-center" style="min-height: 200px;">
                                 @if (!string.IsNullOrEmpty(Model.IdCardBackPath))
                                 {
-                                    if (Context.Session.GetString("AdminRole") == "SuperAdmin")
+                                    if (canViewOriginalImages)
                                     {
                                         <img src="/SecureImage/GetOriginal?fileName=@Model.IdCardBackPath" class="w-100" style="cursor: zoom-in;" onclick="window.open(this.src)" />
                                     }
                                     else
                                     {
-                                        <img src="@Model.IdCardBackMaskedPath" class="w-100" />
+                                        <img src="@(string.IsNullOrEmpty(Model.IdCardBackMaskedPath) ? string.Empty : $"{Model.IdCardBackMaskedPath}?v={maskedImageVersion}")" class="w-100" />
                                     }
                                 }
                                 else
@@ -142,7 +144,7 @@
 
                     <div class="mb-4">
                         <label class="admin-form-label">Thời gian lưu trú</label>
-                        @if (Model.BookingMode == WebHomestay.Models.BookingMode.Hourly)
+                        @if (Model.BookingMode == WebHomestay.Models.Enums.BookingMode.Hourly)
                         {
                             <div class="fw-bold text-primary">@Model.SlotLabel</div>
                             <div class="small">(@Model.StartTime.ToString("HH:mm") - @Model.EndTime.ToString("HH:mm"))</div>
@@ -177,7 +179,7 @@
                         }
                         @if (ViewBag.CheckoutMode == "Manual" && (Model.Status == "Confirmed" || Model.Status == "CheckedIn"))
                         {
-                            bool canCheckout = Model.EndTime <= DateTime.UtcNow;
+                            bool canCheckout = Model.EndTime <= DateTime.Now;
                             <form asp-action="Checkout" method="post">
                                 <input type="hidden" name="id" value="@Model.Id" />
                                 <button type="submit" class="btn-ready py-2 fw-bold rounded-pill @(canCheckout ? "" : "opacity-50")"

@@ -169,7 +169,7 @@ public class ChatHub : Hub
     private int? GetCurrentBranchScope()
         => ChatMonitorScopeHelper.GetScopedBranchId(GetSession());
 
-    private Task<Models.AdminChatSession?> FindAccessibleSessionAsync(string sessionId)
+    private Task<WebHomestay.Models.Entities.Chat.AdminChatSession?> FindAccessibleSessionAsync(string sessionId)
     {
         var query = ChatMonitorScopeHelper.ApplyBranchScope(
             _context.AdminChatSessions.AsNoTracking(),

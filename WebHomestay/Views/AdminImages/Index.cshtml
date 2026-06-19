@@ -1,8 +1,8 @@
-@model IEnumerable<WebHomestay.Models.Booking>
+@model IEnumerable<WebHomestay.Models.Entities.Core.Booking>
 @{
     ViewData["Title"] = "Quản lý Hình ảnh tập trung";
     Layout = "_Layout"; 
-    var branchOptions = ViewBag.BranchOptions as List<WebHomestay.Models.Branch> ?? new();
+    var branchOptions = ViewBag.BranchOptions as List<WebHomestay.Models.Entities.Core.Branch> ?? new();
     var selectedBranchId = ViewBag.SelectedBranchId as int?;
 }
 
@@ -199,7 +199,7 @@
             @foreach (var item in Model)
             {
                 <div class="booking-item" onclick="loadDetails(@item.Id, this)">
-                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.detail"))
+                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.delete"))
                     {
                         <form asp-action="SoftDelete" method="post" class="d-inline btn-delete-image"
                                data-premium-confirm="Xóa ảnh của đơn hàng #@item.Id vào thùng rác?"

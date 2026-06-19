@@ -470,7 +470,7 @@ namespace WebHomestay.Migrations
                     b.ToTable("admin_chat_messages", (string)null);
                 });
 
-            modelBuilder.Entity("WebHomestay.Models.AdminChatSession", b =>
+            modelBuilder.Entity("WebHomestay.Models.Entities.Chat.AdminChatSession", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1023,7 +1023,7 @@ namespace WebHomestay.Migrations
                     b.ToTable("role_permission_templates", (string)null);
                 });
 
-            modelBuilder.Entity("WebHomestay.Models.Room", b =>
+            modelBuilder.Entity("WebHomestay.Models.Entities.Core.Room", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1471,7 +1471,7 @@ namespace WebHomestay.Migrations
 
             modelBuilder.Entity("WebHomestay.Models.Booking", b =>
                 {
-                    b.HasOne("WebHomestay.Models.Room", "Room")
+                    b.HasOne("WebHomestay.Models.Entities.Core.Room", "Room")
                         .WithMany("Bookings")
                         .HasForeignKey("RoomId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1503,7 +1503,7 @@ namespace WebHomestay.Migrations
                     b.Navigation("Booking");
                 });
 
-            modelBuilder.Entity("WebHomestay.Models.Room", b =>
+            modelBuilder.Entity("WebHomestay.Models.Entities.Core.Room", b =>
                 {
                     b.HasOne("WebHomestay.Models.Branch", "Branch")
                         .WithMany("Rooms")
@@ -1516,7 +1516,7 @@ namespace WebHomestay.Migrations
 
             modelBuilder.Entity("WebHomestay.Models.RoomSlotInventory", b =>
                 {
-                    b.HasOne("WebHomestay.Models.Room", "Room")
+                    b.HasOne("WebHomestay.Models.Entities.Core.Room", "Room")
                         .WithMany("SlotInventories")
                         .HasForeignKey("RoomId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1535,7 +1535,7 @@ namespace WebHomestay.Migrations
 
             modelBuilder.Entity("WebHomestay.Models.RoomSlotOverride", b =>
                 {
-                    b.HasOne("WebHomestay.Models.Room", null)
+                    b.HasOne("WebHomestay.Models.Entities.Core.Room", null)
                         .WithMany("SlotOverrides")
                         .HasForeignKey("RoomId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1544,7 +1544,7 @@ namespace WebHomestay.Migrations
 
             modelBuilder.Entity("WebHomestay.Models.RoomSlotTemplateAssignment", b =>
                 {
-                    b.HasOne("WebHomestay.Models.Room", "Room")
+                    b.HasOne("WebHomestay.Models.Entities.Core.Room", "Room")
                         .WithMany("SlotAssignments")
                         .HasForeignKey("RoomId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1569,7 +1569,7 @@ namespace WebHomestay.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("WebHomestay.Models.Room", null)
+                    b.HasOne("WebHomestay.Models.Entities.Core.Room", null)
                         .WithMany()
                         .HasForeignKey("room_id")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1605,7 +1605,7 @@ namespace WebHomestay.Migrations
                     b.Navigation("StaffMembers");
                 });
 
-            modelBuilder.Entity("WebHomestay.Models.Room", b =>
+            modelBuilder.Entity("WebHomestay.Models.Entities.Core.Room", b =>
                 {
                     b.Navigation("Bookings");
 

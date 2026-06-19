@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
-using WebHomestay.Models;
+using WebHomestay.Services;
 
 namespace WebHomestay.Services.AI.Retrieval
 {

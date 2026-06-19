@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using WebHomestay.Data;
-using WebHomestay.Models;
+using WebHomestay.Models.Configuration;
 
 namespace WebHomestay.Services;
 
@@ -46,14 +46,14 @@ public class PermissionResolveService : IPermissionResolveService
         }
 
         if (overrideDict == null || overrideDict.Count == 0)
-            return template;
+            return NormalizePermissions(template);
 
         var merged = new Dictionary<string, bool>(template);
         foreach (var kvp in overrideDict)
         {
             merged[kvp.Key] = kvp.Value;
         }
-        return merged;
+        return NormalizePermissions(merged);
     }
 
     private Dictionary<string, bool> GetRoleTemplate(string role)
@@ -67,10 +67,23 @@ public class PermissionResolveService : IPermissionResolveService
         var template = context.RolePermissionTemplates.AsNoTracking()
             .FirstOrDefault(t => t.Role == role);
 
-        var result = template?.Permissions ?? new Dictionary<string, bool>();
+        var result = NormalizePermissions(template?.Permissions ?? new Dictionary<string, bool>());
 
         _cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
         return result;
+    }
+
+    private static Dictionary<string, bool> NormalizePermissions(Dictionary<string, bool> source)
+    {
+        var normalized = new Dictionary<string, bool>(source);
+
+        // Backward compatibility: old images.detail used as delete permission.
+        if (normalized.TryGetValue("images.detail", out var canDeleteImages) && canDeleteImages)
+        {
+            normalized["images.delete"] = true;
+        }
+
+        return normalized;
     }
 
     public void InvalidateCache(string role)

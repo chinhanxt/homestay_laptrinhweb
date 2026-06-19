@@ -56,12 +56,12 @@
                                     {
                                         <li><a class="dropdown-item py-2" asp-controller="AdminRooms" asp-action="Index"><i class="fas fa-door-open me-2 text-muted"></i>Quản lý Phòng</a></li>
                                     }
-                                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "bookings.view"))
+                                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.view"))
                                     {
-                                        @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "images.view"))
-                                        {
-                                            <li><a class="dropdown-item py-2" asp-controller="AdminImages" asp-action="Index"><i class="fas fa-images me-2 text-muted"></i>Kho ảnh Đơn hàng</a></li>
-                                        }
+                                        <li><a class="dropdown-item py-2" asp-controller="AdminImages" asp-action="Index"><i class="fas fa-images me-2 text-muted"></i>Kho ảnh Đơn hàng</a></li>
+                                    }
+                                    @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "statistics.view"))
+                                    {
                                         <li><a class="dropdown-item py-2" asp-controller="AdminStatistics" asp-action="Index"><i class="fas fa-chart-bar me-2 text-muted"></i>Thống kê doanh thu</a></li>
                                     }
                                     @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "staff.view"))

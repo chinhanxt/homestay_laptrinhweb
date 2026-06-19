@@ -1,8 +1,8 @@
-@model WebHomestay.Models.Room
+@model WebHomestay.Models.Entities.Core.Room
 
 @{
     ViewData["Title"] = "Lịch trình phòng " + Model.Name;
-    var templates = ViewBag.Templates as List<WebHomestay.Models.RoomSlotTemplate>;
+    var templates = ViewBag.Templates as List<WebHomestay.Models.Entities.Slots.RoomSlotTemplate>;
 }
 
 <link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />

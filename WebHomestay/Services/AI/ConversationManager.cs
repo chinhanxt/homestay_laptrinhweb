@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json;
-using WebHomestay.Models.AI;
+using WebHomestay.Models.Configuration;
+using WebHomestay.Models.DTOs.AI;
+using WebHomestay.Models.Entities.AI;
 
 namespace WebHomestay.Services.AI;
 

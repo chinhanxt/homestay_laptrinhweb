@@ -1,4 +1,4 @@
-@model IEnumerable<WebHomestay.Models.Booking>
+@model IEnumerable<WebHomestay.Models.Entities.Core.Booking>
 
 @{
     ViewData["Title"] = "Quản lý Đơn đặt phòng";
@@ -51,7 +51,7 @@
                     <label class="filter-label">Chi nhánh</label>
                     <select class="form-select form-select-sm booking-filter" id="filterBranch">
                         <option value="">Tất cả</option>
-                        @foreach (var branch in ViewBag.Branches as List<WebHomestay.Models.Branch> ?? new())
+                        @foreach (var branch in ViewBag.Branches as List<WebHomestay.Models.Entities.Core.Branch> ?? new())
                         {
                             <option value="@branch.Id">@branch.Name</option>
                         }
@@ -107,7 +107,7 @@
                                     <div class="small text-muted">@item.Room?.Branch?.Name</div>
                                 </td>
                                 <td>
-                                    @if (item.BookingMode == WebHomestay.Models.BookingMode.Hourly)
+                                    @if (item.BookingMode == WebHomestay.Models.Enums.BookingMode.Hourly)
                                     {
                                         var label = item.RoomSlotInventory?.Template?.Name ?? item.SlotLabel;
                                         <div class="fw-bold text-info">Theo giờ @label</div>
@@ -188,7 +188,7 @@
                                         
                                         @if (ViewBag.CheckoutMode == "Manual" && (item.Status == "Confirmed" || item.Status == "CheckedIn"))
                                         {
-                                            bool canCheckout = item.EndTime <= DateTime.UtcNow;
+                                            bool canCheckout = item.EndTime <= DateTime.Now;
                                             <form asp-action="Checkout" method="post" class="d-inline">
                                                 <input type="hidden" name="id" value="@item.Id" />
                                                 <button type="submit" class="btn btn-sm py-1 px-3 fw-bold @(canCheckout ? "btn-success" : "btn-light opacity-50")" 

@@ -1,5 +1,5 @@
 @using System.Text.Json
-@model IEnumerable<WebHomestay.Models.Branch>
+@model IEnumerable<WebHomestay.Models.Entities.Core.Branch>
 
 @{
     ViewData["Title"] = "Quản lý Chi nhánh";
@@ -23,7 +23,7 @@
                     </a>
                     <button type="button" class="btn-premium-outline" data-bs-toggle="modal" data-bs-target="#importBranchesModal">
                         <i class="fas fa-file-import"></i>
-                        <span>Import Excel/ZIP</span>
+                        <span>Import Excel/Word</span>
                     </button>
                 }
                 @if (WebHomestay.Helpers.PermissionHelper.HasPermission(Context, "branches.trash"))
@@ -133,10 +133,10 @@
             <form asp-action="ImportZip" method="post" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <div class="modal-body py-4">
-                    <p class="text-muted small">Chọn file Excel (.xlsx), Word (.docx) hoặc file nén ZIP để nhập hàng loạt thông tin chi nhánh.</p>
+                    <p class="text-muted small">Chọn file Excel (.xlsx) hoặc Word (.docx) để nhập hàng loạt thông tin chi nhánh.</p>
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">Chọn file (.xlsx, .docx hoặc .zip)</label>
-                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx,.docx,.zip" required />
+                        <label class="form-label small fw-bold text-muted">Chọn file (.xlsx, .docx)</label>
+                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx,.xls,.docx,.doc" required />
                     </div>
                 </div>
                 <div class="modal-footer border-0">

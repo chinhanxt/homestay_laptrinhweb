@@ -128,24 +128,26 @@ $(function() {
 
         var headersHtml = '';
         data.headers.forEach(function(h) {
-            headersHtml += '<th class="fw-bold text-muted small" style="white-space: nowrap;">' + h + '</th>';
+            headersHtml += '<th class="fw-bold text-white small" style="white-space: nowrap; padding: 14px 16px; font-weight: 600; border: none; background: var(--admin-primary, #243b5a);">' + h + '</th>';
         });
-        headersHtml += '<th class="fw-bold text-muted small" style="white-space: nowrap;">Trạng thái</th>';
+        headersHtml += '<th class="fw-bold text-white small" style="white-space: nowrap; padding: 14px 16px; font-weight: 600; border: none; background: var(--admin-primary, #243b5a);">Trạng thái</th>';
 
         var rowsHtml = '';
         data.rows.forEach(function(row) {
-            var rowClass = row.isValid ? '' : 'table-danger';
+            var rowStyle = row.isValid ? '' : 'style="background-color: rgba(220, 53, 69, 0.04);"';
             var statusBadge = row.isValid 
-                ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2">Hợp lệ</span>' 
-                : '<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2">Lỗi</span>';
+                ? '<span class="badge-premium badge-success-soft py-1 px-2.5 rounded-pill" style="font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fas fa-check-circle"></i>Hợp lệ</span>' 
+                : '<span class="badge-premium badge-danger-soft py-1 px-2.5 rounded-pill" style="font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fas fa-exclamation-circle"></i>Lỗi</span>';
             
-            var rowMsg = row.isValid ? 'Sẵn sàng nhập' : row.message;
+            var rowMsg = row.isValid 
+                ? '<span class="text-success small fw-semibold">Sẵn sàng nhập</span>' 
+                : '<span class="text-danger small fw-semibold d-block mt-1" style="max-width: 220px; line-height: 1.3;">' + row.message + '</span>';
 
-            rowsHtml += '<tr class="' + rowClass + '">';
+            rowsHtml += '<tr ' + rowStyle + '>';
             row.values.forEach(function(v) {
-                rowsHtml += '<td style="font-size: 0.85rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="' + v + '">' + (v || '') + '</td>';
+                rowsHtml += '<td style="font-size: 0.85rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 14px 16px; border-bottom: 1px solid rgba(226, 232, 240, 0.6);" title="' + (v || '') + '">' + (v || '') + '</td>';
             });
-            rowsHtml += '<td>' + statusBadge + '<div class="small text-muted mt-1" style="max-width: 200px; word-break: break-word;">' + rowMsg + '</div></td>';
+            rowsHtml += '<td style="padding: 14px 16px; border-bottom: 1px solid rgba(226, 232, 240, 0.6);">' + statusBadge + '<div class="mt-1">' + rowMsg + '</div></td>';
             rowsHtml += '</tr>';
         });
 
@@ -157,18 +159,28 @@ $(function() {
             '    <div class="modal-content premium-modal border-0 shadow-lg" style="border-radius: 20px;">' +
             '      <div class="modal-header border-0 pb-0 px-4 pt-4">' +
             '        <div>' +
-            '          <h5 class="modal-title fw-bold text-dark"><i class="fas fa-eye me-2 text-primary"></i>Xem trước kết quả nhập dữ liệu</h5>' +
-            '          <p class="text-muted small mb-0 mt-1">' +
-            '            Hợp lệ: <strong class="text-success">' + data.successCount + '</strong> | ' +
-            '            Không hợp lệ: <strong class="text-danger">' + data.failureCount + '</strong>' +
-            '          </p>' +
+            '          <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" style="font-family: \'Lexend\', sans-serif;"><i class="fas fa-file-invoice text-primary"></i>Xem trước kết quả nhập dữ liệu</h5>' +
             '        </div>' +
             '        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>' +
             '      </div>' +
             '      <div class="modal-body p-4">' +
-            '        <div class="table-responsive border border-light-subtle rounded-4 bg-white" style="max-height: 400px; overflow-y: auto;">' +
+            '        <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">' +
+            '          <div class="d-flex align-items-center gap-2 py-2 px-3 rounded-pill bg-light border border-light-subtle shadow-2xs">' +
+            '            <i class="fas fa-database text-primary fs-6"></i>' +
+            '            <span class="small fw-bold text-dark">Tổng bản ghi: <span>' + (data.successCount + data.failureCount) + '</span></span>' +
+            '          </div>' +
+            '          <div class="d-flex align-items-center gap-2 py-2 px-3 rounded-pill border border-success-subtle shadow-2xs" style="background-color: #f0fdf4;">' +
+            '            <i class="fas fa-check-circle text-success fs-6"></i>' +
+            '            <span class="small fw-bold text-success">Hợp lệ: <span>' + data.successCount + '</span></span>' +
+            '          </div>' +
+            '          <div class="d-flex align-items-center gap-2 py-2 px-3 rounded-pill border border-danger-subtle shadow-2xs" style="background-color: #fef2f2;">' +
+            '            <i class="fas fa-exclamation-circle text-danger fs-6"></i>' +
+            '            <span class="small fw-bold text-danger">Lỗi (Bỏ qua): <span>' + data.failureCount + '</span></span>' +
+            '          </div>' +
+            '        </div>' +
+            '        <div class="table-responsive border rounded-4 bg-white shadow-sm" style="max-height: 450px; overflow-y: auto; border-color: #e2e8f0 !important;">' +
             '          <table class="table table-hover align-middle mb-0" style="font-family: inherit;">' +
-            '            <thead class="sticky-top bg-light" style="z-index: 1;">' +
+            '            <thead class="sticky-top" style="z-index: 2;">' +
             '              <tr>' + headersHtml + '</tr>' +
             '            </thead>' +
             '            <tbody>' + rowsHtml + '</tbody>' +
@@ -176,10 +188,10 @@ $(function() {
             '        </div>' +
             '      </div>' +
             '      <div class="modal-footer border-0 px-4 pb-4 pt-0">' +
-            '        <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Hủy bỏ</button>' +
-            '        <button type="button" id="btn-import-confirm" class="btn btn-primary rounded-pill px-4" ' + confirmBtnDisabled + 
-            '                style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); border: none;">' +
-            '          <i class="fas fa-check me-2"></i>Xác nhận nhập (' + data.successCount + ')' +
+            '        <button type="button" class="btn btn-premium-outline rounded-pill px-4" data-bs-dismiss="modal">Hủy bỏ</button>' +
+            '        <button type="button" id="btn-import-confirm" class="btn btn-primary rounded-pill px-4 fw-bold" ' + confirmBtnDisabled + 
+            '                style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); border: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);">' +
+            '          <i class="fas fa-cloud-upload-alt me-2"></i>Xác nhận nhập (' + data.successCount + ')' +
             '        </button>' +
             '      </div>' +
             '    </div>' +

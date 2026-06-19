@@ -5,11 +5,16 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using WebHomestay.Data;
-using WebHomestay.Models;
-using WebHomestay.Models.AI;
+using WebHomestay.Models.Entities.Core;
+using WebHomestay.Models.Configuration;
+using WebHomestay.Models.DTOs.AI;
+using WebHomestay.Models.Entities.AI;
+using WebHomestay.Models.Enums;
 using WebHomestay.Models.ViewModels;
 using WebHomestay.Services.AI;
 using WebHomestay.Services.AI.Retrieval;
+using BranchEntity = WebHomestay.Models.Entities.Core.Branch;
+using RoomEntity = WebHomestay.Models.Entities.Core.Room;
 
 using Microsoft.AspNetCore.SignalR;
 using WebHomestay.Hubs;
@@ -1525,7 +1530,7 @@ public class ContextAwareBookingConductor : IBookingConductor
         };
     }
 
-    private static object? BuildBranchContactData(Branch? branch)
+    private static object? BuildBranchContactData(BranchEntity? branch)
     {
         if (branch == null) return null;
         return new
@@ -2418,7 +2423,7 @@ public class ContextAwareBookingConductor : IBookingConductor
             return;
         }
 
-        IQueryable<Room> query = _context.Rooms.AsNoTracking().Where(r => r.Status == "Available");
+        IQueryable<RoomEntity> query = _context.Rooms.AsNoTracking().Where(r => r.Status == "Available");
         if (container.Confirmed.BranchId.HasValue)
         {
             query = query.Where(r => r.BranchId == container.Confirmed.BranchId.Value);
