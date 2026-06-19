@@ -43,10 +43,12 @@ public class AdminAIReseedService : IAdminAIReseedService
 
         foreach (var branch in branches)
         {
+            var leadTimeText = $"theo giờ {branch.BookingLeadTimeHours} giờ, theo ngày {branch.BookingLeadTimeDays} ngày";
+
             var branchNode = CreateNode(
                 "branch",
                 branch.Name,
-                $"Chi nhánh tại {branch.Address}. Hotline: {branch.Hotline ?? "chưa cập nhật"}. Lead time đặt phòng: {branch.BookingLeadTimeHours} giờ.",
+                $"Chi nhánh tại {branch.Address}. Hotline: {branch.Hotline ?? "chưa cập nhật"}. Lead time đặt phòng: {leadTimeText}.",
                 new { source = "system-seed", branchId = branch.Id });
             nodes.Add(branchNode);
 
@@ -54,7 +56,7 @@ public class AdminAIReseedService : IAdminAIReseedService
             {
                 Scope = scope,
                 Title = $"Chi nhánh {branch.Name}",
-                Content = $"Chi nhánh {branch.Name} ở {branch.Address}. Hotline: {branch.Hotline ?? "chưa cập nhật"}. Thời gian đặt trước tối thiểu: {branch.BookingLeadTimeHours} giờ.",
+                Content = $"Chi nhánh {branch.Name} ở {branch.Address}. Hotline: {branch.Hotline ?? "chưa cập nhật"}. Thời gian đặt trước tối thiểu: {leadTimeText}.",
                 Tags = $"system-seed,branch,branch-{branch.Id}",
                 Priority = 50
             });

@@ -133,10 +133,10 @@
             <form asp-action="ImportZip" method="post" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <div class="modal-body py-4">
-                    <p class="text-muted small">Chọn file Excel (.xlsx) hoặc file nén ZIP chứa file excel để nhập hàng loạt thông tin chi nhánh.</p>
+                    <p class="text-muted small">Chọn file Excel (.xlsx), Word (.docx) hoặc file nén ZIP để nhập hàng loạt thông tin chi nhánh.</p>
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">Chọn file (.xlsx hoặc .zip)</label>
-                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx,.zip" required />
+                        <label class="form-label small fw-bold text-muted">Chọn file (.xlsx, .docx hoặc .zip)</label>
+                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx,.docx,.zip" required />
                     </div>
                 </div>
                 <div class="modal-footer border-0">
@@ -182,6 +182,17 @@
             });
         });
     </script>
+    <script src="~/js/admin-import-preview.js" asp-append-version="true"></script>
+    <script>
+        $(function() {
+            window.initImportPreview({
+                formSelector: '#importBranchesModal form',
+                previewUrl: '@Url.Action("ImportPreview", "AdminBranches")',
+                confirmUrl: '@Url.Action("ImportConfirm", "AdminBranches")',
+                modalId: 'importBranchesModal'
+            });
+        });
+    </script>
     <script>
         // Tự động hiển thị TempData message nếu có
         @if (TempData["SuccessMessage"] != null)
@@ -194,3 +205,4 @@
         }
     </script>
 }
+

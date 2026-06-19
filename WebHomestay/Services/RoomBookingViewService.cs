@@ -12,17 +12,29 @@ public class RoomBookingViewService : IRoomBookingViewService
     private readonly IAvailabilityService _availabilityService;
     private readonly ISettingService _settingService;
     private readonly PricingService _pricingService;
+    private readonly IBranchLeadTimeService _branchLeadTimeService;
 
-    public RoomBookingViewService(ApplicationDbContext context, IAvailabilityService availabilityService, ISettingService settingService, PricingService pricingService)
+    public RoomBookingViewService(
+        ApplicationDbContext context,
+        IAvailabilityService availabilityService,
+        ISettingService settingService,
+        PricingService pricingService,
+        IBranchLeadTimeService branchLeadTimeService)
     {
         _context = context;
         _availabilityService = availabilityService;
         _settingService = settingService;
         _pricingService = pricingService;
+        _branchLeadTimeService = branchLeadTimeService;
+    }
+
+    public RoomBookingViewService(ApplicationDbContext context, IAvailabilityService availabilityService, ISettingService settingService, PricingService pricingService)
+        : this(context, availabilityService, settingService, pricingService, new BranchLeadTimeService(context))
+    {
     }
 
     public RoomBookingViewService(ApplicationDbContext context, IAvailabilityService availabilityService)
-        : this(context, availabilityService, new SettingService(context, new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions())), new PricingService(context))
+        : this(context, availabilityService, new SettingService(context, new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions())), new PricingService(context), new BranchLeadTimeService(context))
     {
     }
 
@@ -41,18 +53,12 @@ public class RoomBookingViewService : IRoomBookingViewService
         var hourlySlots = new List<RoomSlotInventory>();
         var fiveMinutesAgo = DateTime.UtcNow.AddMinutes(-5);
 
-        int globalLeadTimeHours = await _settingService.GetIntAsync("BookingLeadTimeHours", 2);
-        int branchLeadTimeHours = room.Branch?.BookingLeadTimeHours ?? 0;
-        
-        // Use branch lead time if it's set (not 0), otherwise fallback to global
-        int leadTimeHours = branchLeadTimeHours > 0 ? branchLeadTimeHours : globalLeadTimeHours;
-        
-        DateTime cutoffTime = DateTime.UtcNow.AddHours(leadTimeHours);
+        var leadTimeRule = await _branchLeadTimeService.ResolveAsync(room.BranchId);
 
         foreach (var slot in allSlots)
         {
             // Filter out slots that are in the past or within the lead time buffer
-            if (slot.StartTime < cutoffTime) continue;
+            if (!leadTimeRule.AllowsHourly(slot.StartTime)) continue;
 
             if (slot.Status == "Booked")
             {
@@ -90,7 +96,7 @@ public class RoomBookingViewService : IRoomBookingViewService
             calendar.Add(new CalendarDayViewModel
             {
                 Date = date,
-                Status = blockedDates.Contains(date) ? "Blocked" : "Available",
+                Status = blockedDates.Contains(date) || !leadTimeRule.AllowsDaily(date) ? "Blocked" : "Available",
                 PriceDay = await _pricingService.GetRoomPriceForDate(room.Id, dt, false),
                 PriceHour = await _pricingService.GetRoomPriceForDate(room.Id, dt, true)
             });

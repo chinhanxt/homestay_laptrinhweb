@@ -273,6 +273,24 @@ public class AdminChatServiceTests
     }
 
     [Fact]
+    public async Task GetUnreadCustomerMessageCountAsync_WhenScopedByBranch_CountsOnlyThatBranch()
+    {
+        var ctx = CreateContext();
+        ctx.AdminChatSessions.AddRange(
+            new AdminChatSession { SessionId = "sess-1", BranchId = 1, CustomerName = "A" },
+            new AdminChatSession { SessionId = "sess-2", BranchId = 2, CustomerName = "B" });
+        ctx.AdminChatMessages.AddRange(
+            new AdminChatMessage { SessionId = "sess-1", Role = "user", Content = "Hello", IsRead = false },
+            new AdminChatMessage { SessionId = "sess-2", Role = "user", Content = "Hi", IsRead = false });
+        await ctx.SaveChangesAsync();
+        var svc = new AdminChatService(ctx);
+
+        var count = await svc.GetUnreadCustomerMessageCountAsync(1);
+
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
     public async Task GetSessionsAsync_Returns_All_NonDeleted_Sessions_From_Database()
     {
         var ctx = CreateContext();

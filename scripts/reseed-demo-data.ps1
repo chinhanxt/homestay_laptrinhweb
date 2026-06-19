@@ -87,6 +87,7 @@ Ensure-Asset -Source (Join-Path $repoRoot "ảnh\ma qr.png") -Destination (Join-
 & $psqlExe -h $connectionMap["Host"] -p $connectionMap["Port"] -U $connectionMap["Username"] -d $DatabaseName -v ON_ERROR_STOP=1 -f (Join-Path $repoRoot "scripts\seed-demo-bookings.sql")
 & $psqlExe -h $connectionMap["Host"] -p $connectionMap["Port"] -U $connectionMap["Username"] -d $DatabaseName -v ON_ERROR_STOP=1 -f (Join-Path $repoRoot "scripts\seed-demo-cancellations.sql")
 & $psqlExe -h $connectionMap["Host"] -p $connectionMap["Port"] -U $connectionMap["Username"] -d $DatabaseName -v ON_ERROR_STOP=1 -f (Join-Path $repoRoot "scripts\seed-demo-history.sql")
+& $psqlExe -h $connectionMap["Host"] -p $connectionMap["Port"] -U $connectionMap["Username"] -d $DatabaseName -v ON_ERROR_STOP=1 -f (Join-Path $repoRoot "scripts\seed-demo-chat-history.sql")
 & $psqlExe -h $connectionMap["Host"] -p $connectionMap["Port"] -U $connectionMap["Username"] -d $DatabaseName -v ON_ERROR_STOP=1 -f (Join-Path $repoRoot "scripts\verify-demo-data.sql")
 
 if ($RunBackup) {

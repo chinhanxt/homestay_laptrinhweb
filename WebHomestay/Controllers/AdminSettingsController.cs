@@ -107,18 +107,21 @@ namespace WebHomestay.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        [AdminAuthorize(Permission = "branch.settings")]
+        [AdminAuthorize(Permission = "settings.update")]
         [HttpPost("update-branch")]
-        public async Task<IActionResult> UpdateBranch(int branchId, int leadTime)
+        public async Task<IActionResult> UpdateBranch(int branchId, int leadTimeHours, int leadTimeDays)
         {
             var branch = await _context.Branches.FindAsync(branchId);
             if (branch != null)
             {
-                branch.BookingLeadTimeHours = leadTime;
+                branch.BookingLeadTimeHours = Math.Max(0, leadTimeHours);
+                branch.BookingLeadTimeDays = Math.Max(0, leadTimeDays);
+                branch.BookingLeadTimeValue = leadTimeHours;
+                branch.BookingLeadTimeUnit = BranchLeadTimeUnit.Hours;
                 await _context.SaveChangesAsync();
                 TempData["SuccessMessage"] = $"Cập nhật cấu hình cho chi nhánh {branch.Name} thành công.";
             }
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { tab = "branch" });
         }
 
         [AdminAuthorize(Permission = "payment.settings")]
@@ -203,5 +206,88 @@ namespace WebHomestay.Controllers
 
             return RedirectToAction(nameof(Index));
         }
+
+        [AdminAuthorize(Permission = "settings.update")]
+        [HttpPost("import-slot-templates-preview")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ImportSlotTemplatesPreview(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return Json(new { success = false, message = "Vui lòng chọn file để import." });
+            }
+
+            try
+            {
+                var result = await _importService.PreviewRoomSlotTemplatesAsync(file);
+                return Json(new { success = true, data = result });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [AdminAuthorize(Permission = "settings.update")]
+        [HttpPost("import-slot-templates-confirm")]
+        public async Task<IActionResult> ImportSlotTemplatesConfirm([FromBody] ConfirmImportRequest request)
+        {
+            if (request == null || string.IsNullOrEmpty(request.CacheKey))
+            {
+                return Json(new { success = false, message = "Yêu cầu không hợp lệ." });
+            }
+
+            try
+            {
+                var result = await _importService.ConfirmRoomSlotTemplatesAsync(request.CacheKey);
+                return Json(new { success = true, successCount = result.SuccessCount });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [AdminAuthorize(Permission = "settings.update")]
+        [HttpPost("import-holidays-preview")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ImportHolidaysPreview(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return Json(new { success = false, message = "Vui lòng chọn file để import." });
+            }
+
+            try
+            {
+                var result = await _importService.PreviewHolidaysAsync(file);
+                return Json(new { success = true, data = result });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [AdminAuthorize(Permission = "settings.update")]
+        [HttpPost("import-holidays-confirm")]
+        public async Task<IActionResult> ImportHolidaysConfirm([FromBody] ConfirmImportRequest request)
+        {
+            if (request == null || string.IsNullOrEmpty(request.CacheKey))
+            {
+                return Json(new { success = false, message = "Yêu cầu không hợp lệ." });
+            }
+
+            try
+            {
+                var result = await _importService.ConfirmHolidaysAsync(request.CacheKey);
+                return Json(new { success = true, successCount = result.SuccessCount });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
     }
 }
+

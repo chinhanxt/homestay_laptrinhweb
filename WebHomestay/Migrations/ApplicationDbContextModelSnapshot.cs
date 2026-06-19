@@ -484,6 +484,10 @@ namespace WebHomestay.Migrations
                         .HasColumnType("text")
                         .HasColumnName("auto_reply_message");
 
+                    b.Property<int?>("BranchId")
+                        .HasColumnType("integer")
+                        .HasColumnName("branch_id");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at");
@@ -498,6 +502,10 @@ namespace WebHomestay.Migrations
 
                     b.Property<string>("DeletedBy")
                         .HasColumnType("text");
+
+                    b.Property<bool>("HasPromptedForBranch")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_prompted_for_branch");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
@@ -934,9 +942,24 @@ namespace WebHomestay.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("address");
 
+                    b.Property<int>("BookingLeadTimeDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("booking_lead_time_days");
+
                     b.Property<int>("BookingLeadTimeHours")
                         .HasColumnType("integer")
                         .HasColumnName("booking_lead_time_hours");
+
+                    b.Property<string>("BookingLeadTimeUnit")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("booking_lead_time_unit");
+
+                    b.Property<int>("BookingLeadTimeValue")
+                        .HasColumnType("integer")
+                        .HasColumnName("booking_lead_time_value");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp without time zone")

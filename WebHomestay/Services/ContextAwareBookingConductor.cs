@@ -27,6 +27,7 @@ public class ContextAwareBookingConductor : IBookingConductor
     private readonly AI.IEntityExtractorService _entityExtractor;
     private readonly IPublicBookingRoomExplanationService _roomExplanationService;
     private readonly PricingService _pricingService;
+    private readonly IBranchLeadTimeService _branchLeadTimeService;
     private const string CacheKeyPrefix = "ai-booking-conductor:";
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(30);
 
@@ -47,7 +48,8 @@ public class ContextAwareBookingConductor : IBookingConductor
         AI.LLMIntentClassifier intentClassifier,
         AI.IEntityExtractorService entityExtractor,
         IPublicBookingRoomExplanationService roomExplanationService,
-        PricingService pricingService)
+        PricingService pricingService,
+        IBranchLeadTimeService branchLeadTimeService)
     {
         _context = context;
         _cache = cache;
@@ -58,6 +60,31 @@ public class ContextAwareBookingConductor : IBookingConductor
         _entityExtractor = entityExtractor;
         _roomExplanationService = roomExplanationService;
         _pricingService = pricingService;
+        _branchLeadTimeService = branchLeadTimeService;
+    }
+
+    public ContextAwareBookingConductor(
+        ApplicationDbContext context,
+        IMemoryCache cache,
+        IServiceScopeFactory scopeFactory,
+        IBookingCreationService bookingCreationService,
+        IAdminChatService adminChatService,
+        AI.LLMIntentClassifier intentClassifier,
+        AI.IEntityExtractorService entityExtractor,
+        IPublicBookingRoomExplanationService roomExplanationService,
+        PricingService pricingService)
+        : this(
+            context,
+            cache,
+            scopeFactory,
+            bookingCreationService,
+            adminChatService,
+            intentClassifier,
+            entityExtractor,
+            roomExplanationService,
+            pricingService,
+            new BranchLeadTimeService(context))
+    {
     }
 
     private string CacheKey(string sessionId) => $"{CacheKeyPrefix}{sessionId}";
@@ -194,6 +221,95 @@ public class ContextAwareBookingConductor : IBookingConductor
         await TryBindRoomContextFromMessageAsync(container, message, cancellationToken);
         container.Confirmed.MissingRequiredFields = GetMissingRequiredFields(container.Confirmed, studioConfig);
 
+        if ((intent == MessageIntent.BookingIntent || intent == MessageIntent.BrowsingRooms) && container.Confirmed.BranchId.HasValue)
+        {
+            var leadTimeRule = await _branchLeadTimeService.ResolveAsync(container.Confirmed.BranchId.Value, cancellationToken);
+            
+            // Check Daily mode lead time
+            if (string.Equals(container.Confirmed.BookingMode, "daily", StringComparison.OrdinalIgnoreCase) && container.Confirmed.CheckInDate.HasValue)
+            {
+                if (!leadTimeRule.AllowsDaily(container.Confirmed.CheckInDate.Value))
+                {
+                    var earliestStr = leadTimeRule.EarliestAllowedDailyDate?.ToString("dd/MM/yyyy") ?? "";
+                    var explanation = $"Rất tiếc, chi nhánh này yêu cầu thời gian đặt trước tối thiểu {leadTimeRule.DailyLeadTimeDays} ngày. Ngày gần nhất bạn có thể đặt là {earliestStr}. Vui lòng chọn ngày khác.";
+                    
+                    container.Confirmed.CheckInDate = null;
+                    container.Confirmed.CheckOutDate = null;
+                    container.Confirmed.MissingRequiredFields = GetMissingRequiredFields(container.Confirmed, studioConfig);
+                    
+                    var gatingBlocks = await BuildMissingFieldBlocksAsync(sessionId, container.Confirmed, studioConfig, cancellationToken);
+                    CacheState(sessionId, container);
+                    
+                    return new ConductorResult
+                    {
+                        Action = ConductorAction.AskInfo,
+                        State = container,
+                        UiBlocks = gatingBlocks,
+                        Answer = explanation,
+                        Reason = "leadtime-gating-daily"
+                    };
+                }
+            }
+            // Check Hourly mode lead time
+            else if (string.Equals(container.Confirmed.BookingMode, "hourly", StringComparison.OrdinalIgnoreCase) && container.Confirmed.HourlyDate.HasValue)
+            {
+                if (container.Confirmed.RequestedTimeStart.HasValue)
+                {
+                    var localStart = container.Confirmed.HourlyDate.Value.ToDateTime(container.Confirmed.RequestedTimeStart.Value);
+                    var startUtc = localStart.AddHours(-7);
+                    if (!leadTimeRule.AllowsHourly(startUtc))
+                    {
+                        var earliestLocal = leadTimeRule.HourlyCutoffUtc?.AddHours(7) ?? DateTime.Now.AddHours(leadTimeRule.Value);
+                        var earliestStr = earliestLocal.ToString("dd/MM/yyyy HH:mm");
+                        var explanation = $"Rất tiếc, chi nhánh này yêu cầu thời gian đặt trước tối thiểu {leadTimeRule.HourlyLeadTimeHours} giờ. Khung giờ gần nhất bạn có thể đặt là từ {earliestStr}. Vui lòng chọn giờ khác.";
+                        
+                        container.Confirmed.HourlyDate = null;
+                        container.Confirmed.RequestedTimeStart = null;
+                        container.Confirmed.RequestedTimeLabel = null;
+                        container.Confirmed.MissingRequiredFields = GetMissingRequiredFields(container.Confirmed, studioConfig);
+                        
+                        var gatingBlocks = await BuildMissingFieldBlocksAsync(sessionId, container.Confirmed, studioConfig, cancellationToken);
+                        CacheState(sessionId, container);
+                        
+                        return new ConductorResult
+                        {
+                            Action = ConductorAction.AskInfo,
+                            State = container,
+                            UiBlocks = gatingBlocks,
+                            Answer = explanation,
+                            Reason = "leadtime-gating-hourly"
+                        };
+                    }
+                }
+                else
+                {
+                    var localEnd = container.Confirmed.HourlyDate.Value.ToDateTime(new TimeOnly(23, 59, 59));
+                    var endUtc = localEnd.AddHours(-7);
+                    if (!leadTimeRule.AllowsHourly(endUtc))
+                    {
+                        var earliestLocal = leadTimeRule.HourlyCutoffUtc?.AddHours(7) ?? DateTime.Now.AddHours(leadTimeRule.Value);
+                        var earliestStr = earliestLocal.ToString("dd/MM/yyyy");
+                        var explanation = $"Rất tiếc, chi nhánh này yêu cầu thời gian đặt trước tối thiểu {leadTimeRule.HourlyLeadTimeHours} giờ. Ngày gần nhất bạn có thể đặt là từ ngày {earliestStr}. Vui lòng chọn ngày khác.";
+                        
+                        container.Confirmed.HourlyDate = null;
+                        container.Confirmed.MissingRequiredFields = GetMissingRequiredFields(container.Confirmed, studioConfig);
+                        
+                        var gatingBlocks = await BuildMissingFieldBlocksAsync(sessionId, container.Confirmed, studioConfig, cancellationToken);
+                        CacheState(sessionId, container);
+                        
+                        return new ConductorResult
+                        {
+                            Action = ConductorAction.AskInfo,
+                            State = container,
+                            UiBlocks = gatingBlocks,
+                            Answer = explanation,
+                            Reason = "leadtime-gating-hourly-date"
+                        };
+                    }
+                }
+            }
+        }
+
         if (IsRoomContextOccupancyQuestion(message, container))
         {
             CacheState(sessionId, container);
@@ -235,7 +351,7 @@ public class ContextAwareBookingConductor : IBookingConductor
             if (!container.Confirmed.HourlyDate.HasValue)
             {
                 container.Confirmed.MissingRequiredFields = new List<string> { "hourlyDate" };
-                var slotDateBlocks = await BuildMissingFieldBlocksAsync(container.Confirmed, studioConfig, cancellationToken);
+                var slotDateBlocks = await BuildMissingFieldBlocksAsync(sessionId, container.Confirmed, studioConfig, cancellationToken);
                 CacheState(sessionId, container);
                 return new ConductorResult
                 {
@@ -271,7 +387,7 @@ public class ContextAwareBookingConductor : IBookingConductor
 
         if (action == ConductorAction.AskInfo)
         {
-            uiBlocks = await BuildMissingFieldBlocksAsync(container.Confirmed, studioConfig, cancellationToken);
+            uiBlocks = await BuildMissingFieldBlocksAsync(sessionId, container.Confirmed, studioConfig, cancellationToken);
         }
 
         if (action == ConductorAction.ShowRooms)
@@ -685,17 +801,24 @@ public class ContextAwareBookingConductor : IBookingConductor
 
                 if (!container.Confirmed.BranchId.HasValue)
                 {
+                    var shouldRenderBranchSelector = !await _adminChatService.HasBranchPromptBeenShownAsync(actionRequest.SessionId);
+                    if (shouldRenderBranchSelector)
+                    {
+                        await _adminChatService.MarkBranchPromptShownAsync(actionRequest.SessionId);
+                    }
+
                     return new BookingActionResult
                     {
-                        Answer = container.Confirmed.BookingMode == "daily"
-                            ? "Mình sẽ tư vấn đặt theo ngày. Bạn chọn chi nhánh trước nhé."
-                            : "Mình sẽ tư vấn đặt theo giờ. Bạn chọn chi nhánh trước nhé.",
+                        Answer = shouldRenderBranchSelector
+                            ? (container.Confirmed.BookingMode == "daily"
+                                ? "Mình sẽ tư vấn đặt theo ngày. Bạn chọn chi nhánh trước nhé."
+                                : "Mình sẽ tư vấn đặt theo giờ. Bạn chọn chi nhánh trước nhé.")
+                            : "Mình đã hỏi chi nhánh ở trên rồi, bạn chọn giúp mình chi nhánh hoặc nhắn nếu muốn đổi sang chi nhánh khác nhé.",
                         Action = ConductorAction.AskInfo,
                         State = container,
-                        UiBlocks = new List<object>
-                        {
-                            await BuildBranchSelectorBlockAsync(cancellationToken)
-                        }
+                        UiBlocks = shouldRenderBranchSelector
+                            ? new List<object> { await BuildBranchSelectorBlockAsync(cancellationToken) }
+                            : new List<object>()
                     };
                 }
 
@@ -2063,7 +2186,7 @@ public class ContextAwareBookingConductor : IBookingConductor
         return missing;
     }
 
-    private async Task<List<object>> BuildMissingFieldBlocksAsync(BookingConfirmedState state, AdminAIStudioConfigResponse? studioConfig, CancellationToken cancellationToken)
+    private async Task<List<object>> BuildMissingFieldBlocksAsync(string sessionId, BookingConfirmedState state, AdminAIStudioConfigResponse? studioConfig, CancellationToken cancellationToken)
     {
         var uiBlocks = new List<object>();
         var firstMissing = state.MissingRequiredFields.FirstOrDefault();
@@ -2077,7 +2200,11 @@ public class ContextAwareBookingConductor : IBookingConductor
 
         if (firstMissing == "branchId" || inputType == "branchSelector" || inputType == "branches")
         {
-            uiBlocks.Add(await BuildBranchSelectorBlockAsync(cancellationToken));
+            if (!await _adminChatService.HasBranchPromptBeenShownAsync(sessionId))
+            {
+                uiBlocks.Add(await BuildBranchSelectorBlockAsync(cancellationToken));
+                await _adminChatService.MarkBranchPromptShownAsync(sessionId);
+            }
             return uiBlocks;
         }
 
@@ -2513,8 +2640,8 @@ public class ContextAwareBookingConductor : IBookingConductor
             var hubContext = scope.ServiceProvider.GetService<IHubContext<ChatHub>>();
             if (hubContext != null)
             {
-                var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
-                await hubContext.Clients.Group("admin_monitor").SendAsync("sessionUpdate", new
+                var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync(session?.BranchId);
+                await hubContext.Clients.Groups(ChatMonitorScopeHelper.GetMonitorGroupsForSession(session?.BranchId)).SendAsync("sessionUpdate", new
                 {
                     sessionId,
                     status = "paused",

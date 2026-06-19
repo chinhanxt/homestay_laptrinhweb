@@ -52,6 +52,7 @@ builder.Services.AddScoped<WebHomestay.Services.IBookingCreationService, WebHome
 builder.Services.AddScoped<WebHomestay.Services.IBookingCancellationService, WebHomestay.Services.BookingCancellationService>();
 builder.Services.AddScoped<WebHomestay.Services.ISlotManagementService, WebHomestay.Services.SlotManagementService>();
 builder.Services.AddScoped<WebHomestay.Services.IMailService, WebHomestay.Services.MailService>();
+builder.Services.AddScoped<WebHomestay.Services.IBranchLeadTimeService, WebHomestay.Services.BranchLeadTimeService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<WebHomestay.Services.ISettingService, WebHomestay.Services.SettingService>();
 builder.Services.AddScoped<WebHomestay.Services.IStatisticsService, WebHomestay.Services.StatisticsService>();
@@ -125,55 +126,6 @@ using (var scope = app.Services.CreateScope())
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<ApplicationDbContext>();
     context.Database.Migrate();
-
-    // Force reseed on startup to clear any legacy or corrupted embeddings, and reconstruct the grounding data
-    try
-    {
-        var reseedService = services.GetRequiredService<WebHomestay.Services.AI.IAdminAIReseedService>();
-        reseedService.ReseedAsync().GetAwaiter().GetResult();
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Failed to force database reseed on startup.");
-    }
-
-    // Auto-reindex embeddings on startup if any are missing
-    var anyRoomWithEmbedding = context.Rooms.Any(r => r.Embedding != null);
-    var anyUnitWithEmbedding = context.AIKnowledgeUnits.Any(k => k.Embedding != null);
-    if ((!anyRoomWithEmbedding && context.Rooms.Any()) || (!anyUnitWithEmbedding && context.AIKnowledgeUnits.Any()))
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogInformation("Auto-reindexing AI embeddings on startup...");
-        var embeddingService = services.GetRequiredService<WebHomestay.Services.AI.IEmbeddingService>();
-        
-        try
-        {
-            var units = context.AIKnowledgeUnits.Where(k => k.IsActive && !k.IsDeleted && k.Embedding == null).ToList();
-            foreach (var unit in units)
-            {
-                var text = $"{unit.Title}. {unit.Content}. Thẻ: {unit.Tags}";
-                var rawEmbedding = embeddingService.GetEmbeddingAsync(text).GetAwaiter().GetResult();
-                unit.Embedding = new Pgvector.Vector(rawEmbedding);
-            }
-
-            var rooms = context.Rooms.Include(r => r.Branch).Where(r => r.Embedding == null).ToList();
-            foreach (var room in rooms)
-            {
-                var branchName = room.Branch?.Name ?? "Hệ thống";
-                var text = $"Phòng {room.Name} thuộc chi nhánh {branchName}, giá giờ {room.PricePerHour:N0}đ, giá ngày {room.PricePerDay:N0}đ. Sức chứa {room.Capacity} người, tối đa {room.MaxGuests} khách. Tiện nghi và mô tả: {room.Description ?? "Chưa cập nhật."}";
-                var rawEmbedding = embeddingService.GetEmbeddingAsync(text).GetAwaiter().GetResult();
-                room.Embedding = new Pgvector.Vector(rawEmbedding);
-            }
-
-            context.SaveChanges();
-            logger.LogInformation("Auto-reindexing AI embeddings on startup completed successfully.");
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to auto-reindex AI embeddings on startup.");
-        }
-    }
 
     // Seed default settings
     if (!context.SystemSettings.Any(s => s.SettingKey == "BookingLeadTimeHours"))

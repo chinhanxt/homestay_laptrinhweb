@@ -450,6 +450,11 @@ namespace WebHomestay.Services.AI
 
         private async Task<string> BuildConductorReplyAsync(ConductorResult decision, CancellationToken cancellationToken)
         {
+            if (!string.IsNullOrEmpty(decision.Answer))
+            {
+                return decision.Answer;
+            }
+
             var confirmed = decision.State.Confirmed;
             if (IsDeterministicConductorReply(decision.Reason))
             {

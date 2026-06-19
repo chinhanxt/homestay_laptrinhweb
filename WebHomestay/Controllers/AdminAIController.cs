@@ -758,7 +758,49 @@ public class AdminAIController : Controller
 
         return RedirectToAction(nameof(Index));
     }
+
+    [AdminAuthorize(Permission = "ai.edit")]
+    [HttpPost("import-knowledge-preview")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ImportKnowledgePreview(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return Json(new { success = false, message = "Vui lòng chọn file ZIP hoặc Excel để import." });
+        }
+
+        try
+        {
+            var result = await _importService.PreviewAIKnowledgeAsync(file);
+            return Json(new { success = true, data = result });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = ex.Message });
+        }
+    }
+
+    [AdminAuthorize(Permission = "ai.edit")]
+    [HttpPost("import-knowledge-confirm")]
+    public async Task<IActionResult> ImportKnowledgeConfirm([FromBody] ConfirmImportRequest request)
+    {
+        if (request == null || string.IsNullOrEmpty(request.CacheKey))
+        {
+            return Json(new { success = false, message = "Yêu cầu không hợp lệ." });
+        }
+
+        try
+        {
+            var result = await _importService.ConfirmAIKnowledgeAsync(request.CacheKey);
+            return Json(new { success = true, successCount = result.SuccessCount });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = ex.Message });
+        }
+    }
 }
+
 
 public class QuickActionRequest
 {

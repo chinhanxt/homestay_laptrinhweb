@@ -31,6 +31,7 @@ public class ConductorResult
     public BookingSessionContainer State { get; set; } = new();
     public List<object> UiBlocks { get; set; } = new();
     public string? Reason { get; set; }
+    public string? Answer { get; set; }
 }
 
 public class BookingActionRequest

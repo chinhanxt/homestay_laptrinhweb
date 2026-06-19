@@ -266,5 +266,47 @@ namespace WebHomestay.Controllers
 
             return RedirectToAction(nameof(Index));
         }
+
+        [AdminAuthorize(Permission = "branches.create")]
+        [HttpPost("import-preview")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ImportPreview(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return Json(new { success = false, message = "Vui lòng chọn file để import." });
+            }
+
+            try
+            {
+                var result = await _importService.PreviewBranchesAsync(file);
+                return Json(new { success = true, data = result });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [AdminAuthorize(Permission = "branches.create")]
+        [HttpPost("import-confirm")]
+        public async Task<IActionResult> ImportConfirm([FromBody] ConfirmImportRequest request)
+        {
+            if (request == null || string.IsNullOrEmpty(request.CacheKey))
+            {
+                return Json(new { success = false, message = "Yêu cầu không hợp lệ." });
+            }
+
+            try
+            {
+                var result = await _importService.ConfirmBranchesAsync(request.CacheKey);
+                return Json(new { success = true, successCount = result.SuccessCount });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
     }
 }
+

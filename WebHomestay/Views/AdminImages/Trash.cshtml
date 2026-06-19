@@ -4,6 +4,8 @@
 @{
     ViewData["Title"] = "Thùng rác Ảnh";
     var retentionDays = await SettingService.GetIntAsync("BookingTrashRetentionDays", 7);
+    var branchOptions = ViewBag.BranchOptions as List<WebHomestay.Models.Branch> ?? new();
+    var selectedBranchId = ViewBag.SelectedBranchId as int?;
 }
 
 <link rel="stylesheet" href="~/css/admin-premium.css" asp-append-version="true" />
@@ -16,7 +18,22 @@
                 <h1>Thùng rác Ảnh</h1>
                 <p class="text-muted small mb-0 mt-1">Các ảnh trong này sẽ tự động bị xóa vĩnh viễn sau @retentionDays ngày.</p>
             </div>
-            <div class="admin-hero-actions">
+            <div class="admin-hero-actions d-flex align-items-center gap-2">
+                @if (branchOptions.Any())
+                {
+                    <form method="get" class="d-inline">
+                        <select name="branchId" class="form-select bg-white border shadow-none" style="font-size: 0.85rem; padding: 0.375rem 2.25rem 0.375rem 0.75rem; border-radius: 8px;" onchange="this.form.submit()">
+                            @if (Context.Session.GetString("AdminRole") == "SuperAdmin")
+                            {
+                                <option value="">Tất cả chi nhánh</option>
+                            }
+                            @foreach (var branch in branchOptions)
+                            {
+                                <option value="@branch.Id" selected="@(selectedBranchId == branch.Id)">@branch.Name</option>
+                            }
+                        </select>
+                    </form>
+                }
                 <a asp-action="Index" class="btn-premium-outline">
                     <i class="fas fa-arrow-left"></i>
                     <span>Quay lại kho ảnh</span>

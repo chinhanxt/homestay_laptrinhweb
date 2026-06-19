@@ -25,14 +25,17 @@ powershell -ExecutionPolicy Bypass -File scripts/restore-demo-db.ps1 -DatabaseNa
 
 ## 4. Chạy web với DB demo
 
-PowerShell:
-
 ```powershell
-$env:ConnectionStrings__DefaultConnection = "Host=localhost;Port=5432;Database=web_homestay_demo;Username=postgres;Password=1510"
-dotnet run --project WebHomestay/WebHomestay.csproj
+.\wdemo
 ```
 
-## 5. Kiểm tra nhanh dữ liệu demo
+## 5. Chạy web với DB gốc
+
+```powershell
+.\wmain
+```
+
+## 6. Kiểm tra nhanh dữ liệu demo
 
 ```powershell
 $env:PGPASSWORD = "1510"

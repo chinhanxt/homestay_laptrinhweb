@@ -114,21 +114,21 @@ namespace WebHomestay.Controllers
             {
                 // Upsert session + update activity
                 var session = await _adminChatService.UpsertSessionAsync(
-                    request.SessionId, request.CustomerName);
+                    request.SessionId, request.CustomerName, request.BranchId);
                 await _adminChatService.AddCustomerMessageAsync(
                     request.SessionId, request.Message, request.CustomerName);
                 var contactPhone = ExtractPhoneLikeContact(request.Message);
                 if (!string.IsNullOrWhiteSpace(contactPhone))
                 {
-                    await _adminChatService.UpsertSessionAsync(request.SessionId, contactPhone);
+                    await _adminChatService.UpsertSessionAsync(request.SessionId, contactPhone, request.BranchId);
                     await _adminChatService.AddSystemMessageAsync(
                         request.SessionId,
                         $"Khách vừa để lại SĐT/Zalo trong chat: {contactPhone}. Nhân viên nên liên hệ hỗ trợ nếu khách cần chốt đặt phòng.");
                 }
 
-                var unreadCount = (await _adminChatService.GetUnreadCustomerMessageCountsAsync(new[] { request.SessionId }))
+                var unreadCount = (await _adminChatService.GetUnreadCustomerMessageCountsAsync(new[] { request.SessionId }, session.BranchId))
                     .GetValueOrDefault(request.SessionId);
-                var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
+                var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync(session.BranchId);
 
                 // Check if paused
                 if (session.Status == "paused")
@@ -149,8 +149,7 @@ namespace WebHomestay.Controllers
                         }, cancellationToken);
 
                     // Broadcast customer message to admin monitor in realtime
-                    await _hubContext.Clients.Group("admin_monitor")
-                        .SendAsync("newMessage", new
+                    await BroadcastToAdminGroupsAsync(session.BranchId, "newMessage", new
                         {
                             sessionId = request.SessionId,
                             role = "user",
@@ -159,8 +158,7 @@ namespace WebHomestay.Controllers
                         }, cancellationToken);
 
                     // Broadcast system auto-reply to admin monitor in realtime
-                    await _hubContext.Clients.Group("admin_monitor")
-                        .SendAsync("newMessage", new
+                    await BroadcastToAdminGroupsAsync(session.BranchId, "newMessage", new
                         {
                             sessionId = request.SessionId,
                             role = "system",
@@ -168,8 +166,7 @@ namespace WebHomestay.Controllers
                             createdAt = msg.CreatedAt
                         }, cancellationToken);
 
-                    await _hubContext.Clients.Group("admin_monitor")
-                        .SendAsync("sessionUpdate", new
+                    await BroadcastToAdminGroupsAsync(session.BranchId, "sessionUpdate", new
                         {
                             sessionId = request.SessionId,
                             status = "paused",
@@ -192,8 +189,7 @@ namespace WebHomestay.Controllers
                 }
 
                 // Broadcast customer message to admin monitor in realtime (normal flow)
-                await _hubContext.Clients.Group("admin_monitor")
-                    .SendAsync("newMessage", new
+                await BroadcastToAdminGroupsAsync(session.BranchId, "newMessage", new
                     {
                         sessionId = request.SessionId,
                         role = "user",
@@ -214,6 +210,16 @@ namespace WebHomestay.Controllers
                 };
 
                 var brainResponse = await _orchestrator.ChatAsync(brainRequest, cancellationToken);
+                var resolvedBranchId = (brainResponse.BookingState as AIBookingSessionState)?.BranchId ?? request.BranchId ?? session.BranchId;
+                await _adminChatService.AssignBranchAsync(request.SessionId, resolvedBranchId);
+                session = await _adminChatService.UpsertSessionAsync(request.SessionId, request.CustomerName, resolvedBranchId);
+
+                if (await ShouldAppendInitialBranchSelectorAsync(request.SessionId, resolvedBranchId, brainResponse.UiBlocks))
+                {
+                    brainResponse.UiBlocks ??= new List<object>();
+                    brainResponse.UiBlocks.Add(await BuildBranchSelectorBlockAsync(cancellationToken));
+                    await _adminChatService.MarkBranchPromptShownAsync(request.SessionId);
+                }
 
                 // Save AI reply to database
                 string? uiBlocksJson = null;
@@ -228,8 +234,7 @@ namespace WebHomestay.Controllers
                     brainResponse.BookingAction);
 
                 // Broadcast AI message to admin monitor in realtime
-                await _hubContext.Clients.Group("admin_monitor")
-                    .SendAsync("newMessage", new
+                await BroadcastToAdminGroupsAsync(session.BranchId, "newMessage", new
                     {
                         sessionId = request.SessionId,
                         role = "ai",
@@ -240,8 +245,7 @@ namespace WebHomestay.Controllers
                     }, cancellationToken);
 
                 // Broadcast session update to admin monitor
-                await _hubContext.Clients.Group("admin_monitor")
-                    .SendAsync("sessionUpdate", new
+                await BroadcastToAdminGroupsAsync(session.BranchId, "sessionUpdate", new
                     {
                         sessionId = request.SessionId,
                         status = session.Status,
@@ -299,8 +303,10 @@ namespace WebHomestay.Controllers
                     await _adminChatService.AddCustomerMessageAsync(actionRequest.SessionId, userActionDesc, null);
 
                     // Broadcast customer message to admin monitor
-                    await _hubContext.Clients.Group("admin_monitor")
-                        .SendAsync("newMessage", new
+                    var actionBranchId = await ResolveBranchIdForActionAsync(actionRequest, cancellationToken);
+                    await _adminChatService.AssignBranchAsync(actionRequest.SessionId, actionBranchId);
+
+                    await BroadcastToAdminGroupsAsync(actionBranchId, "newMessage", new
                         {
                             sessionId = actionRequest.SessionId,
                             role = "user",
@@ -311,6 +317,10 @@ namespace WebHomestay.Controllers
 
                 // Handle the action
                 var result = await _bookingConductor.HandleActionAsync(actionRequest, cancellationToken);
+                var resolvedBranchId = result.State?.Confirmed?.BranchId
+                    ?? actionRequest.BranchId
+                    ?? await ResolveBranchIdForActionAsync(actionRequest, cancellationToken);
+                await _adminChatService.AssignBranchAsync(actionRequest.SessionId, resolvedBranchId);
 
                 // Save AI reply to database
                 string? uiBlocksJson = null;
@@ -325,8 +335,7 @@ namespace WebHomestay.Controllers
                     result.Action.ToString());
 
                 // Broadcast AI message to admin monitor in realtime
-                await _hubContext.Clients.Group("admin_monitor")
-                    .SendAsync("newMessage", new
+                await BroadcastToAdminGroupsAsync(resolvedBranchId, "newMessage", new
                     {
                         sessionId = actionRequest.SessionId,
                         role = "ai",
@@ -337,12 +346,11 @@ namespace WebHomestay.Controllers
                     }, cancellationToken);
 
                 // Broadcast session update to admin monitor
-                var unreadCount = (await _adminChatService.GetUnreadCustomerMessageCountsAsync(new[] { actionRequest.SessionId }))
+                var unreadCount = (await _adminChatService.GetUnreadCustomerMessageCountsAsync(new[] { actionRequest.SessionId }, resolvedBranchId))
                     .GetValueOrDefault(actionRequest.SessionId);
-                var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
+                var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync(resolvedBranchId);
 
-                await _hubContext.Clients.Group("admin_monitor")
-                    .SendAsync("sessionUpdate", new
+                await BroadcastToAdminGroupsAsync(resolvedBranchId, "sessionUpdate", new
                     {
                         sessionId = actionRequest.SessionId,
                         status = "auto",
@@ -479,6 +487,87 @@ namespace WebHomestay.Controllers
             var digits = new string((message ?? string.Empty).Where(char.IsDigit).ToArray());
             if (digits.Length is < 8 or > 15) return null;
             return digits;
+        }
+
+        private Task BroadcastToAdminGroupsAsync(int? branchId, string method, object payload, CancellationToken cancellationToken)
+        {
+            var groups = ChatMonitorScopeHelper.GetMonitorGroupsForSession(branchId);
+            return _hubContext.Clients.Groups(groups).SendAsync(method, payload, cancellationToken);
+        }
+
+        private async Task<int?> ResolveBranchIdForActionAsync(BookingActionRequest actionRequest, CancellationToken cancellationToken)
+        {
+            if (actionRequest.BranchId.HasValue)
+            {
+                return actionRequest.BranchId.Value;
+            }
+
+            if (actionRequest.RoomId.HasValue)
+            {
+                return await _context.Rooms
+                    .Where(room => room.Id == actionRequest.RoomId.Value)
+                    .Select(room => (int?)room.BranchId)
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
+
+            if (actionRequest.SlotId.HasValue)
+            {
+                return await _context.RoomSlotInventories
+                    .Where(slot => slot.Id == actionRequest.SlotId.Value)
+                    .Select(slot => (int?)slot.Room.BranchId)
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
+
+            return await _context.AdminChatSessions
+                .Where(session => session.SessionId == actionRequest.SessionId)
+                .Select(session => session.BranchId)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        private async Task<bool> ShouldAppendInitialBranchSelectorAsync(string sessionId, int? branchId, IEnumerable<object>? uiBlocks)
+        {
+            if (branchId.HasValue)
+            {
+                return false;
+            }
+
+            if (uiBlocks != null && uiBlocks.Any(block => JsonSerializer.Serialize(block).Contains("\"branchSelector\"", StringComparison.OrdinalIgnoreCase)))
+            {
+                await _adminChatService.MarkBranchPromptShownAsync(sessionId);
+                return false;
+            }
+
+            if (await _adminChatService.HasBranchPromptBeenShownAsync(sessionId))
+            {
+                return false;
+            }
+
+            var userMessageCount = await _context.AdminChatMessages
+                .CountAsync(message => message.SessionId == sessionId && message.Role == "user");
+
+            return userMessageCount == 1;
+        }
+
+        private async Task<object> BuildBranchSelectorBlockAsync(CancellationToken cancellationToken)
+        {
+            var branches = await _context.Branches
+                .OrderBy(branch => branch.Id)
+                .Select(branch => new
+                {
+                    id = branch.Id,
+                    name = branch.Name
+                })
+                .ToListAsync(cancellationToken);
+
+            return new
+            {
+                type = "branchSelector",
+                data = new
+                {
+                    label = "Bạn chọn chi nhánh giúp mình để mình lọc phòng chính xác hơn nhé",
+                    branches
+                }
+            };
         }
 
 

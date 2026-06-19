@@ -4,8 +4,8 @@ namespace WebHomestay.Services;
 
 public interface IAdminChatQuickSendService
 {
-    Task<AdminChatQuickSendSchema?> GetSchemaAsync(string type, CancellationToken cancellationToken = default);
-    Task<AdminChatQuickSendBuildResult?> BuildAsync(string sessionId, string type, JsonElement payload, CancellationToken cancellationToken = default);
+    Task<AdminChatQuickSendSchema?> GetSchemaAsync(string type, int? allowedBranchId = null, CancellationToken cancellationToken = default);
+    Task<AdminChatQuickSendBuildResult?> BuildAsync(string sessionId, string type, JsonElement payload, int? allowedBranchId = null, CancellationToken cancellationToken = default);
 }
 
 public sealed class AdminChatQuickSendSchema

@@ -25,6 +25,9 @@ namespace WebHomestay.Models
 
         public string? MapUrl { get; set; }
         public int BookingLeadTimeHours { get; set; } = 2;
+        public int BookingLeadTimeValue { get; set; } = 2;
+        public string? BookingLeadTimeUnit { get; set; } = BranchLeadTimeUnit.Hours;
+        public int BookingLeadTimeDays { get; set; } = 1;
 
         // Soft delete
         public bool IsDeleted { get; set; } = false;

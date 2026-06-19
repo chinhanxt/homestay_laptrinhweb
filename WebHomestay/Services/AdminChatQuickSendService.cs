@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using WebHomestay.Data;
+using WebHomestay.Models;
 
 namespace WebHomestay.Services;
 
@@ -9,22 +10,33 @@ public class AdminChatQuickSendService : IAdminChatQuickSendService
     private readonly ApplicationDbContext _context;
     private readonly IAvailabilityService _availabilityService;
     private readonly ISettingService _settingService;
+    private readonly IBranchLeadTimeService _branchLeadTimeService;
+
+    public AdminChatQuickSendService(
+        ApplicationDbContext context,
+        IAvailabilityService availabilityService,
+        ISettingService settingService,
+        IBranchLeadTimeService branchLeadTimeService)
+    {
+        _context = context;
+        _availabilityService = availabilityService;
+        _settingService = settingService;
+        _branchLeadTimeService = branchLeadTimeService;
+    }
 
     public AdminChatQuickSendService(
         ApplicationDbContext context,
         IAvailabilityService availabilityService,
         ISettingService settingService)
+        : this(context, availabilityService, settingService, new BranchLeadTimeService(context))
     {
-        _context = context;
-        _availabilityService = availabilityService;
-        _settingService = settingService;
     }
 
-    public async Task<AdminChatQuickSendSchema?> GetSchemaAsync(string type, CancellationToken cancellationToken = default)
+    public async Task<AdminChatQuickSendSchema?> GetSchemaAsync(string type, int? allowedBranchId = null, CancellationToken cancellationToken = default)
     {
-        var branches = await LoadBranchOptionsAsync(cancellationToken);
+        var branches = await LoadBranchOptionsAsync(allowedBranchId, cancellationToken);
         var rooms = type == "slotPicker"
-            ? await LoadRoomOptionsAsync(cancellationToken)
+            ? await LoadRoomOptionsAsync(allowedBranchId, cancellationToken)
             : Array.Empty<object>();
 
         return type switch
@@ -182,22 +194,25 @@ public class AdminChatQuickSendService : IAdminChatQuickSendService
         };
     }
 
-    public async Task<AdminChatQuickSendBuildResult?> BuildAsync(string sessionId, string type, JsonElement payload, CancellationToken cancellationToken = default)
+    public async Task<AdminChatQuickSendBuildResult?> BuildAsync(string sessionId, string type, JsonElement payload, int? allowedBranchId = null, CancellationToken cancellationToken = default)
     {
+        EnforceBranchScope(payload, allowedBranchId);
+
         return type switch
         {
-            "roomSelector" => await BuildRoomSelectorAsync(payload, cancellationToken),
-            "slotPicker" => await BuildSlotPickerAsync(payload, cancellationToken),
+            "roomSelector" => await BuildRoomSelectorAsync(payload, allowedBranchId, cancellationToken),
+            "slotPicker" => await BuildSlotPickerAsync(payload, allowedBranchId, cancellationToken),
             "infoForm" => await BuildInfoFormAsync(payload, cancellationToken),
             "bookingCta" => await BuildBookingCtaAsync(sessionId, payload, cancellationToken),
-            "handoffContact" => await BuildHandoffContactAsync(payload, cancellationToken),
+            "handoffContact" => await BuildHandoffContactAsync(payload, allowedBranchId, cancellationToken),
             _ => null
         };
     }
 
-    private async Task<AdminChatQuickSendBuildResult> BuildRoomSelectorAsync(JsonElement payload, CancellationToken cancellationToken)
+    private async Task<AdminChatQuickSendBuildResult> BuildRoomSelectorAsync(JsonElement payload, int? allowedBranchId, CancellationToken cancellationToken)
     {
         var branchId = GetRequiredInt(payload, "branchId", "Vui lòng chọn chi nhánh.");
+        EnsureBranchAllowed(branchId, allowedBranchId);
         var guestCount = GetRequiredInt(payload, "guestCount", "Vui lòng nhập số khách.");
         var bookingMode = GetRequiredString(payload, "bookingMode", "Vui lòng chọn hình thức đặt.");
 
@@ -228,9 +243,10 @@ public class AdminChatQuickSendService : IAdminChatQuickSendService
         };
     }
 
-    private async Task<AdminChatQuickSendBuildResult> BuildSlotPickerAsync(JsonElement payload, CancellationToken cancellationToken)
+    private async Task<AdminChatQuickSendBuildResult> BuildSlotPickerAsync(JsonElement payload, int? allowedBranchId, CancellationToken cancellationToken)
     {
         var branchId = GetRequiredInt(payload, "branchId", "Vui lòng chọn chi nhánh.");
+        EnsureBranchAllowed(branchId, allowedBranchId);
         var roomId = GetRequiredInt(payload, "roomId", "Vui lòng chọn phòng.");
         var guestCount = GetRequiredInt(payload, "guestCount", "Vui lòng nhập số khách.");
         var hourlyDate = GetRequiredDate(payload, "hourlyDate", "Vui lòng chọn ngày cần xem khung giờ.");
@@ -338,9 +354,10 @@ public class AdminChatQuickSendService : IAdminChatQuickSendService
         };
     }
 
-    private async Task<AdminChatQuickSendBuildResult> BuildHandoffContactAsync(JsonElement payload, CancellationToken cancellationToken)
+    private async Task<AdminChatQuickSendBuildResult> BuildHandoffContactAsync(JsonElement payload, int? allowedBranchId, CancellationToken cancellationToken)
     {
         var branchId = GetRequiredInt(payload, "branchId", "Vui lòng chọn chi nhánh.");
+        EnsureBranchAllowed(branchId, allowedBranchId);
         var branch = await _context.Branches
             .AsNoTracking()
             .FirstOrDefaultAsync(b => b.Id == branchId, cancellationToken);
@@ -410,6 +427,12 @@ public class AdminChatQuickSendService : IAdminChatQuickSendService
             throw new InvalidOperationException("Ngày trả phòng phải sau ngày nhận phòng.");
         }
 
+        var leadTimeRule = await _branchLeadTimeService.ResolveAsync(branchId, cancellationToken);
+        if (!leadTimeRule.AllowsDaily(checkInDate))
+        {
+            throw new InvalidOperationException($"Ngày nhận phòng vi phạm lead time đặt phòng của chi nhánh ({leadTimeRule.DailyLeadTimeDays} ngày). Ngày sớm nhất có thể đặt là {leadTimeRule.EarliestAllowedDailyDate:dd/MM/yyyy}.");
+        }
+
         var interval = BookingTimeRules.BuildDailyStay(checkInDate, checkOutDate);
         var roomIds = await _availabilityService.GetAvailableRoomIds(branchId, interval.Start, interval.End);
 
@@ -452,10 +475,18 @@ public class AdminChatQuickSendService : IAdminChatQuickSendService
         };
     }
 
-    private async Task<IReadOnlyList<object>> LoadBranchOptionsAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<object>> LoadBranchOptionsAsync(int? allowedBranchId, CancellationToken cancellationToken)
     {
-        return await _context.Branches
+        var query = _context.Branches
             .AsNoTracking()
+            .AsQueryable();
+
+        if (allowedBranchId.HasValue)
+        {
+            query = query.Where(b => b.Id == allowedBranchId.Value);
+        }
+
+        return await query
             .OrderBy(b => b.Name)
             .Select(b => (object)new
             {
@@ -465,11 +496,18 @@ public class AdminChatQuickSendService : IAdminChatQuickSendService
             .ToListAsync(cancellationToken);
     }
 
-    private async Task<IReadOnlyList<object>> LoadRoomOptionsAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<object>> LoadRoomOptionsAsync(int? allowedBranchId, CancellationToken cancellationToken)
     {
-        return await _context.Rooms
+        var query = _context.Rooms
             .AsNoTracking()
-            .Where(r => r.Status == "Available")
+            .Where(r => r.Status == "Available");
+
+        if (allowedBranchId.HasValue)
+        {
+            query = query.Where(r => r.BranchId == allowedBranchId.Value);
+        }
+
+        return await query
             .OrderBy(r => r.BranchId)
             .ThenBy(r => r.Name)
             .Select(r => (object)new
@@ -480,6 +518,24 @@ public class AdminChatQuickSendService : IAdminChatQuickSendService
                 maxGuests = r.MaxGuests
             })
             .ToListAsync(cancellationToken);
+    }
+
+    private static void EnsureBranchAllowed(int branchId, int? allowedBranchId)
+    {
+        if (allowedBranchId.HasValue && branchId != allowedBranchId.Value)
+        {
+            throw new InvalidOperationException("Bạn chỉ được thao tác với chi nhánh được phân quyền.");
+        }
+    }
+
+    private static void EnforceBranchScope(JsonElement payload, int? allowedBranchId)
+    {
+        if (!allowedBranchId.HasValue || !payload.TryGetProperty("branchId", out var branchEl) || branchEl.ValueKind != JsonValueKind.Number)
+        {
+            return;
+        }
+
+        EnsureBranchAllowed(branchEl.GetInt32(), allowedBranchId);
     }
 
     private async Task<List<object>> LoadBookingFormFieldsAsync(CancellationToken cancellationToken)
@@ -553,18 +609,13 @@ public class AdminChatQuickSendService : IAdminChatQuickSendService
 
     private async Task<DateTime> ResolveLeadTimeCutoffAsync(int branchId, CancellationToken cancellationToken)
     {
-        var globalLeadTime = await _settingService.GetIntAsync("BookingLeadTimeHours", 2);
-        var branchLeadTime = await _context.Branches
-            .AsNoTracking()
-            .Where(b => b.Id == branchId)
-            .Select(b => (int?)b.BookingLeadTimeHours)
-            .FirstOrDefaultAsync(cancellationToken);
+        var rule = await _branchLeadTimeService.ResolveAsync(branchId, cancellationToken);
+        if (rule.HourlyCutoffUtc.HasValue)
+        {
+            return rule.HourlyCutoffUtc.Value.ToLocalTime();
+        }
 
-        var leadTimeHours = branchLeadTime is > 0
-            ? branchLeadTime.GetValueOrDefault()
-            : globalLeadTime;
-
-        return DateTime.Now.AddHours(Math.Max(0, leadTimeHours));
+        return DateTime.Now.AddHours(2);
     }
 
     private static int GetRequiredInt(JsonElement payload, string key, string errorMessage)

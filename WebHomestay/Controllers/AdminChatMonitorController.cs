@@ -56,7 +56,13 @@ public class AdminChatMonitorController : Controller
         }
 
         var includeDeleted = string.Equals(scope, "deleted", StringComparison.OrdinalIgnoreCase);
-        var sessions = await _adminChatService.GetSessionsAsync(includeDeleted, 30);
+        var branchScope = GetCurrentBranchScope();
+        if (!CanAccessBranchScopedData())
+        {
+            return Ok(Array.Empty<object>());
+        }
+
+        var sessions = await _adminChatService.GetSessionsAsync(includeDeleted, 30, branchScope);
         var sessionIds = sessions.Select(s => s.SessionId).ToList();
 
         var lastMessages = await _context.AdminChatMessages
@@ -70,8 +76,8 @@ public class AdminChatMonitorController : Controller
             })
             .ToListAsync();
 
-        var unreadCounts = await _adminChatService.GetUnreadCustomerMessageCountsAsync(sessionIds);
-        var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
+        var unreadCounts = await _adminChatService.GetUnreadCustomerMessageCountsAsync(sessionIds, branchScope);
+        var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync(branchScope);
         var pendingCancellationCounts = await _context.BookingCancellationRequests
             .Where(r => sessionIds.Contains(r.ChatSessionId) && r.Status == "Pending")
             .GroupBy(r => r.ChatSessionId)
@@ -104,7 +110,7 @@ public class AdminChatMonitorController : Controller
     [HttpPost("session/{sessionId}/takeover")]
     public async Task<IActionResult> Takeover(string sessionId)
     {
-        var session = await _context.AdminChatSessions.FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        var session = await FindAccessibleSessionAsync(sessionId);
         if (session == null || session.IsDeleted)
         {
             return NotFound(new { message = "Không tìm thấy phiên chat để tiếp quản." });
@@ -112,10 +118,10 @@ public class AdminChatMonitorController : Controller
 
         var adminUser = HttpContext.Session.GetString("AdminUser") ?? "admin";
         await _adminChatService.TakeoverSessionAsync(sessionId, adminUser);
-        session = await _context.AdminChatSessions.AsNoTracking().FirstAsync(s => s.SessionId == sessionId);
-        var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
+        session = await FindAccessibleSessionAsync(sessionId, asNoTracking: true);
+        var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync(GetCurrentBranchScope());
 
-        await _hubContext.Clients.Group("admin_monitor").SendAsync("sessionUpdate", new
+        await BroadcastSessionScopedAsync(session?.BranchId, "sessionUpdate", new
         {
             sessionId,
             status = session.Status,
@@ -143,7 +149,7 @@ public class AdminChatMonitorController : Controller
     [HttpPost("session/{sessionId}/delete")]
     public async Task<IActionResult> SoftDelete(string sessionId)
     {
-        var session = await _context.AdminChatSessions.FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        var session = await FindAccessibleSessionAsync(sessionId);
         if (session == null || session.IsDeleted)
         {
             return NotFound(new { message = "Không tìm thấy phiên chat để xóa." });
@@ -152,7 +158,7 @@ public class AdminChatMonitorController : Controller
         var adminUser = HttpContext.Session.GetString("AdminUser") ?? "admin";
         await _adminChatService.SoftDeleteSessionAsync(sessionId, adminUser);
 
-        await _hubContext.Clients.Group("admin_monitor").SendAsync("sessionDeleted", new
+        await BroadcastSessionScopedAsync(session.BranchId, "sessionDeleted", new
         {
             sessionId,
             deletedBy = adminUser,
@@ -166,16 +172,16 @@ public class AdminChatMonitorController : Controller
     [HttpPost("session/{sessionId}/restore")]
     public async Task<IActionResult> Restore(string sessionId)
     {
-        var session = await _context.AdminChatSessions.FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        var session = await FindAccessibleSessionAsync(sessionId, includeDeleted: true);
         if (session == null || !session.IsDeleted)
         {
             return NotFound(new { message = "Không tìm thấy phiên chat cần khôi phục." });
         }
 
         await _adminChatService.RestoreSessionAsync(sessionId);
-        session = await _context.AdminChatSessions.AsNoTracking().FirstAsync(s => s.SessionId == sessionId);
+        session = await FindAccessibleSessionAsync(sessionId, includeDeleted: true, asNoTracking: true);
 
-        await _hubContext.Clients.Group("admin_monitor").SendAsync("sessionRestored", new
+        await BroadcastSessionScopedAsync(session?.BranchId, "sessionRestored", new
         {
             sessionId,
             status = session.Status,
@@ -196,7 +202,7 @@ public class AdminChatMonitorController : Controller
     [HttpPost("session/{sessionId}/delete-permanent")]
     public async Task<IActionResult> PermanentlyDelete(string sessionId)
     {
-        var session = await _context.AdminChatSessions.AsNoTracking().FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        var session = await FindAccessibleSessionAsync(sessionId, includeDeleted: true, asNoTracking: true);
         if (session == null)
         {
             return NotFound(new { message = "Không tìm thấy phiên chat để xóa vĩnh viễn." });
@@ -204,7 +210,7 @@ public class AdminChatMonitorController : Controller
 
         await _adminChatService.PermanentlyDeleteSessionAsync(sessionId);
 
-        await _hubContext.Clients.Group("admin_monitor").SendAsync("sessionPurged", new
+        await BroadcastSessionScopedAsync(session.BranchId, "sessionPurged", new
         {
             sessionId
         });
@@ -216,7 +222,13 @@ public class AdminChatMonitorController : Controller
     [HttpGet("session/{sessionId}")]
     public async Task<IActionResult> GetSessionDetail(string sessionId)
     {
-        var messages = await _adminChatService.GetSessionMessagesAsync(sessionId);
+        var session = await FindAccessibleSessionAsync(sessionId, includeDeleted: true, asNoTracking: true);
+        if (session == null)
+        {
+            return NotFound(new { message = "Không tìm thấy hội thoại." });
+        }
+
+        var messages = await _adminChatService.GetSessionMessagesAsync(sessionId, GetCurrentBranchScope());
         var traces = await _context.AIConversationTraces
             .Where(t => t.SessionId == sessionId)
             .OrderBy(t => t.CreatedAt)
@@ -253,11 +265,17 @@ public class AdminChatMonitorController : Controller
     [HttpPost("session/{sessionId}/mark-read")]
     public async Task<IActionResult> MarkRead(string sessionId)
     {
+        var session = await FindAccessibleSessionAsync(sessionId, includeDeleted: true);
+        if (session == null)
+        {
+            return NotFound(new { message = "Không tìm thấy hội thoại." });
+        }
+
         var readCount = await _adminChatService.MarkCustomerMessagesReadAsync(sessionId);
-        var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
+        var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync(GetCurrentBranchScope());
         
         // Không cập nhật lastActivityAt khi chỉ mark read để tránh card nhảy lên đầu
-        await _hubContext.Clients.Group("admin_monitor").SendAsync("sessionUpdate", new
+        await BroadcastSessionScopedAsync(session.BranchId, "sessionUpdate", new
         {
             sessionId,
             unreadCount = 0,
@@ -271,7 +289,7 @@ public class AdminChatMonitorController : Controller
     [HttpPost("session/{sessionId}/reply")]
     public async Task<IActionResult> SendReply(string sessionId, [FromBody] AdminChatReplyRequest request, CancellationToken cancellationToken = default)
     {
-        var session = await _context.AdminChatSessions.FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
+        var session = await FindAccessibleSessionAsync(sessionId, cancellationToken: cancellationToken);
         if (session == null || session.IsDeleted)
         {
             return BadRequest(new { message = "Phiên chat không còn khả dụng để gửi tin." });
@@ -319,10 +337,10 @@ public class AdminChatMonitorController : Controller
             createdAt = message.CreatedAt
         };
         await _hubContext.Clients.Group($"user_{sessionId}").SendAsync("newMessage", replyPayload);
-        await _hubContext.Clients.Group("admin_monitor").SendAsync("newMessage", replyPayload);
+        await BroadcastSessionScopedAsync(session.BranchId, "newMessage", replyPayload, cancellationToken);
 
-        var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
-        await _hubContext.Clients.Group("admin_monitor").SendAsync("sessionUpdate", new
+        var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync(GetCurrentBranchScope());
+        await BroadcastSessionScopedAsync(session.BranchId, "sessionUpdate", new
         {
             sessionId,
             status = session.Status,
@@ -352,9 +370,7 @@ public class AdminChatMonitorController : Controller
     [HttpGet("session/{sessionId}/quick-send/{type}/schema")]
     public async Task<IActionResult> GetQuickSendSchema(string sessionId, string type, CancellationToken cancellationToken)
     {
-        var session = await _context.AdminChatSessions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
+        var session = await FindAccessibleSessionAsync(sessionId, asNoTracking: true, cancellationToken: cancellationToken);
         if (session == null || session.IsDeleted)
         {
             return NotFound(new { message = "Phiên chat không còn khả dụng." });
@@ -365,7 +381,7 @@ public class AdminChatMonitorController : Controller
             return BadRequest(new { message = "Cần takeover và tạm dừng AI trước khi gửi nhanh." });
         }
 
-        var schema = await _quickSendService.GetSchemaAsync(type, cancellationToken);
+        var schema = await _quickSendService.GetSchemaAsync(type, GetCurrentBranchScope(), cancellationToken);
         if (schema == null)
         {
             return BadRequest(new { message = "Loại form gửi nhanh không hợp lệ." });
@@ -382,7 +398,7 @@ public class AdminChatMonitorController : Controller
         [FromBody] AdminChatQuickSendRequest request,
         CancellationToken cancellationToken)
     {
-        var session = await _context.AdminChatSessions.FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
+        var session = await FindAccessibleSessionAsync(sessionId, cancellationToken: cancellationToken);
         if (session == null || session.IsDeleted)
         {
             return BadRequest(new { message = "Phiên chat không còn khả dụng để gửi nhanh." });
@@ -395,7 +411,7 @@ public class AdminChatMonitorController : Controller
 
         try
         {
-            var block = await _quickSendService.BuildAsync(sessionId, type, request.Payload, cancellationToken);
+            var block = await _quickSendService.BuildAsync(sessionId, type, request.Payload, GetCurrentBranchScope(), cancellationToken);
             if (block == null)
             {
                 return BadRequest(new { message = "Loại form gửi nhanh không hợp lệ." });
@@ -421,10 +437,10 @@ public class AdminChatMonitorController : Controller
                 createdAt = message.CreatedAt
             };
             await _hubContext.Clients.Group($"user_{sessionId}").SendAsync("newMessage", quickSendPayload, cancellationToken);
-            await _hubContext.Clients.Group("admin_monitor").SendAsync("newMessage", quickSendPayload, cancellationToken);
+            await BroadcastSessionScopedAsync(session.BranchId, "newMessage", quickSendPayload, cancellationToken);
 
-            var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync();
-            await _hubContext.Clients.Group("admin_monitor").SendAsync("sessionUpdate", new
+            var totalUnreadCount = await _adminChatService.GetUnreadCustomerMessageCountAsync(GetCurrentBranchScope());
+            await BroadcastSessionScopedAsync(session.BranchId, "sessionUpdate", new
             {
                 sessionId,
                 status = session.Status,
@@ -463,6 +479,12 @@ public class AdminChatMonitorController : Controller
     [HttpGet("session/{sessionId}/quick-block/{type}")]
     public async Task<IActionResult> GetQuickBlock(string sessionId, string type, CancellationToken cancellationToken)
     {
+        var session = await FindAccessibleSessionAsync(sessionId, asNoTracking: true, cancellationToken: cancellationToken);
+        if (session == null || session.IsDeleted)
+        {
+            return NotFound(new { message = "Phiên chat không còn khả dụng." });
+        }
+
         var block = type switch
         {
             "roomSelector" => await BuildRoomSelectorBlock(cancellationToken),
@@ -481,8 +503,7 @@ public class AdminChatMonitorController : Controller
     [HttpPost("session/{sessionId}/auto-reply")]
     public async Task<IActionResult> SetAutoReply(string sessionId, [FromBody] AutoReplyRequest request)
     {
-        var session = await _context.AdminChatSessions
-            .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        var session = await FindAccessibleSessionAsync(sessionId);
         if (session == null) return NotFound();
 
         session.AutoReplyMessage = request.AutoReplyMessage;
@@ -502,7 +523,9 @@ public class AdminChatMonitorController : Controller
     [HttpGet("cancellations")]
     public async Task<IActionResult> GetCancellations(string status = "Pending")
     {
+        var accessibleSessionIds = await GetAccessibleSessionIdsAsync(includeDeleted: true);
         var requests = await _context.BookingCancellationRequests
+            .Where(r => accessibleSessionIds.Contains(r.ChatSessionId))
             .Where(r => r.Status == status)
             .OrderByDescending(r => r.CreatedAt)
             .Take(50)
@@ -528,6 +551,9 @@ public class AdminChatMonitorController : Controller
     [HttpPost("cancellations/lookup-booking")]
     public async Task<IActionResult> LookupBookingForCancellation([FromBody] LookupBookingRequest request)
     {
+        if (!CanAccessBranchScopedData())
+            return NotFound();
+
         if (string.IsNullOrWhiteSpace(request.BookingCode))
             return BadRequest(new { error = "Vui lòng nhập mã booking." });
 
@@ -544,6 +570,9 @@ public class AdminChatMonitorController : Controller
 
         if (string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { error = "Booking này đã bị huỷ trước đó." });
+
+        if (!CanAccessBookingBranch(booking.Room?.BranchId))
+            return NotFound(new { error = "Không tìm thấy booking với mã này." });
 
         return Ok(new
         {
@@ -563,11 +592,25 @@ public class AdminChatMonitorController : Controller
     [RequestSizeLimit(10 * 1024 * 1024)]
     public async Task<IActionResult> CreateManualCancellation([FromForm] string bookingCode, [FromForm] IFormFile? image)
     {
+        if (!CanAccessBranchScopedData())
+            return NotFound();
+
         if (string.IsNullOrWhiteSpace(bookingCode))
             return BadRequest(new { error = "Vui lòng nhập mã booking." });
 
         if (image == null || image.Length == 0)
             return BadRequest(new { error = "Vui lòng chọn ảnh chụp Zalo." });
+
+        var bookingId = ParseBookingIdInt(bookingCode.Trim());
+        if (!bookingId.HasValue)
+            return BadRequest(new { error = "Mã booking không hợp lệ." });
+
+        var bookingBranchId = await _context.Bookings
+            .Where(booking => booking.Id == bookingId.Value)
+            .Select(booking => (int?)booking.Room.BranchId)
+            .FirstOrDefaultAsync();
+        if (!CanAccessBookingBranch(bookingBranchId))
+            return NotFound(new { error = "Không tìm thấy booking với mã này." });
 
         try
         {
@@ -590,6 +633,7 @@ public class AdminChatMonitorController : Controller
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.Id == id);
         if (request == null) return NotFound();
+        if (!await CanAccessSessionIdAsync(request.ChatSessionId, includeDeleted: true)) return NotFound();
 
         var booking = request.BookingId.HasValue
             ? await BuildBookingSummary(request.BookingId.Value)
@@ -614,6 +658,7 @@ public class AdminChatMonitorController : Controller
     {
         var request = await _context.BookingCancellationRequests.FirstOrDefaultAsync(r => r.Id == id);
         if (request == null) return NotFound();
+        if (!await CanAccessSessionIdAsync(request.ChatSessionId, includeDeleted: true)) return NotFound();
         if (!string.Equals(request.Status, "Approved", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { message = "Chỉ có thể hủy booking sau khi yêu cầu đã được chấp nhận." });
         if (!request.BookingId.HasValue)
@@ -640,6 +685,7 @@ public class AdminChatMonitorController : Controller
     {
         var request = await _context.BookingCancellationRequests.FindAsync(id);
         if (request == null) return NotFound();
+        if (!await CanAccessSessionIdAsync(request.ChatSessionId, includeDeleted: true)) return NotFound();
         var bookingExists = await _context.Bookings.AnyAsync(b => b.Id == bookingId);
         if (!bookingExists) return NotFound(new { message = "Không tìm thấy đơn đặt phòng." });
 
@@ -656,6 +702,7 @@ public class AdminChatMonitorController : Controller
     {
         try
         {
+            if (!await CanAccessCancellationAsync(id)) return NotFound();
             var processedBy = HttpContext.Session.GetString("AdminUser") ?? "admin";
             var preview = await _bookingCancellationService.BuildApprovalPreviewAsync(new ProcessCancellationDto(id, staffReason, appliedRefundPercent, processedBy, refundBillProof));
             return Ok(preview);
@@ -673,6 +720,7 @@ public class AdminChatMonitorController : Controller
     {
         try
         {
+            if (!await CanAccessCancellationAsync(id)) return NotFound();
             var processedBy = HttpContext.Session.GetString("AdminUser") ?? "admin";
             var request = await _bookingCancellationService.ApproveAsync(new ProcessCancellationDto(id, staffReason, appliedRefundPercent, processedBy, refundBillProof, notificationEmailSubject, notificationEmailBody));
             return Ok(new { success = true, request.Id, request.Status });
@@ -689,6 +737,7 @@ public class AdminChatMonitorController : Controller
     {
         try
         {
+            if (!await CanAccessCancellationAsync(id)) return NotFound();
             var processedBy = HttpContext.Session.GetString("AdminUser") ?? "admin";
             var preview = await _bookingCancellationService.BuildRejectionPreviewAsync(new ProcessCancellationDto(id, staffReason, 0, processedBy, null));
             return Ok(preview);
@@ -706,6 +755,7 @@ public class AdminChatMonitorController : Controller
     {
         try
         {
+            if (!await CanAccessCancellationAsync(id)) return NotFound();
             var processedBy = HttpContext.Session.GetString("AdminUser") ?? "admin";
             var request = await _bookingCancellationService.RejectAsync(new ProcessCancellationDto(id, staffReason, 0, processedBy, null, notificationEmailSubject, notificationEmailBody));
             return Ok(new { success = true, request.Id, request.Status });
@@ -722,6 +772,12 @@ public class AdminChatMonitorController : Controller
     {
         try
         {
+            if (!await CanAccessCancellationAsync(id))
+            {
+                Response.StatusCode = StatusCodes.Status404NotFound;
+                return Content(BuildMissingCancellationFileHtml(kind, "Ban khong co quyen truy cap tep dinh kem nay."), "text/html; charset=utf-8");
+            }
+
             var path = await _bookingCancellationService.GetProtectedFilePathAsync(id, kind);
             if (!System.IO.File.Exists(path))
             {
@@ -905,8 +961,16 @@ public class AdminChatMonitorController : Controller
 
     private async Task<object> BuildRoomSelectorBlock(CancellationToken cancellationToken)
     {
-        var rooms = await _context.Rooms
-            .Where(r => r.Status == "Available")
+        var branchScope = GetCurrentBranchScope();
+        var roomsQuery = _context.Rooms
+            .Where(r => r.Status == "Available");
+
+        if (branchScope.HasValue)
+        {
+            roomsQuery = roomsQuery.Where(r => r.BranchId == branchScope.Value);
+        }
+
+        var rooms = await roomsQuery
             .OrderBy(r => r.BranchId)
             .ThenBy(r => r.Name)
             .Take(12)
@@ -940,9 +1004,17 @@ public class AdminChatMonitorController : Controller
     private async Task<object> BuildSlotPickerBlock(CancellationToken cancellationToken)
     {
         var now = DateTime.Now;
-        var slots = await _context.RoomSlotInventories
+        var branchScope = GetCurrentBranchScope();
+        var slotsQuery = _context.RoomSlotInventories
             .Include(s => s.Room)
-            .Where(s => s.Status == "Available" && s.StartTime > now)
+            .Where(s => s.Status == "Available" && s.StartTime > now);
+
+        if (branchScope.HasValue)
+        {
+            slotsQuery = slotsQuery.Where(s => s.Room.BranchId == branchScope.Value);
+        }
+
+        var slots = await slotsQuery
             .OrderBy(s => s.StartTime)
             .Take(24)
             .Select(s => new
@@ -1012,7 +1084,10 @@ public class AdminChatMonitorController : Controller
 
     private async Task<object> BuildHandoffContactBlock(CancellationToken cancellationToken)
     {
-        var hasBranches = await _context.Branches.AnyAsync(cancellationToken);
+        var branchScope = GetCurrentBranchScope();
+        var hasBranches = branchScope.HasValue
+            ? await _context.Branches.AnyAsync(b => b.Id == branchScope.Value, cancellationToken)
+            : await _context.Branches.AnyAsync(cancellationToken);
         return new
         {
             message = hasBranches
@@ -1091,6 +1166,89 @@ public class AdminChatMonitorController : Controller
             .OrderByDescending(b => b.CreatedAt)
             .Select(b => (int?)b.Id)
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private bool CanAccessBranchScopedData()
+        => ChatMonitorScopeHelper.IsSuperAdmin(HttpContext.Session) || HttpContext.Session.GetInt32("AdminBranchId").HasValue;
+
+    private int? GetCurrentBranchScope()
+        => ChatMonitorScopeHelper.GetScopedBranchId(HttpContext.Session);
+
+    private IQueryable<WebHomestay.Models.AdminChatSession> BuildAccessibleSessionQuery(bool includeDeleted, bool asNoTracking = false)
+    {
+        var query = asNoTracking
+            ? _context.AdminChatSessions.AsNoTracking()
+            : _context.AdminChatSessions.AsQueryable();
+
+        query = includeDeleted
+            ? query
+            : query.Where(session => !session.IsDeleted);
+
+        return ChatMonitorScopeHelper.ApplyBranchScope(
+            query,
+            GetCurrentBranchScope(),
+            ChatMonitorScopeHelper.IsSuperAdmin(HttpContext.Session));
+    }
+
+    private Task<WebHomestay.Models.AdminChatSession?> FindAccessibleSessionAsync(
+        string sessionId,
+        bool includeDeleted = true,
+        bool asNoTracking = false,
+        CancellationToken cancellationToken = default)
+    {
+        return BuildAccessibleSessionQuery(includeDeleted, asNoTracking)
+            .FirstOrDefaultAsync(session => session.SessionId == sessionId, cancellationToken);
+    }
+
+    private async Task<List<string>> GetAccessibleSessionIdsAsync(bool includeDeleted)
+    {
+        if (!CanAccessBranchScopedData())
+        {
+            return new List<string>();
+        }
+
+        return await BuildAccessibleSessionQuery(includeDeleted, asNoTracking: true)
+            .Select(session => session.SessionId)
+            .ToListAsync();
+    }
+
+    private async Task<bool> CanAccessSessionIdAsync(string sessionId, bool includeDeleted)
+    {
+        if (!CanAccessBranchScopedData())
+        {
+            return false;
+        }
+
+        return await BuildAccessibleSessionQuery(includeDeleted, asNoTracking: true)
+            .AnyAsync(session => session.SessionId == sessionId);
+    }
+
+    private async Task<bool> CanAccessCancellationAsync(int id)
+    {
+        var chatSessionId = await _context.BookingCancellationRequests
+            .Where(request => request.Id == id)
+            .Select(request => request.ChatSessionId)
+            .FirstOrDefaultAsync();
+
+        return !string.IsNullOrWhiteSpace(chatSessionId)
+            && await CanAccessSessionIdAsync(chatSessionId, includeDeleted: true);
+    }
+
+    private Task BroadcastSessionScopedAsync(int? branchId, string method, object payload, CancellationToken cancellationToken = default)
+    {
+        var groups = ChatMonitorScopeHelper.GetMonitorGroupsForSession(branchId);
+        return _hubContext.Clients.Groups(groups).SendAsync(method, payload, cancellationToken);
+    }
+
+    private bool CanAccessBookingBranch(int? branchId)
+    {
+        if (ChatMonitorScopeHelper.IsSuperAdmin(HttpContext.Session))
+        {
+            return true;
+        }
+
+        var scopedBranchId = HttpContext.Session.GetInt32("AdminBranchId");
+        return branchId.HasValue && scopedBranchId.HasValue && branchId.Value == scopedBranchId.Value;
     }
 }
 

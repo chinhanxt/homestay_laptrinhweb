@@ -13,7 +13,7 @@ public class AdminChatService : IAdminChatService
         _db = db;
     }
 
-    public async Task<AdminChatSession> UpsertSessionAsync(string sessionId, string? customerName)
+    public async Task<AdminChatSession> UpsertSessionAsync(string sessionId, string? customerName, int? branchId = null)
     {
         var session = await _db.AdminChatSessions
             .FirstOrDefaultAsync(s => s.SessionId == sessionId);
@@ -24,6 +24,7 @@ public class AdminChatService : IAdminChatService
             {
                 SessionId = sessionId,
                 CustomerName = customerName,
+                BranchId = branchId,
                 Status = "auto",
                 CreatedAt = DateTime.Now,
                 LastActivityAt = DateTime.Now
@@ -34,6 +35,8 @@ public class AdminChatService : IAdminChatService
         {
             if (!string.IsNullOrWhiteSpace(customerName))
                 session.CustomerName = customerName;
+            if (branchId.HasValue)
+                session.BranchId = branchId.Value;
             if (session.IsDeleted)
             {
                 session.IsDeleted = false;
@@ -51,6 +54,44 @@ public class AdminChatService : IAdminChatService
 
         await _db.SaveChangesAsync();
         return session;
+    }
+
+    public async Task AssignBranchAsync(string sessionId, int? branchId)
+    {
+        if (!branchId.HasValue)
+        {
+            return;
+        }
+
+        var session = await _db.AdminChatSessions.FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        if (session == null || session.BranchId == branchId.Value)
+        {
+            return;
+        }
+
+        session.BranchId = branchId.Value;
+        session.LastActivityAt = DateTime.Now;
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task<bool> HasBranchPromptBeenShownAsync(string sessionId)
+    {
+        return await _db.AdminChatSessions
+            .Where(s => s.SessionId == sessionId)
+            .Select(s => s.HasPromptedForBranch)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task MarkBranchPromptShownAsync(string sessionId)
+    {
+        var session = await _db.AdminChatSessions.FirstOrDefaultAsync(s => s.SessionId == sessionId);
+        if (session == null || session.HasPromptedForBranch)
+        {
+            return;
+        }
+
+        session.HasPromptedForBranch = true;
+        await _db.SaveChangesAsync();
     }
 
     public async Task<bool> IsPausedAsync(string sessionId)
@@ -234,7 +275,7 @@ public class AdminChatService : IAdminChatService
         await _db.SaveChangesAsync();
     }
 
-    public async Task<List<AdminChatSession>> GetSessionsAsync(bool includeDeleted, int timeoutMinutes = 30)
+    public async Task<List<AdminChatSession>> GetSessionsAsync(bool includeDeleted, int timeoutMinutes = 30, int? branchId = null)
     {
         await BackfillLegacySessionsAsync();
 
@@ -244,25 +285,37 @@ public class AdminChatService : IAdminChatService
             ? query.Where(s => s.IsDeleted)
             : query.Where(s => !s.IsDeleted);
 
+        query = ApplyBranchScope(query, branchId);
+
         return await query
             .OrderByDescending(s => s.LastActivityAt)
             .ToListAsync();
     }
 
-    public async Task<List<AdminChatSession>> GetActiveSessionsAsync(int timeoutMinutes = 30)
+    public async Task<List<AdminChatSession>> GetActiveSessionsAsync(int timeoutMinutes = 30, int? branchId = null)
     {
         await BackfillLegacySessionsAsync();
 
         var cutoff = DateTime.Now.AddMinutes(-timeoutMinutes);
-        return await _db.AdminChatSessions
+        return await ApplyBranchScope(_db.AdminChatSessions, branchId)
             .Where(s => !s.IsDeleted && s.LastActivityAt >= cutoff)
             .OrderByDescending(s => s.LastActivityAt)
             .ToListAsync();
     }
 
-    public async Task<List<AdminChatMessage>> GetSessionMessagesAsync(string sessionId)
+    public async Task<List<AdminChatMessage>> GetSessionMessagesAsync(string sessionId, int? branchId = null)
     {
         await BackfillLegacyMessagesFromTracesAsync(sessionId);
+
+        if (branchId.HasValue)
+        {
+            var isAccessible = await _db.AdminChatSessions
+                .AnyAsync(s => s.SessionId == sessionId && s.BranchId == branchId.Value);
+            if (!isAccessible)
+            {
+                return new List<AdminChatMessage>();
+            }
+        }
 
         return await _db.AdminChatMessages
             .Where(m => m.SessionId == sessionId)
@@ -270,11 +323,11 @@ public class AdminChatService : IAdminChatService
             .ToListAsync();
     }
 
-    public async Task<int> GetUnreadCustomerMessageCountAsync()
+    public async Task<int> GetUnreadCustomerMessageCountAsync(int? branchId = null)
     {
         return await _db.AdminChatMessages
             .Where(m => m.Role == "user" && !m.IsRead)
-            .Join(_db.AdminChatSessions.Where(s => !s.IsDeleted),
+            .Join(ApplyBranchScope(_db.AdminChatSessions.Where(s => !s.IsDeleted), branchId),
                   m => m.SessionId,
                   s => s.SessionId,
                   (m, s) => m.SessionId)
@@ -282,13 +335,18 @@ public class AdminChatService : IAdminChatService
             .CountAsync();
     }
 
-    public async Task<Dictionary<string, int>> GetUnreadCustomerMessageCountsAsync(IEnumerable<string> sessionIds)
+    public async Task<Dictionary<string, int>> GetUnreadCustomerMessageCountsAsync(IEnumerable<string> sessionIds, int? branchId = null)
     {
         var ids = sessionIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
         if (ids.Count == 0) return new Dictionary<string, int>();
 
+        var accessibleSessionIds = await ApplyBranchScope(_db.AdminChatSessions, branchId)
+            .Where(s => ids.Contains(s.SessionId))
+            .Select(s => s.SessionId)
+            .ToListAsync();
+
         return await _db.AdminChatMessages
-            .Where(m => ids.Contains(m.SessionId) && m.Role == "user" && !m.IsRead)
+            .Where(m => accessibleSessionIds.Contains(m.SessionId) && m.Role == "user" && !m.IsRead)
             .GroupBy(m => m.SessionId)
             .Select(g => new { SessionId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.SessionId, x => x.Count);
@@ -336,6 +394,16 @@ public class AdminChatService : IAdminChatService
 
         if (messages.Count > 0 || session != null)
             await _db.SaveChangesAsync();
+    }
+
+    private static IQueryable<AdminChatSession> ApplyBranchScope(IQueryable<AdminChatSession> query, int? branchId)
+    {
+        if (!branchId.HasValue)
+        {
+            return query;
+        }
+
+        return query.Where(session => session.BranchId == branchId.Value);
     }
 
     private async Task BackfillLegacySessionsAsync()

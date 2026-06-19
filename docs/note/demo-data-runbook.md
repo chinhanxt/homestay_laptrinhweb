@@ -30,6 +30,7 @@ powershell -ExecutionPolicy Bypass -File scripts/restore-demo-db.ps1 -DatabaseNa
 - `scripts/seed-demo-bookings.sql`: inventory và booking tuần demo `15/06/2026 - 22/06/2026`
 - `scripts/seed-demo-cancellations.sql`: đơn hủy chờ duyệt ở tất cả chi nhánh
 - `scripts/seed-demo-history.sql`: lịch sử booking 3 tháng để làm đẹp thống kê
+- `scripts/seed-demo-chat-history.sql`: lịch sử chat monitor demo, 5 phiên mỗi chi nhánh
 - `scripts/verify-demo-data.sql`: kiểm tra nhanh số lượng seed quan trọng
 
 ## Lưu ý

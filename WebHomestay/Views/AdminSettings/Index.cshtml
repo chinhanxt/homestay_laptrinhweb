@@ -754,14 +754,40 @@
                                 
                                 <form asp-action="UpdateBranch" method="post">
                                     <input type="hidden" name="branchId" value="@b.Id" />
+                                    
+                                    <!-- Đặt theo giờ -->
                                     <div class="mb-3">
-                                        <label class="form-label small fw-bold text-muted">Số giờ đặt trước (Lead Time)</label>
+                                        <label class="form-label small fw-bold text-muted">Đặt theo giờ: Thời gian đặt trước tối thiểu</label>
                                         <div class="input-group-premium">
                                             <i class="fas fa-clock text-muted"></i>
-                                            <input type="number" name="leadTime" value="@b.BookingLeadTimeHours" class="form-control-premium" placeholder="Vd: 2">
+                                            <input type="number"
+                                                   name="leadTimeHours"
+                                                   min="0"
+                                                   value="@b.BookingLeadTimeHours"
+                                                   class="form-control-premium"
+                                                   placeholder="Vd: 2">
                                             <span class="suffix">giờ</span>
                                         </div>
                                     </div>
+
+                                    <!-- Đặt theo ngày -->
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold text-muted">Đặt theo ngày: Thời gian đặt trước tối thiểu</label>
+                                        <div class="input-group-premium">
+                                            <i class="fas fa-calendar-alt text-muted"></i>
+                                            <input type="number"
+                                                   name="leadTimeDays"
+                                                   min="0"
+                                                   value="@b.BookingLeadTimeDays"
+                                                   class="form-control-premium"
+                                                   placeholder="Vd: 1">
+                                            <span class="suffix">ngày</span>
+                                        </div>
+                                        <div class="small text-muted mt-2">
+                                            Ví dụ: Cấu hình 7 ngày, hôm nay 19/06/2026 thì khách chỉ được đặt theo ngày từ 27/06/2026.
+                                        </div>
+                                    </div>
+                                    
                                     <button type="submit" class="btn-save-branch">
                                         <i class="fas fa-check me-2"></i> Lưu chi nhánh
                                     </button>
@@ -2295,16 +2321,16 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content premium-modal">
             <div class="modal-header border-0">
-                <h5 class="modal-title fw-bold"><i class="fas fa-file-import me-2 text-primary"></i>Import Khung Giờ từ Excel</h5>
+                <h5 class="modal-title fw-bold"><i class="fas fa-file-import me-2 text-primary"></i>Import Khung Giờ</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form asp-action="ImportSlotTemplates" method="post" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <div class="modal-body py-4">
-                    <p class="text-muted small">Vui lòng chọn file Excel cấu hình khung giờ (.xlsx) đúng định dạng mẫu.</p>
+                    <p class="text-muted small">Vui lòng chọn file Excel (.xlsx), Word (.docx) hoặc file nén ZIP cấu hình khung giờ đúng định dạng mẫu.</p>
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">Chọn file Excel</label>
-                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx" required />
+                        <label class="form-label small fw-bold text-muted">Chọn file (.xlsx, .docx hoặc .zip)</label>
+                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx,.docx,.zip" required />
                     </div>
                 </div>
                 <div class="modal-footer border-0">
@@ -2321,16 +2347,16 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content premium-modal">
             <div class="modal-header border-0">
-                <h5 class="modal-title fw-bold"><i class="fas fa-file-import me-2 text-primary"></i>Import Ngày Lễ từ Excel</h5>
+                <h5 class="modal-title fw-bold"><i class="fas fa-file-import me-2 text-primary"></i>Import Ngày Lễ</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form asp-action="ImportHolidays" method="post" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <div class="modal-body py-4">
-                    <p class="text-muted small">Vui lòng chọn file Excel danh sách ngày lễ (.xlsx) đúng định dạng mẫu.</p>
+                    <p class="text-muted small">Vui lòng chọn file Excel (.xlsx), Word (.docx) hoặc file nén ZIP danh sách ngày lễ đúng định dạng mẫu.</p>
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">Chọn file Excel</label>
-                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx" required />
+                        <label class="form-label small fw-bold text-muted">Chọn file (.xlsx, .docx hoặc .zip)</label>
+                        <input type="file" name="file" class="form-control premium-input" accept=".xlsx,.docx,.zip" required />
                     </div>
                 </div>
                 <div class="modal-footer border-0">
@@ -2989,5 +3015,23 @@
             txtarea.dispatchEvent(event);
         };
     </script>
+    <script src="~/js/admin-import-preview.js" asp-append-version="true"></script>
+    <script>
+        $(function() {
+            window.initImportPreview({
+                formSelector: '#importSlotsModal form',
+                previewUrl: '@Url.Action("ImportSlotTemplatesPreview", "AdminSettings")',
+                confirmUrl: '@Url.Action("ImportSlotTemplatesConfirm", "AdminSettings")',
+                modalId: 'importSlotsModal'
+            });
+            window.initImportPreview({
+                formSelector: '#importHolidaysModal form',
+                previewUrl: '@Url.Action("ImportHolidaysPreview", "AdminSettings")',
+                confirmUrl: '@Url.Action("ImportHolidaysConfirm", "AdminSettings")',
+                modalId: 'importHolidaysModal'
+            });
+        });
+    </script>
 }
+
 

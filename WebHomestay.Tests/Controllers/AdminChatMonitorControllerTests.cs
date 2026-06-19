@@ -31,6 +31,7 @@ public class AdminChatMonitorControllerTests
         var userProxy = new Mock<IClientProxy>();
 
         clients.Setup(x => x.Group("admin_monitor")).Returns(adminMonitorProxy.Object);
+        clients.Setup(x => x.Groups(It.IsAny<IReadOnlyList<string>>())).Returns(adminMonitorProxy.Object);
         clients.Setup(x => x.Group(It.Is<string>(name => name.StartsWith("user_", StringComparison.Ordinal)))).Returns(userProxy.Object);
         hub.SetupGet(x => x.Clients).Returns(clients.Object);
 
@@ -61,6 +62,7 @@ public class AdminChatMonitorControllerTests
             Session = new FakeSession()
         };
         httpContext.Session.SetString("AdminUser", "admin01");
+        httpContext.Session.SetString("AdminRole", "SuperAdmin");
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = httpContext
@@ -103,6 +105,67 @@ public class AdminChatMonitorControllerTests
         var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
         Assert.Contains("trash-1", json);
         Assert.DoesNotContain("live-1", json);
+    }
+
+    [Fact]
+    public async Task GetSessions_ForManager_ReturnsOnlySessionsInSameBranch()
+    {
+        using var context = CreateContext();
+        context.AdminChatSessions.AddRange(
+            new AdminChatSession
+            {
+                SessionId = "branch-1",
+                BranchId = 1,
+                CustomerName = "Quan 1",
+                Status = "auto",
+                LastActivityAt = DateTime.Now,
+                CreatedAt = DateTime.Now
+            },
+            new AdminChatSession
+            {
+                SessionId = "branch-2",
+                BranchId = 2,
+                CustomerName = "Quan 7",
+                Status = "auto",
+                LastActivityAt = DateTime.Now,
+                CreatedAt = DateTime.Now
+            });
+        await context.SaveChangesAsync();
+
+        var controller = BuildController(context);
+        controller.HttpContext.Session.SetString("AdminRole", "Manager");
+        controller.HttpContext.Session.SetInt32("AdminBranchId", 1);
+
+        var result = await controller.GetSessions("active");
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var json = System.Text.Json.JsonSerializer.Serialize(ok.Value);
+        Assert.Contains("branch-1", json);
+        Assert.DoesNotContain("branch-2", json);
+    }
+
+    [Fact]
+    public async Task GetSessionDetail_ForManagerOutsideBranch_ReturnsNotFound()
+    {
+        using var context = CreateContext();
+        context.AdminChatSessions.Add(new AdminChatSession
+        {
+            SessionId = "cross-branch",
+            BranchId = 2,
+            CustomerName = "Other Branch",
+            Status = "auto",
+            LastActivityAt = DateTime.Now,
+            CreatedAt = DateTime.Now
+        });
+        await context.SaveChangesAsync();
+
+        var controller = BuildController(context);
+        controller.HttpContext.Session.SetString("AdminRole", "Manager");
+        controller.HttpContext.Session.SetInt32("AdminBranchId", 1);
+
+        var result = await controller.GetSessionDetail("cross-branch");
+
+        Assert.IsType<NotFoundObjectResult>(result);
     }
 
     [Fact]

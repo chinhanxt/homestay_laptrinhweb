@@ -20,25 +20,34 @@ namespace WebHomestay.Controllers
         }
 
         [AdminAuthorize(Permission = "images.view")]
-        public async Task<IActionResult> Index(string? search)
+        public async Task<IActionResult> Index(string? search, int? branchId)
         {
             var role = HttpContext.Session.GetString("AdminRole");
-            var branchId = HttpContext.Session.GetInt32("AdminBranchId");
+            var sessionBranchId = HttpContext.Session.GetInt32("AdminBranchId");
+
+            var allowedBranchId = role == "SuperAdmin"
+                ? branchId
+                : sessionBranchId;
 
             var query = _context.Bookings
                 .Include(b => b.Room)
                 .ThenInclude(r => r.Branch)
                 .Where(b => !b.IsDeleted && (b.PaymentProofUrl != null || b.IdCardFrontPath != null));
 
-            if (role != "SuperAdmin" && branchId.HasValue)
+            if (allowedBranchId.HasValue)
             {
-                query = query.Where(b => b.Room.BranchId == branchId.Value);
+                query = query.Where(b => b.Room.BranchId == allowedBranchId.Value);
             }
 
             if (!string.IsNullOrEmpty(search))
             {
                 query = query.Where(b => b.CustomerName.Contains(search) || b.CustomerPhone.Contains(search) || b.Id.ToString().Contains(search));
             }
+
+            ViewBag.SelectedBranchId = allowedBranchId;
+            ViewBag.BranchOptions = role == "SuperAdmin"
+                ? await _context.Branches.Where(b => !b.IsDeleted).OrderBy(b => b.Name).ToListAsync()
+                : await _context.Branches.Where(b => sessionBranchId.HasValue && b.Id == sessionBranchId.Value).ToListAsync();
 
             var bookings = await query
                 .OrderByDescending(b => b.CreatedAt)
@@ -85,10 +94,14 @@ namespace WebHomestay.Controllers
 
         [AdminAuthorize(Permission = "images.trash")]
         [HttpGet("trash")]
-        public async Task<IActionResult> Trash()
+        public async Task<IActionResult> Trash(int? branchId)
         {
             var role = HttpContext.Session.GetString("AdminRole");
-            var branchId = HttpContext.Session.GetInt32("AdminBranchId");
+            var sessionBranchId = HttpContext.Session.GetInt32("AdminBranchId");
+
+            var allowedBranchId = role == "SuperAdmin"
+                ? branchId
+                : sessionBranchId;
 
             var query = _context.Bookings
                 .Include(b => b.Room)
@@ -96,8 +109,15 @@ namespace WebHomestay.Controllers
                     .ThenInclude(i => i.Template)
                 .Where(b => b.IsDeleted && (b.PaymentProofUrl != null || b.IdCardFrontPath != null));
 
-            if (role != "SuperAdmin" && branchId.HasValue)
-                query = query.Where(b => b.Room.BranchId == branchId.Value);
+            if (allowedBranchId.HasValue)
+            {
+                query = query.Where(b => b.Room.BranchId == allowedBranchId.Value);
+            }
+
+            ViewBag.SelectedBranchId = allowedBranchId;
+            ViewBag.BranchOptions = role == "SuperAdmin"
+                ? await _context.Branches.Where(b => !b.IsDeleted).OrderBy(b => b.Name).ToListAsync()
+                : await _context.Branches.Where(b => sessionBranchId.HasValue && b.Id == sessionBranchId.Value).ToListAsync();
 
             var bookings = await query
                 .OrderByDescending(b => b.DeletedAt)

@@ -43,6 +43,12 @@ public class ContextAwareBookingConductorTests
         var bookingCreation = new FakeBookingCreationService(context);
         
         var mockAdminChat = new Moq.Mock<IAdminChatService>();
+        mockAdminChat.Setup(service => service.HasBranchPromptBeenShownAsync(Moq.It.IsAny<string>()))
+            .ReturnsAsync(false);
+        mockAdminChat.Setup(service => service.MarkBranchPromptShownAsync(Moq.It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+        mockAdminChat.Setup(service => service.GetUnreadCustomerMessageCountAsync(Moq.It.IsAny<int?>()))
+            .ReturnsAsync(0);
         var adminChat = adminChatService ?? mockAdminChat.Object;
         
         var mockExtractor = new Moq.Mock<WebHomestay.Services.AI.IEntityExtractorService>();
@@ -637,7 +643,7 @@ public class ContextAwareBookingConductorTests
             Progress = new BookingProgressState { SelectedRoomId = 11, ActiveRoomContextId = 11 }
         }, TimeSpan.FromMinutes(30));
 
-        var request = MakeRequest("phòng này ở 3 người được không", branchId: 1, startTime: new DateTime(2026, 6, 14), guestCount: 3);
+        var request = MakeRequest("phòng này ở 3 người được không", branchId: 1, startTime: DateTime.Today.AddDays(5), guestCount: 3);
         var result = await conductor.DecideAsync("ctx-1", request.Message, request, CancellationToken.None);
 
         Assert.Equal(ConductorAction.Reply, result.Action);
@@ -658,12 +664,12 @@ public class ContextAwareBookingConductorTests
                 BranchId = 1,
                 GuestCount = 3,
                 BookingMode = "hourly",
-                HourlyDate = new DateOnly(2026, 6, 14)
+                HourlyDate = DateOnly.FromDateTime(DateTime.Today.AddDays(5))
             },
             Progress = new BookingProgressState { SelectedRoomId = 12, ActiveRoomContextId = 12 }
         }, TimeSpan.FromMinutes(30));
 
-        var request = MakeRequest("phòng này giá sao", branchId: 1, startTime: new DateTime(2026, 6, 14), guestCount: 3);
+        var request = MakeRequest("phòng này giá sao", branchId: 1, startTime: DateTime.Today.AddDays(5), guestCount: 3);
         var result = await conductor.DecideAsync("ctx-price-1", request.Message, request, CancellationToken.None);
 
         Assert.Equal(ConductorAction.Reply, result.Action);
@@ -685,13 +691,13 @@ public class ContextAwareBookingConductorTests
                 BranchId = 1,
                 GuestCount = 3,
                 BookingMode = "daily",
-                CheckInDate = new DateOnly(2026, 6, 14),
-                CheckOutDate = new DateOnly(2026, 6, 16)
+                CheckInDate = DateOnly.FromDateTime(DateTime.Today.AddDays(5)),
+                CheckOutDate = DateOnly.FromDateTime(DateTime.Today.AddDays(7))
             },
             Progress = new BookingProgressState { SelectedRoomId = 13, ActiveRoomContextId = 13 }
         }, TimeSpan.FromMinutes(30));
 
-        var request = MakeRequest("phòng này cuối tuần có phụ thu không", branchId: 1, startTime: new DateTime(2026, 6, 14), guestCount: 3);
+        var request = MakeRequest("phòng này cuối tuần có phụ thu không", branchId: 1, startTime: DateTime.Today.AddDays(5), guestCount: 3);
         var result = await conductor.DecideAsync("ctx-policy-1", request.Message, request, CancellationToken.None);
 
         Assert.Equal(ConductorAction.Reply, result.Action);
@@ -943,6 +949,7 @@ public class ContextAwareBookingConductorTests
         
         mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
         mockClients.Setup(c => c.Group("admin_monitor")).Returns(mockClientProxy.Object);
+        mockClients.Setup(c => c.Groups(Moq.It.IsAny<IReadOnlyList<string>>())).Returns(mockClientProxy.Object);
         mockClientProxy
             .Setup(cp => cp.SendCoreAsync("sessionUpdate", Moq.It.IsAny<object[]>(), Moq.It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -1010,6 +1017,34 @@ public class ContextAwareBookingConductorTests
         Assert.NotNull(result.State.Confirmed.MissingRequiredFields);
         Assert.Single(result.State.Confirmed.MissingRequiredFields);
         Assert.Equal("branchId", result.State.Confirmed.MissingRequiredFields[0]);
+    }
+
+    [Fact]
+    public async Task DailyBookingIntent_WhenDateIsBeforeEarliestAllowed_ReturnsAskInfoWithExplanation()
+    {
+        using var context = CreateContext();
+        var cache = CreateCache();
+        context.Branches.Add(new Branch
+        {
+            Id = 1,
+            Name = "LumiStay Riverside Quận 7",
+            Address = "Q7",
+            BookingLeadTimeValue = 7,
+            BookingLeadTimeUnit = BranchLeadTimeUnit.Days,
+            BookingLeadTimeDays = 7
+        });
+        SeedRoom(context, id: 91, branchId: 1, capacity: 2, maxGuests: 3, extraGuestFee: 100000m);
+
+        var conductor = CreateConductor(context, cache, configureServices: services =>
+        {
+            services.AddSingleton<IBranchLeadTimeService>(new BranchLeadTimeService(context, () => new DateTime(2026, 6, 19, 8, 0, 0, DateTimeKind.Utc)));
+        });
+
+        var request = MakeRequest("đặt phòng ngày 26/6", branchId: 1, startTime: new DateTime(2026, 6, 26), guestCount: 2, bookingMode: "daily");
+        var result = await conductor.DecideAsync("leadtime-ai-1", request.Message, request, CancellationToken.None);
+
+        Assert.Equal(ConductorAction.AskInfo, result.Action);
+        Assert.Contains("27/06/2026", result.Answer ?? string.Empty);
     }
 }
 

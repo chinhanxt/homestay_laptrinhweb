@@ -11,16 +11,27 @@ public class BookingCreationService : IBookingCreationService
     private readonly ApplicationDbContext _context;
     private readonly IAvailabilityService _availabilityService;
     private readonly PricingService _pricingService;
+    private readonly IBranchLeadTimeService _branchLeadTimeService;
 
-    public BookingCreationService(ApplicationDbContext context, IAvailabilityService availabilityService, PricingService pricingService)
+    public BookingCreationService(
+        ApplicationDbContext context,
+        IAvailabilityService availabilityService,
+        PricingService pricingService,
+        IBranchLeadTimeService branchLeadTimeService)
     {
         _context = context;
         _availabilityService = availabilityService;
         _pricingService = pricingService;
+        _branchLeadTimeService = branchLeadTimeService;
+    }
+
+    public BookingCreationService(ApplicationDbContext context, IAvailabilityService availabilityService, PricingService pricingService)
+        : this(context, availabilityService, pricingService, new BranchLeadTimeService(context))
+    {
     }
 
     public BookingCreationService(ApplicationDbContext context, IAvailabilityService availabilityService)
-        : this(context, availabilityService, new PricingService(context))
+        : this(context, availabilityService, new PricingService(context), new BranchLeadTimeService(context))
     {
     }
 
@@ -32,6 +43,13 @@ public class BookingCreationService : IBookingCreationService
             
         if (!await _availabilityService.IsHourlySlotAvailableForRoomAsync(inventory.Id, request.RoomId, request.GuestCount))
             throw new InvalidOperationException("Khung giờ đặt phòng không hợp lệ hoặc vừa được người khác đặt.");
+
+        var leadTimeRule = await _branchLeadTimeService.ResolveAsync(inventory.Room.BranchId);
+        if (!leadTimeRule.AllowsHourly(inventory.StartTime))
+        {
+            throw new InvalidOperationException(
+                $"Chi nhánh này yêu cầu đặt trước tối thiểu {leadTimeRule.HourlyLeadTimeHours} giờ.");
+        }
 
         var booking = new Booking
         {
@@ -65,6 +83,13 @@ public class BookingCreationService : IBookingCreationService
         var interval = BookingTimeRules.BuildDailyStay(request.CheckInDate!.Value, request.CheckOutDate!.Value);
         if (!await _availabilityService.IsRoomAvailable(request.RoomId, interval.Start, interval.End))
             throw new InvalidOperationException("Khoảng ngày này không còn trống.");
+
+        var leadTimeRule = await _branchLeadTimeService.ResolveAsync(room.BranchId);
+        if (!leadTimeRule.AllowsDaily(request.CheckInDate!.Value))
+        {
+            throw new InvalidOperationException(
+                $"Chi nhánh này yêu cầu đặt trước tối thiểu {leadTimeRule.DailyLeadTimeDays} ngày. Ngày gần nhất có thể đặt là {leadTimeRule.EarliestAllowedDailyDate:dd/MM/yyyy}.");
+        }
 
         // Calculate nights
         int nights = (request.CheckOutDate!.Value.DayNumber - request.CheckInDate!.Value.DayNumber);

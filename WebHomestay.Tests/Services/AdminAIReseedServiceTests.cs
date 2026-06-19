@@ -128,4 +128,29 @@ public class AdminAIReseedServiceTests
 
         Assert.DoesNotContain(context.AIKnowledgeUnits, unit => unit.Title == "Legacy Article");
     }
+
+    [Fact]
+    public async Task ReseedAsync_AlignsWordingWithLeadTimeUnit()
+    {
+        await using var context = CreateContext();
+        
+        var branch = new Branch
+        {
+            Id = 1,
+            Name = "Lumi Q1",
+            Address = "123 Nguyen Hue",
+            Hotline = "0909000001",
+            BookingLeadTimeValue = 7,
+            BookingLeadTimeUnit = BranchLeadTimeUnit.Days,
+            BookingLeadTimeDays = 7
+        };
+        context.Branches.Add(branch);
+        await context.SaveChangesAsync();
+
+        var service = new AdminAIReseedService(context);
+        await service.ReseedAsync();
+
+        var branchSummary = context.AIKnowledgeUnits.First(unit => unit.Title == "Chi nhánh Lumi Q1").Content;
+        Assert.Contains("7 ngày", branchSummary);
+    }
 }

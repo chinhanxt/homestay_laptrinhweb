@@ -13,7 +13,9 @@ Before making changes, read **MANDATORY_CONTEXT.md** and **docs/yeucau/TONG_QUAN
 | `dotnet ef migrations add <Name> --project WebHomestay/WebHomestay.csproj` | Add EF migration |
 | `dotnet ef database update --project WebHomestay/WebHomestay.csproj` | Apply EF migrations |
 | `.\r.ps1 up` / `.\r.ps1 u` | Restore + build + run |
-| `.\r.ps1 watch` / `.\w.bat` / `.\r.ps1 w` | Hot reload |
+| `.\r.ps1 watch` / `.\r.ps1 w` | Hot reload |
+| `.\wmain` | Run web app with main DB (`web_homestay`) |
+| `.\wdemo` | Run web app with demo DB (`web_homestay_demo`) |
 | `.\r.ps1 clean` / `.\r.ps1 c` | Clean build artifacts |
 | `make up` / `make watch` | Makefile alternative (Unix-friendly) |
 

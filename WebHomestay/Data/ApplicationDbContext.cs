@@ -96,6 +96,9 @@ namespace WebHomestay.Data
                 entity.Property(e => e.Email).HasColumnName("email").HasMaxLength(100);
                 entity.Property(e => e.MapUrl).HasColumnName("map_url");
                 entity.Property(e => e.BookingLeadTimeHours).HasColumnName("booking_lead_time_hours");
+                entity.Property(e => e.BookingLeadTimeValue).HasColumnName("booking_lead_time_value");
+                entity.Property(e => e.BookingLeadTimeUnit).HasColumnName("booking_lead_time_unit").HasMaxLength(20);
+                entity.Property(e => e.BookingLeadTimeDays).HasColumnName("booking_lead_time_days").HasDefaultValue(1);
                 entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
                 entity.Property(e => e.DeletedAt).HasColumnName("deleted_at");
             });
@@ -361,6 +364,8 @@ namespace WebHomestay.Data
                 entity.Property(e => e.SessionId).HasColumnName("session_id");
                 entity.HasIndex(e => e.SessionId).IsUnique();
                 entity.Property(e => e.CustomerName).HasColumnName("customer_name");
+                entity.Property(e => e.BranchId).HasColumnName("branch_id");
+                entity.Property(e => e.HasPromptedForBranch).HasColumnName("has_prompted_for_branch");
                 entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(20);
                 entity.Property(e => e.PausedBy).HasColumnName("paused_by");
                 entity.Property(e => e.PausedAt).HasColumnName("paused_at");
