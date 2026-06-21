@@ -16,6 +16,7 @@ namespace WebHomestay.Controllers.AI
         private readonly IImageMaskingService _maskingService;
         private readonly ApplicationDbContext _context;
         private readonly IBookingConductor _bookingConductor;
+        private readonly IBranchLeadTimeService _branchLeadTimeService;
         private readonly IAdminChatService _adminChatService;
         private readonly IHubContext<Hubs.ChatHub> _hubContext;
         private readonly ILogger<AIChatController> _logger;
@@ -26,6 +27,7 @@ namespace WebHomestay.Controllers.AI
             IImageMaskingService maskingService,
             ApplicationDbContext context,
             IBookingConductor bookingConductor,
+            IBranchLeadTimeService branchLeadTimeService,
             IAdminChatService adminChatService,
             IHubContext<Hubs.ChatHub> hubContext,
             ILogger<AIChatController> logger)
@@ -35,6 +37,7 @@ namespace WebHomestay.Controllers.AI
             _maskingService = maskingService;
             _context = context;
             _bookingConductor = bookingConductor;
+            _branchLeadTimeService = branchLeadTimeService;
             _adminChatService = adminChatService;
             _hubContext = hubContext;
             _logger = logger;
@@ -459,9 +462,31 @@ namespace WebHomestay.Controllers.AI
         {
             var branches = await _context.Branches
                 .OrderBy(b => b.Id)
-                .Select(b => new { b.Id, b.Name })
+                .Select(b => new
+                {
+                    b.Id,
+                    b.Name,
+                    b.BookingLeadTimeDays,
+                    b.BookingLeadTimeHours
+                })
                 .ToListAsync(cancellationToken);
-            return Ok(branches);
+
+            var payload = new List<object>(branches.Count);
+            foreach (var branch in branches)
+            {
+                var rule = await _branchLeadTimeService.ResolveAsync(branch.Id, cancellationToken);
+                payload.Add(new
+                {
+                    id = branch.Id,
+                    name = branch.Name,
+                    bookingLeadTimeDays = branch.BookingLeadTimeDays,
+                    bookingLeadTimeHours = branch.BookingLeadTimeHours,
+                    earliestAllowedDailyDate = rule.EarliestAllowedDailyDate?.ToString("yyyy-MM-dd"),
+                    earliestAllowedHourlyDate = rule.EarliestAllowedHourlyDate?.ToString("yyyy-MM-dd")
+                });
+            }
+
+            return Ok(payload);
         }
 
         [HttpGet("debug-last-trace")]

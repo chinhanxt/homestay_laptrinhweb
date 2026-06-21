@@ -70,7 +70,7 @@ public class RoomBookingViewServiceTests
 
         var model = await service.BuildAsync(room, new DateOnly(2026, 6, 27));
 
-        Assert.Equal("Blocked", model.DailyCalendar.Single(d => d.Date == new DateOnly(2026, 6, 26)).Status);
-        Assert.Equal("Available", model.DailyCalendar.Single(d => d.Date == new DateOnly(2026, 6, 27)).Status);
+        Assert.Equal("Blocked", model.DailyCalendar.Single(d => d.Date == new DateOnly(2026, 6, 25)).Status);
+        Assert.Equal("Available", model.DailyCalendar.Single(d => d.Date == new DateOnly(2026, 6, 26)).Status);
     }
 }

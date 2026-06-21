@@ -33,7 +33,8 @@ public class BranchLeadTimeServiceTests
         Assert.Equal(3, rule.HourlyLeadTimeHours);
         Assert.Equal(2, rule.DailyLeadTimeDays);
         Assert.Equal(now.AddHours(3), rule.HourlyCutoffUtc);
-        Assert.Equal(new DateOnly(2026, 6, 22), rule.EarliestAllowedDailyDate); // 19/06 + 2 days + 1 day buffer = 22/06
+        Assert.Equal(new DateOnly(2026, 6, 19), rule.EarliestAllowedHourlyDate);
+        Assert.Equal(new DateOnly(2026, 6, 21), rule.EarliestAllowedDailyDate); // 19/06 + 2 days = 21/06
     }
 
     [Fact]
@@ -61,6 +62,7 @@ public class BranchLeadTimeServiceTests
         Assert.Equal(0, rule.HourlyLeadTimeHours);
         Assert.Equal(0, rule.DailyLeadTimeDays);
         Assert.Equal(now, rule.HourlyCutoffUtc);
+        Assert.Equal(new DateOnly(2026, 6, 19), rule.EarliestAllowedHourlyDate);
         Assert.Equal(new DateOnly(2026, 6, 19), rule.EarliestAllowedDailyDate); // 0 days means today is allowed
     }
 }

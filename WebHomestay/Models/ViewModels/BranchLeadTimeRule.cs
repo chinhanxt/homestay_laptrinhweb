@@ -10,6 +10,7 @@ public class BranchLeadTimeRule
     public int HourlyLeadTimeHours { get; set; }
     public int DailyLeadTimeDays { get; set; }
     public DateTime? HourlyCutoffUtc { get; set; }
+    public DateOnly? EarliestAllowedHourlyDate { get; set; }
     public DateOnly? EarliestAllowedDailyDate { get; set; }
 
     public bool AllowsHourly(DateTime slotStartUtc)

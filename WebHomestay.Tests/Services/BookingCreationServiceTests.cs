@@ -143,13 +143,13 @@ public class BookingCreationServiceTests
         {
             RoomId = 10,
             BookingMode = BookingMode.Daily,
-            CheckInDate = new DateOnly(2026, 6, 26),
-            CheckOutDate = new DateOnly(2026, 6, 28),
+            CheckInDate = new DateOnly(2026, 6, 25),
+            CheckOutDate = new DateOnly(2026, 6, 27),
             CustomerName = "Nhan",
             CustomerPhone = "0900000000",
             GuestCount = 2
         }));
 
-        Assert.Contains("27/06/2026", ex.Message);
+        Assert.Contains("26/06/2026", ex.Message);
     }
 }

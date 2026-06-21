@@ -1040,11 +1040,11 @@ public class ContextAwareBookingConductorTests
             services.AddSingleton<IBranchLeadTimeService>(new BranchLeadTimeService(context, () => new DateTime(2026, 6, 19, 8, 0, 0, DateTimeKind.Utc)));
         });
 
-        var request = MakeRequest("đặt phòng ngày 26/6", branchId: 1, startTime: new DateTime(2026, 6, 26), guestCount: 2, bookingMode: "daily");
+        var request = MakeRequest("đặt phòng ngày 25/6", branchId: 1, startTime: new DateTime(2026, 6, 25), guestCount: 2, bookingMode: "daily");
         var result = await conductor.DecideAsync("leadtime-ai-1", request.Message, request, CancellationToken.None);
 
         Assert.Equal(ConductorAction.AskInfo, result.Action);
-        Assert.Contains("27/06/2026", result.Answer ?? string.Empty);
+        Assert.Contains("26/06/2026", result.Answer ?? string.Empty);
     }
 }
 

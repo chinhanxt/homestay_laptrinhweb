@@ -1,2 +1,4 @@
 @echo off
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0run-web.ps1" -Database demo
+setlocal
+set "REPO_ROOT=%~dp0"
+powershell -NoLogo -NoProfile -NoExit -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%REPO_ROOT%'; & '%REPO_ROOT%run-web.ps1' -Database demo"

@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let latestBookingSummary = null;
     let zaloContactsLoaded = false;
     let contextTouched = { mode: false };
+    let branchMetadataById = new Map();
 
     function getSessionId() {
         let sid = localStorage.getItem('ai_chat_session_id');
@@ -259,6 +260,11 @@ document.addEventListener('DOMContentLoaded', () => {
             updateContextDateTimeControls();
         });
     }
+    if (branchSelect) {
+        branchSelect.addEventListener('change', () => {
+            updateContextDateTimeControls();
+        });
+    }
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -378,15 +384,19 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('/ai/branches');
             const branches = await response.json().catch(() => []);
+            branchMetadataById = new Map();
             branchSelect.innerHTML = '';
             branchSelect.appendChild(new Option('Chọn chi nhánh', ''));
             if (Array.isArray(branches)) {
                 branches.forEach(branch => {
                     if (!branch || branch.id == null) return;
+                    branchMetadataById.set(String(branch.id), branch);
                     branchSelect.appendChild(new Option(branch.name || `Chi nhánh ${branch.id}`, String(branch.id)));
                 });
             }
+            updateContextDateTimeControls();
         } catch {
+            branchMetadataById = new Map();
             branchSelect.innerHTML = '';
             branchSelect.appendChild(new Option('Không tải được chi nhánh', ''));
         }
@@ -597,10 +607,10 @@ document.addEventListener('DOMContentLoaded', () => {
         dateInput.type = 'date';
         dateInput.name = 'checkInDate';
         dateInput.className = 'ai-date-picker-input';
-        
-        const todayStr = new Date().toISOString().split('T')[0];
-        dateInput.min = todayStr;
-        dateInput.value = todayStr;
+
+        const constraints = getBookingDateConstraints('hourly');
+        dateInput.min = constraints.checkInMin;
+        dateInput.value = normalizeDateValue(dateInput.value, constraints.checkInMin);
         
         inputWrapper.appendChild(dateInput);
         container.appendChild(inputWrapper);
@@ -644,9 +654,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ciInput.type = 'date';
         ciInput.name = 'checkInDate';
         ciInput.className = 'ai-date-picker-input';
-        const todayStr = new Date().toISOString().split('T')[0];
-        ciInput.min = todayStr;
-        ciInput.value = todayStr;
+        const constraints = getBookingDateConstraints('daily');
+        ciInput.min = constraints.checkInMin;
+        ciInput.value = normalizeDateValue(ciInput.value, constraints.checkInMin);
         ciWrapper.appendChild(ciInput);
         ciCol.appendChild(ciWrapper);
         grid.appendChild(ciCol);
@@ -670,12 +680,9 @@ document.addEventListener('DOMContentLoaded', () => {
         coInput.type = 'date';
         coInput.name = 'checkOutDate';
         coInput.className = 'ai-date-picker-input';
-        
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
-        coInput.min = tomorrowStr;
-        coInput.value = tomorrowStr;
+
+        coInput.min = constraints.checkOutMin;
+        coInput.value = normalizeDateValue(coInput.value, constraints.checkOutMin);
         coWrapper.appendChild(coInput);
         coCol.appendChild(coWrapper);
         grid.appendChild(coCol);
@@ -684,9 +691,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ciInput.addEventListener('change', () => {
             if (ciInput.value) {
-                const nextDay = new Date(ciInput.value);
-                nextDay.setDate(nextDay.getDate() + 1);
-                coInput.min = nextDay.toISOString().split('T')[0];
+                coInput.min = addDaysToDateString(ciInput.value, 1);
                 if (coInput.value <= ciInput.value) {
                     coInput.value = coInput.min;
                 }
@@ -1068,6 +1073,7 @@ document.addEventListener('DOMContentLoaded', () => {
         latestBookingSummary = wrapper;
         wrapper.dataset.baseLines = JSON.stringify(Array.isArray(data.lines) ? data.lines.filter(line => !String(line || '').startsWith('Số khách:') && !String(line || '').startsWith('Phụ thu khách thêm:')) : []);
         wrapper.dataset.totalPrice = toSafeNumber(data.totalPrice).toString();
+        wrapper.dataset.bookingPricing = JSON.stringify(normalizeBookingPricing(data.pricing));
         const title = document.createElement('h4');
         title.textContent = data.title || 'Tóm tắt đặt phòng';
         wrapper.appendChild(title);
@@ -1078,7 +1084,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const total = document.createElement('div');
         total.className = 'ai-booking-total';
         wrapper.appendChild(total);
-        updateBookingSummaryTotals(null);
+        updateBookingSummaryTotals(data.pricing || null);
         scrollMessages();
     }
 
@@ -1177,11 +1183,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateBookingSummaryTotals(pricing) {
         if (!latestBookingSummary) return;
         const baseLines = JSON.parse(latestBookingSummary.dataset.baseLines || '[]');
+        const storedPricing = normalizeBookingPricing(JSON.parse(latestBookingSummary.dataset.bookingPricing || '{}'));
+        const resolvedPricing = {
+            ...storedPricing,
+            ...(pricing && typeof pricing === 'object' ? normalizeBookingPricing(pricing) : {})
+        };
         const totalFromServer = toSafeNumber(latestBookingSummary.dataset.totalPrice);
-        const guestCount = normalizeGuestCount(pricing?.guestCount || bookingState.guestCount || getGuestCount(), pricing);
-        const capacity = toSafeNumber(pricing?.capacity);
-        const extraGuestFee = toSafeNumber(pricing?.extraGuestFee);
-        const baseTotalPrice = toSafeNumber(pricing?.baseTotalPrice) || totalFromServer;
+        const guestCount = normalizeGuestCount(pricing?.guestCount || bookingState.guestCount || getGuestCount(), resolvedPricing);
+        const capacity = toSafeNumber(resolvedPricing.capacity);
+        const extraGuestFee = toSafeNumber(resolvedPricing.extraGuestFee);
+        const baseTotalPrice = toSafeNumber(resolvedPricing.baseTotalPrice) || totalFromServer;
         const extraGuests = Math.max(0, guestCount - capacity);
         const extraTotal = extraGuests * extraGuestFee;
         const lines = [...baseLines, `Số khách: ${guestCount}`];
@@ -1703,10 +1714,6 @@ document.addEventListener('DOMContentLoaded', () => {
         checkInEl.type = 'date';
         checkInEl.className = 'ai-date-picker-input ai-ds-checkin';
         checkInEl.required = true;
-        
-        const todayStr = new Date().toISOString().split('T')[0];
-        checkInEl.min = todayStr;
-        checkInEl.value = todayStr;
 
         checkInWrapper.appendChild(checkInEl);
         checkInCol.appendChild(checkInWrapper);
@@ -1733,12 +1740,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const checkOutEl = document.createElement('input');
         checkOutEl.type = 'date';
         checkOutEl.className = 'ai-date-picker-input ai-ds-checkout';
-        
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
-        checkOutEl.min = tomorrowStr;
-        checkOutEl.value = tomorrowStr;
 
         checkOutWrapper.appendChild(checkOutEl);
         checkOutCol.appendChild(checkOutWrapper);
@@ -1748,9 +1749,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         checkInEl.addEventListener('change', () => {
             if (checkInEl.value) {
-                const nextDay = new Date(checkInEl.value);
-                nextDay.setDate(nextDay.getDate() + 1);
-                checkOutEl.min = nextDay.toISOString().split('T')[0];
+                checkOutEl.min = addDaysToDateString(checkInEl.value, 1);
                 if (checkOutEl.value <= checkInEl.value) {
                     checkOutEl.value = checkOutEl.min;
                 }
@@ -1758,11 +1757,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const updateLayout = (isDaily) => {
+            const constraints = getBookingDateConstraints(isDaily ? 'daily' : 'hourly');
+            checkInEl.min = constraints.checkInMin;
+            checkInEl.value = normalizeDateValue(checkInEl.value, constraints.checkInMin);
+
             if (isDaily) {
                 checkOutCol.style.display = 'block';
                 checkInCol.className = 'col-6';
                 checkOutCol.className = 'col-6';
                 checkInCaption.textContent = 'Ngày nhận';
+                checkOutEl.min = addDaysToDateString(checkInEl.value || constraints.checkInMin, 1);
+                checkOutEl.value = normalizeDateValue(checkOutEl.value, checkOutEl.min);
             } else {
                 checkOutCol.style.display = 'none';
                 checkInCol.className = 'col-12';
@@ -1961,14 +1966,70 @@ document.addEventListener('DOMContentLoaded', () => {
         const mode = getBookingMode();
         const hourly = mode === 'hourly';
         const daily = mode === 'daily';
+        const constraints = getBookingDateConstraints(daily ? 'daily' : 'hourly');
         checkInInput.type = 'date';
         checkOutInput.type = 'date';
         checkInInput.previousElementSibling.textContent = daily ? 'Ngày nhận' : 'Ngày đặt';
         checkOutInput.previousElementSibling.textContent = 'Ngày trả';
         if (checkOutField) checkOutField.hidden = !daily;
         timeFields.forEach(field => { field.hidden = true; });
+        checkInInput.min = constraints.checkInMin;
+        checkInInput.value = normalizeDateValue(checkInInput.value, constraints.checkInMin);
+        checkOutInput.min = daily
+            ? addDaysToDateString(checkInInput.value || constraints.checkInMin, 1)
+            : constraints.checkOutMin;
+        if (daily) {
+            checkOutInput.value = normalizeDateValue(checkOutInput.value, checkOutInput.min);
+        }
         if (checkInInput.value && checkInInput.value.length > 10) checkInInput.value = checkInInput.value.slice(0, 10);
         if (checkOutInput.value && checkOutInput.value.length > 10) checkOutInput.value = checkOutInput.value.slice(0, 10);
+    }
+
+    function getSelectedBranchMetadata() {
+        const branchId = getBranchId();
+        if (!branchId) return null;
+        return branchMetadataById.get(String(branchId)) || null;
+    }
+
+    function getBookingDateConstraints(mode) {
+        const branchMetadata = getSelectedBranchMetadata();
+        const today = getLocalDateInputValue(new Date());
+        const fallbackHourlyMin = today;
+        const fallbackDailyMin = today;
+        const dailyCheckInMin = branchMetadata?.earliestAllowedDailyDate || fallbackDailyMin;
+        const hourlyCheckInMin = branchMetadata?.earliestAllowedHourlyDate || fallbackHourlyMin;
+        const checkInMin = mode === 'daily' ? dailyCheckInMin : hourlyCheckInMin;
+
+        return {
+            checkInMin,
+            checkOutMin: addDaysToDateString(checkInMin, 1)
+        };
+    }
+
+    function normalizeDateValue(value, minValue) {
+        if (!value || value < minValue) {
+            return minValue;
+        }
+
+        return value;
+    }
+
+    function addDaysToDateString(dateString, days) {
+        const [year, month, day] = String(dateString || '').split('-').map(Number);
+        if (!year || !month || !day) {
+            return getLocalDateInputValue(new Date());
+        }
+
+        const date = new Date(year, month - 1, day);
+        date.setDate(date.getDate() + days);
+        return getLocalDateInputValue(date);
+    }
+
+    function getLocalDateInputValue(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 
     function formatMoney(value) {

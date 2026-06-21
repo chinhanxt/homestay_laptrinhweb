@@ -125,24 +125,13 @@
                                 <td>
                                     @if (!string.IsNullOrEmpty(item.PaymentProofUrl))
                                     {
-                                        <a href="#" data-bs-toggle="modal" data-bs-target="#billModal-@item.Id">
-                                            <img src="@item.PaymentProofUrl" class="admin-img-thumb" style="border-radius: 4px;" />
-                                        </a>
-                                        
-                                        <!-- Bill Preview Modal -->
-                                        <div class="modal fade" id="billModal-@item.Id" tabindex="-1">
-                                            <div class="modal-dialog modal-dialog-centered">
-                                                <div class="modal-content border-0 shadow-lg">
-                                                    <div class="modal-header border-0">
-                                                        <h6 class="modal-title fw-bold">Minh chứng #@item.Id</h6>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                    </div>
-                                                    <div class="modal-body p-0">
-                                                        <img src="@item.PaymentProofUrl" class="w-100" />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <button type="button"
+                                                class="btn p-0 border-0 bg-transparent bill-preview-trigger"
+                                                data-proof-url="@item.PaymentProofUrl"
+                                                data-booking-id="@item.Id"
+                                                aria-label="Xem minh chứng đơn #@item.Id">
+                                            <img src="@item.PaymentProofUrl" class="admin-img-thumb" style="border-radius: 4px;" loading="lazy" />
+                                        </button>
                                     }
                                     else
                                     {
@@ -285,6 +274,26 @@
     </div>
 </div>
 
+<div class="modal fade" id="billPreviewModal" tabindex="-1" aria-labelledby="billPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0">
+                <h6 class="modal-title fw-bold" id="billPreviewModalLabel">Minh chứng</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body p-0 text-center bg-light-subtle">
+                <div id="billPreviewLoading" class="py-5 text-muted small">
+                    <i class="fas fa-spinner fa-spin me-2"></i>Đang tải ảnh minh chứng...
+                </div>
+                <img id="billPreviewImage"
+                     alt="Ảnh minh chứng thanh toán"
+                     class="img-fluid d-none"
+                     style="max-height: 80vh; width: auto;" />
+            </div>
+        </div>
+    </div>
+</div>
+
 @{
     var isError = TempData["ErrorMessage"] != null;
     var message = isError ? TempData["ErrorMessage"] : TempData["SuccessMessage"];
@@ -350,6 +359,52 @@
             document.getElementById('filterSearch').value = '';
             filterBookingTable();
         });
+
+        var billPreviewModalEl = document.getElementById('billPreviewModal');
+        var billPreviewLabelEl = document.getElementById('billPreviewModalLabel');
+        var billPreviewImageEl = document.getElementById('billPreviewImage');
+        var billPreviewLoadingEl = document.getElementById('billPreviewLoading');
+        var billPreviewModal = billPreviewModalEl ? bootstrap.Modal.getOrCreateInstance(billPreviewModalEl) : null;
+
+        function resetBillPreview() {
+            if (!billPreviewImageEl || !billPreviewLoadingEl) {
+                return;
+            }
+
+            billPreviewImageEl.classList.add('d-none');
+            billPreviewImageEl.removeAttribute('src');
+            billPreviewLoadingEl.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Đang tải ảnh minh chứng...';
+            billPreviewLoadingEl.classList.remove('d-none');
+        }
+
+        document.querySelectorAll('.bill-preview-trigger').forEach(function(trigger) {
+            trigger.addEventListener('click', function() {
+                if (!billPreviewModal || !billPreviewImageEl || !billPreviewLoadingEl) {
+                    return;
+                }
+
+                var proofUrl = this.dataset.proofUrl;
+                var bookingId = this.dataset.bookingId;
+                resetBillPreview();
+                if (billPreviewLabelEl) {
+                    billPreviewLabelEl.textContent = 'Minh chứng #' + bookingId;
+                }
+
+                billPreviewImageEl.onload = function() {
+                    billPreviewLoadingEl.classList.add('d-none');
+                    billPreviewImageEl.classList.remove('d-none');
+                };
+
+                billPreviewImageEl.onerror = function() {
+                    billPreviewLoadingEl.innerHTML = '<span class="text-danger">Không tải được ảnh minh chứng.</span>';
+                };
+
+                billPreviewImageEl.src = proofUrl;
+                billPreviewModal.show();
+            });
+        });
+
+        billPreviewModalEl?.addEventListener('hidden.bs.modal', resetBillPreview);
 
         // Sort
         var bookingsSortAsc = null, bookingsSortField = null;
