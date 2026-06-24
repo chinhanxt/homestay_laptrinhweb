@@ -1,9 +1,11 @@
 using System;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using WebHomestay.Data;
 
 namespace WebHomestay.Services.AI
@@ -12,11 +14,16 @@ namespace WebHomestay.Services.AI
     {
         private readonly ApplicationDbContext _context;
         private readonly IAIModelClient _modelClient;
+        private readonly ILogger<OperationalInsightService> _logger;
 
-        public OperationalInsightService(ApplicationDbContext context, IAIModelClient modelClient)
+        public OperationalInsightService(
+            ApplicationDbContext context,
+            IAIModelClient modelClient,
+            ILogger<OperationalInsightService> logger)
         {
             _context = context;
             _modelClient = modelClient;
+            _logger = logger;
         }
 
         public async Task<string> GetDailyBriefingJsonAsync(CancellationToken cancellationToken = default)
@@ -77,43 +84,11 @@ namespace WebHomestay.Services.AI
 
             var dataContextJson = JsonSerializer.Serialize(dataContext);
 
-            var systemPrompt = @"Bạn là trợ lý AI phân tích số liệu vận hành cho Admin của hệ thống Homestay Tự Vận Hành.
-Nhiệm vụ của bạn là đọc dữ liệu vận hành hôm nay và tạo ra một báo cáo thông minh ngắn gọn (Daily Briefing) cùng với danh sách các hành động nhanh (Quick Actions) tương ứng.
-
-Yêu cầu định dạng đầu ra:
-Bạn phải trả về DUY NHẤT một chuỗi JSON hợp lệ, không chứa bất kỳ thẻ markdown code block (như ```json) hay lời giải thích nào bên ngoài.
-
-Cấu trúc JSON mong muốn:
-{
-  ""briefing"": ""Một đoạn văn tóm tắt ngắn gọn bằng tiếng Việt, thân thiện, súc tích (khoảng 3-4 câu) về tình hình vận hành hôm nay. Hãy nêu bật các cảnh báo quan trọng như: nhiều check-in/out cùng lúc, có phòng đang bảo trì, có yêu cầu hủy đơn chưa duyệt hoặc có nhiều chat khách hàng đang chờ trả lời."",
-  ""quickActions"": [
-    {
-      ""label"": ""Tên nút hành động ngắn gọn bằng tiếng Việt (VD: Duyệt booking chờ thanh toán, Xem yêu cầu hủy, Chat với khách)"",
-      ""action"": ""Mã hành động: CHOOSE_ONE_OF [VIEW_BOOKINGS, VIEW_CANCELLATIONS, VIEW_CHATS, VIEW_MAINTENANCE]"",
-      ""param"": ""Tham số phụ nếu cần (ví dụ id hoặc để trống)"",
-      ""type"": ""Màu sắc hiển thị: CHOOSE_ONE_OF [primary, success, warning, danger]""
-    }
-  ]
-}
-
-Ví dụ JSON trả về:
-{
-  ""briefing"": ""Chào buổi sáng! Hệ thống hôm nay ghi nhận có 3 lượt check-in và 2 lượt check-out. Đáng chú ý là có 1 yêu cầu hủy phòng đang chờ duyệt và 2 phiên chat của khách hàng chưa được trả lời. Ngoài ra, phòng Suite 102 vẫn đang trong quá trình bảo trì."",
-  ""quickActions"": [
-    {
-      ""label"": ""Xem yêu cầu hủy phòng"",
-      ""action"": ""VIEW_CANCELLATIONS"",
-      ""param"": """",
-      ""type"": ""danger""
-    },
-    {
-      ""label"": ""Trả lời chat khách hàng"",
-      ""action"": ""VIEW_CHATS"",
-      ""type"": ""warning"",
-      ""param"": """"
-    }
-  ]
-}";
+            var systemPrompt = @"Bạn là trợ lý AI phân tích số liệu vận hành cho admin homestay.
+Trả về DUY NHẤT một JSON hợp lệ, không markdown, không giải thích thêm.
+JSON phải có dạng:
+{""briefing"":""..."",""quickActions"":[{""label"":""..."",""action"":""VIEW_BOOKINGS|VIEW_CANCELLATIONS|VIEW_CHATS|VIEW_MAINTENANCE"",""param"":"""",""type"":""primary|success|warning|danger""}]}
+Briefing gồm 2-3 câu tiếng Việt, súc tích, nêu rõ check-in/check-out, booking chờ xử lý, yêu cầu hủy, chat chờ phản hồi, bảo trì nếu có.";
 
             try
             {
@@ -121,8 +96,8 @@ Ví dụ JSON trả về:
                 {
                     SystemPrompt = systemPrompt,
                     UserMessage = $"Dữ liệu vận hành thực tế hôm nay:\n{dataContextJson}",
-                    Temperature = 0.3m,
-                    MaxTokens = 800
+                    Temperature = 0.2m,
+                    MaxTokens = 220
                 }, cancellationToken);
 
                 var jsonStr = response.Content?.Trim() ?? string.Empty;
@@ -142,25 +117,155 @@ Ví dụ JSON trả về:
                 }
                 jsonStr = jsonStr.Trim();
 
-                // Simple validation by parsing
-                using var doc = JsonDocument.Parse(jsonStr);
-                return jsonStr;
-            }
-            catch (Exception)
-            {
-                // Return a default structured fallback in case of AI errors
-                var fallback = new
+                if (string.IsNullOrWhiteSpace(jsonStr))
                 {
-                    briefing = $"Chào Admin, hệ thống hôm nay ghi nhận {checkInsToday.Count} lượt check-in, {checkOutsToday.Count} lượt check-out. Hiện tại có {pendingPayments} booking đang chờ xử lý, {pendingCancellations} yêu cầu hủy chưa duyệt và {openChats} tin nhắn đang chờ phản hồi. Trợ lý AI tạm thời không thể phân tích sâu hơn do lỗi kết nối.",
-                    quickActions = new[]
-                    {
-                        new { label = "Xem danh sách đặt phòng", action = "VIEW_BOOKINGS", param = "", type = "primary" },
-                        new { label = "Kiểm tra kênh chat", action = "VIEW_CHATS", param = "", type = "warning" },
-                        new { label = "Duyệt yêu cầu hủy phòng", action = "VIEW_CANCELLATIONS", param = "", type = "danger" }
-                    }
-                };
-                return JsonSerializer.Serialize(fallback);
+                    throw new InvalidOperationException("Operational briefing AI returned empty content.");
+                }
+
+                using var doc = JsonDocument.Parse(jsonStr);
+                return BuildSuccessfulBriefingJson(jsonStr, response.Provider, response.Model);
             }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to build operational briefing from AI provider.");
+                return JsonSerializer.Serialize(BuildFallbackBriefing(
+                    checkInsToday.Count,
+                    checkOutsToday.Count,
+                    pendingPayments,
+                    pendingCancellations,
+                    openChats,
+                    maintenanceRooms.Count,
+                    ExtractProviderName(ex),
+                    DescribeOperationalInsightFailure(ex)));
+            }
+        }
+
+        private static string BuildSuccessfulBriefingJson(string jsonStr, string provider, string model)
+        {
+            var root = JsonNode.Parse(jsonStr)?.AsObject() ?? new JsonObject();
+            root["status"] = new JsonObject
+            {
+                ["tone"] = "success",
+                ["label"] = "Đã kết nối AI",
+                ["detail"] = "Provider phản hồi thành công và đúng định dạng phân tích.",
+                ["provider"] = provider,
+                ["model"] = model,
+                ["connection"] = "ok",
+                ["format"] = "valid",
+                ["usingFallback"] = false
+            };
+
+            return root.ToJsonString();
+        }
+
+        private static object BuildFallbackBriefing(
+            int checkIns,
+            int checkOuts,
+            int pendingPayments,
+            int pendingCancellations,
+            int openChats,
+            int maintenanceRooms,
+            string provider,
+            string failureReason)
+        {
+            var maintenanceSentence = maintenanceRooms > 0
+                ? $" Có {maintenanceRooms} phòng đang ở trạng thái bảo trì."
+                : string.Empty;
+
+            var status = BuildFailureStatus(provider, failureReason);
+
+            return new
+            {
+                briefing = $"Chào Admin, hệ thống hôm nay ghi nhận {checkIns} lượt check-in, {checkOuts} lượt check-out. Hiện tại có {pendingPayments} booking đang chờ xử lý, {pendingCancellations} yêu cầu hủy chưa duyệt và {openChats} tin nhắn đang chờ phản hồi.{maintenanceSentence} {failureReason}".Trim(),
+                status,
+                quickActions = new[]
+                {
+                    new { label = "Xem danh sách đặt phòng", action = "VIEW_BOOKINGS", param = "", type = "primary" },
+                    new { label = "Kiểm tra kênh chat", action = "VIEW_CHATS", param = "", type = "warning" },
+                    new { label = "Duyệt yêu cầu hủy phòng", action = "VIEW_CANCELLATIONS", param = "", type = "danger" }
+                }
+            };
+        }
+
+        private static object BuildFailureStatus(string provider, string failureReason)
+        {
+            var lowered = failureReason.ToLowerInvariant();
+            var tone = "warning";
+            var label = "AI đang dùng fallback an toàn";
+            var connection = "degraded";
+            var format = "unknown";
+
+            if (lowered.Contains("đúng định dạng"))
+            {
+                label = "AI phản hồi chưa đúng định dạng";
+                format = "invalid";
+            }
+            else if (lowered.Contains("quota") || lowered.Contains("tần suất"))
+            {
+                label = "AI chạm giới hạn quota";
+                tone = "danger";
+                connection = "failed";
+            }
+            else if (lowered.Contains("từ chối truy cập") || lowered.Contains("api key"))
+            {
+                label = "AI bị từ chối truy cập";
+                tone = "danger";
+                connection = "failed";
+            }
+            else if (lowered.Contains("chưa phản hồi ổn định"))
+            {
+                label = "Kết nối AI chưa ổn định";
+            }
+
+            return new
+            {
+                tone,
+                label,
+                detail = failureReason,
+                provider,
+                model = string.Empty,
+                connection,
+                format,
+                usingFallback = true
+            };
+        }
+
+        private static string DescribeOperationalInsightFailure(Exception ex)
+        {
+            var message = ex.Message?.ToLowerInvariant() ?? string.Empty;
+
+            if (message.Contains("returned 401") || message.Contains("unauthorized") || message.Contains("api key"))
+            {
+                return "Trợ lý AI tạm thời bị từ chối truy cập, cần kiểm tra API key hoặc quyền của provider.";
+            }
+
+            if (message.Contains("returned 429") || message.Contains("quota") || message.Contains("rate limit"))
+            {
+                return "Trợ lý AI đang chạm giới hạn quota hoặc tần suất gọi, vui lòng thử lại sau.";
+            }
+
+            if (ex is JsonException || message.Contains("empty content") || message.Contains("invalid json") || message.Contains("expected depth"))
+            {
+                return "Trợ lý AI có phản hồi nhưng chưa đúng định dạng phân tích, nên hệ thống đang dùng bản tóm tắt an toàn.";
+            }
+
+            return "Trợ lý AI tạm thời chưa phản hồi ổn định, nên hệ thống đang dùng bản tóm tắt an toàn.";
+        }
+
+        private static string ExtractProviderName(Exception ex)
+        {
+            var message = ex.Message ?? string.Empty;
+            if (message.Contains("'groq'", StringComparison.OrdinalIgnoreCase) || message.Contains("groq", StringComparison.OrdinalIgnoreCase))
+            {
+                return "groq";
+            }
+
+            if (message.Contains("'gemini'", StringComparison.OrdinalIgnoreCase) || message.Contains("gemini", StringComparison.OrdinalIgnoreCase))
+            {
+                return "gemini";
+            }
+
+            return "ai-provider";
         }
     }
 }

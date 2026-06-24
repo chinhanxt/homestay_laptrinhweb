@@ -2100,6 +2100,75 @@ window.toggleBrainTrash = toggleBrainTrash;
 window.restoreBrainItem = restoreBrainItem;
 window.permanentDeleteBrainItem = permanentDeleteBrainItem;
 
+function normalizeBriefingStatus(status) {
+    const raw = status || {};
+    return {
+        tone: raw.tone || 'warning',
+        label: raw.label || 'AI đang dùng fallback an toàn',
+        detail: raw.detail || 'Chưa có chẩn đoán chi tiết.',
+        provider: raw.provider || 'unknown',
+        model: raw.model || '',
+        connection: raw.connection || 'unknown',
+        format: raw.format || 'unknown',
+        usingFallback: raw.usingFallback === true
+    };
+}
+
+function renderBriefingStatus(status) {
+    const connectionLabels = {
+        ok: 'Ổn định',
+        degraded: 'Giảm chất lượng',
+        failed: 'Thất bại',
+        unknown: 'Chưa rõ'
+    };
+    const formatLabels = {
+        valid: 'Hợp lệ',
+        invalid: 'Không hợp lệ',
+        unknown: 'Chưa rõ'
+    };
+    const toneMap = {
+        success: {
+            badgeClass: 'bg-success-subtle text-success border-success-subtle',
+            icon: 'fa-circle-check',
+            borderClass: 'border-success-subtle',
+            panelBg: 'background: rgba(25, 135, 84, 0.08);'
+        },
+        danger: {
+            badgeClass: 'bg-danger-subtle text-danger border-danger-subtle',
+            icon: 'fa-circle-xmark',
+            borderClass: 'border-danger-subtle',
+            panelBg: 'background: rgba(220, 53, 69, 0.08);'
+        },
+        warning: {
+            badgeClass: 'bg-warning-subtle text-warning border-warning-subtle',
+            icon: 'fa-triangle-exclamation',
+            borderClass: 'border-warning-subtle',
+            panelBg: 'background: rgba(255, 193, 7, 0.12);'
+        }
+    };
+    const tone = toneMap[status.tone] || toneMap.warning;
+    const fallbackText = status.usingFallback ? 'Đang dùng' : 'Không dùng';
+    const connectionText = connectionLabels[status.connection] || connectionLabels.unknown;
+    const formatText = formatLabels[status.format] || formatLabels.unknown;
+
+    return `
+        <div class="briefing-status-panel border rounded-4 px-3 py-3 mb-3 ${tone.borderClass}" style="${tone.panelBg}">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <span class="badge rounded-pill border ${tone.badgeClass} px-3 py-2 fw-semibold">
+                    <i class="fas ${tone.icon} me-2"></i>${escapeHtml(status.label)}
+                </span>
+                <span class="small text-muted">Provider: <strong>${escapeHtml(status.provider)}</strong>${status.model ? ` | Model: <strong>${escapeHtml(status.model)}</strong>` : ''}</span>
+            </div>
+            <div class="small text-dark mb-2" style="line-height:1.45;">${escapeHtml(status.detail)}</div>
+            <div class="d-flex flex-wrap gap-2 small">
+                <span class="badge rounded-pill text-bg-light border">Kết nối: ${escapeHtml(connectionText)}</span>
+                <span class="badge rounded-pill text-bg-light border">Định dạng: ${escapeHtml(formatText)}</span>
+                <span class="badge rounded-pill text-bg-light border">Fallback: ${escapeHtml(fallbackText)}</span>
+            </div>
+        </div>
+    `;
+}
+
 async function loadOperationalBriefing() {
     const loading = document.getElementById('ai-briefing-loading');
     const content = document.getElementById('ai-briefing-content');
@@ -2126,6 +2195,7 @@ async function loadOperationalBriefing() {
 
         const data = await response.json();
         const rawText = data.briefing || 'Không có bản tin hôm nay.';
+        const status = normalizeBriefingStatus(data.status);
         
         // Dynamic Extraction of Operational Metrics
         const checkInMatch = rawText.match(/(\d+)\s*(?:lượt\s*)?check-in/i);
@@ -2152,6 +2222,11 @@ async function loadOperationalBriefing() {
                     <div class="metric-icon"><i class="fas fa-exchange-alt text-primary"></i></div>
                     <div class="metric-value text-primary">${checkIn} / ${checkOut}</div>
                     <div class="metric-title text-muted">Check In / Out</div>
+                </div>
+                <div class="briefing-metric-card shadow-sm border ${bookings > 0 ? 'border-success-subtle bg-success-subtle bg-opacity-25' : 'border-light-subtle'}">
+                    <div class="metric-icon"><i class="fas fa-calendar-check ${bookings > 0 ? 'text-success animate-pulse' : 'text-muted'}"></i></div>
+                    <div class="metric-value ${bookings > 0 ? 'text-success fw-bold' : 'text-muted'}">${bookings}</div>
+                    <div class="metric-title text-muted">Booking chờ xử lý</div>
                 </div>
                 <div class="briefing-metric-card shadow-sm border ${cancellations > 0 ? 'border-danger-subtle bg-danger-subtle bg-opacity-25' : 'border-light-subtle'}">
                     <div class="metric-icon"><i class="fas fa-ban ${cancellations > 0 ? 'text-danger animate-pulse' : 'text-muted'}"></i></div>
@@ -2195,7 +2270,7 @@ async function loadOperationalBriefing() {
         });
         feedHtml += '</div>';
 
-        content.innerHTML = metricsHtml + feedHtml;
+        content.innerHTML = renderBriefingStatus(status) + metricsHtml + feedHtml;
         content.style.display = 'block';
         loading.style.display = 'none';
 
